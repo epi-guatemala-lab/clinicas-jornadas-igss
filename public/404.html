@@ -1,0 +1,18 @@
+<!doctype html>
+<!--
+  Fallback para SPA en GitHub Pages.
+  Si el usuario refresca en /clinicas-jornadas/jornadas, GH Pages devuelve 404.
+  Este 404.html guarda la ruta solicitada en sessionStorage y redirige al
+  index.html; main.jsx la recupera y hace navigate() preservando deep links.
+-->
+<html>
+  <head><meta charset="utf-8" />
+    <script>
+      sessionStorage.setItem('redirect', location.pathname + location.search + location.hash);
+      var base = (document.querySelector('base') || {}).href ||
+                 location.origin + '/clinicas-jornadas-igss/';
+      location.replace(base);
+    </script>
+  </head>
+  <body>Redirigiendo…</body>
+</html>
