@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react';
 import { apiDashboard } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
 import KPICard from '../components/KPICard';
+import {
+  Serie12MesesChart, TiposJornadaChart, TopEmpresasChart,
+  DistribucionDepartamentoChart, EstadoJornadasChart, CostosMensualesChart,
+} from '../components/Charts';
 import { fmtQ, fmtN, fmtPct, TIPO_LABEL, SEMAFORO_DOT } from '../utils/format';
 
 const ENDPOINT_POR_ROL = {
@@ -33,6 +37,16 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {data.kpis.map((k, i) => <KPICard key={i} kpi={k} />)}
       </div>
+
+      {/* Sección de gráficos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Serie12MesesChart />
+        <DistribucionDepartamentoChart />
+        <TiposJornadaChart />
+        <EstadoJornadasChart />
+      </div>
+      <TopEmpresasChart />
+      <CostosMensualesChart />
 
       {user.rol === 'sipresalud' && data.distribucion_departamento && (
         <div className="card p-4">
