@@ -12,8 +12,11 @@ export default function Layout({ children }) {
     { to: '/calendario', label: 'Calendario', roles: ['admin', 'gerencia', 'ce', 'sipresalud'] },
     { to: '/jornadas', label: 'Jornadas', roles: ['admin', 'gerencia', 'ce', 'sipresalud'] },
     { to: '/empresas', label: 'Empresas', roles: ['admin', 'gerencia', 'ce', 'sipresalud'] },
-    { to: '/viaticos', label: 'Viáticos', roles: ['admin', 'gerencia', 'ce', 'sipresalud'] },
+    // Viáticos: solo gerencia/admin (montos sensibles)
+    { to: '/viaticos', label: 'Viáticos', roles: ['admin', 'gerencia'] },
+    // Personal: solo gerencia/admin (compensaciones cifradas)
     { to: '/personal', label: 'Personal', roles: ['admin', 'gerencia'] },
+    // Metas: solo gerencia/admin (cambios estratégicos)
     { to: '/metas', label: 'Metas', roles: ['admin', 'gerencia'] },
   ];
   const visibles = navLinks.filter((l) => l.roles.includes(user.rol));
