@@ -29,7 +29,7 @@ export default function App() {
             <Route path="/calendario" element={<Protected><Calendario /></Protected>} />
             <Route path="/jornadas" element={<Protected><Jornadas /></Protected>} />
             <Route path="/empresas" element={<Protected><Empresas /></Protected>} />
-            <Route path="/viaticos" element={<Protected roles={['admin','gerencia']}><Viaticos /></Protected>} />
+            <Route path="/viaticos" element={<Protected><Viaticos /></Protected>} />
             <Route path="/personal" element={<Protected roles={['admin','gerencia']}><Personal /></Protected>} />
             <Route path="/metas" element={<Protected roles={['admin','gerencia']}><Metas /></Protected>} />
           </Routes>
