@@ -51,8 +51,13 @@ export default function CalendarMonth({ month, eventos, onEventClick }) {
                   <button key={e.id} onClick={() => onEventClick?.(e)}
                     className={`block w-full text-left text-xs rounded px-1.5 py-1 truncate ${
                       SEMAFORO_BG[e.semaforo] || 'bg-slate-300'
-                    } hover:opacity-90`}
-                    title={`${TIPO_LABEL[e.tipo] || e.tipo} · ${e.empresa || ''}`}>
+                    } hover:opacity-90 ${
+                      e.sin_jornada_asociada ? 'ring-2 ring-red-500 ring-offset-1' : ''
+                    }`}
+                    title={`${TIPO_LABEL[e.tipo] || e.tipo} · ${e.empresa || ''}${
+                      e.sin_jornada_asociada ? ' · ⚠️ SIN jornada asociada' : ''
+                    }`}>
+                    {e.sin_jornada_asociada && <span className="mr-1">⚠️</span>}
                     {e.hora_inicio && <span className="mr-1 opacity-80">{e.hora_inicio.slice(0,5)}</span>}
                     <span className="font-medium">{e.empresa || e.tema || TIPO_LABEL[e.tipo]}</span>
                   </button>
