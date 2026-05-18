@@ -142,9 +142,12 @@ function NuevaJornadaModal({ onClose, onCreated }) {
   });
   const [err, setErr] = useState('');
 
+  const [jornadasSipre, setJornadasSipre] = useState([]);
+
   useEffect(() => {
     apiListEmpresas({ activa: true }).then(setEmpresas);
     apiListPersonal({ activo: true }).then(setPersonal);
+    apiListJornadas({ seccion: 'SIPRESALUD' }).then(setJornadasSipre);
   }, []);
 
   // Personal filtrado por sección de la jornada (admin/gerencia ven todo)
@@ -176,6 +179,7 @@ function NuevaJornadaModal({ onClose, onCreated }) {
         viaticos_presupuesto: Number(form.viaticos_presupuesto) || 0,
         empresa_id: form.empresa_id || null,
         lider_personal_id: form.lider_personal_id || null,
+        inauguracion_jornada_id: form.inauguracion_jornada_id || null,
       });
       onCreated();
     } catch (e) {
@@ -249,6 +253,25 @@ function NuevaJornadaModal({ onClose, onCreated }) {
               <label className="flex items-center gap-2"><input type="checkbox" checked={form.inaugura_clinica}
                 onChange={(e) => setField('inaugura_clinica', e.target.checked)} /> Esta jornada inaugura clínica permanente</label>
             </div>
+
+            {form.tipo === 'INAUGURACION' && (
+              <div className="bg-amber-50 border-l-4 border-amber-400 p-3 rounded">
+                <p className="text-sm text-amber-900 font-medium mb-2">
+                  ⚠️ Las inauguraciones requieren una <b>jornada de tamizaje SIPRESALUD asociada</b>
+                  para llevar equipo médico. Si dejás sin asociar, aparecerá como alerta.
+                </p>
+                <label className="label">Jornada SIPRESALUD asociada</label>
+                <select className="input" value={form.inauguracion_jornada_id || ''}
+                  onChange={(e) => setField('inauguracion_jornada_id', e.target.value ? Number(e.target.value) : null)}>
+                  <option value="">— Sin asociar (generará alerta roja) —</option>
+                  {jornadasSipre.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.codigo} · {j.fecha_inicio} · {(j.empresa_nombre || j.tema || '').slice(0, 35)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div>
               <div className="flex items-center justify-between mb-1">

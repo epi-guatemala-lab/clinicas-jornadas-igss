@@ -12,6 +12,7 @@ export default function Calendario() {
   const [seccion, setSeccion] = useState('TODAS');
   const [eventos, setEventos] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [soloAlertas, setSoloAlertas] = useState(false);
 
   const desde = useMemo(() => format(startOfMonth(month), 'yyyy-MM-dd'), [month]);
   const hasta = useMemo(() => format(endOfMonth(month), 'yyyy-MM-dd'), [month]);
@@ -36,20 +37,37 @@ export default function Calendario() {
         </div>
       </div>
 
-      {user.rol !== 'ce' && (
-        <div className="flex flex-wrap gap-2 text-sm">
-          {['TODAS', 'CE', 'SIPRESALUD'].map((s) => (
-            <button key={s} onClick={() => setSeccion(s)}
-              className={`px-3 py-1.5 rounded-md border ${
-                seccion === s
-                  ? 'bg-igss-primary text-white border-igss-primary'
-                  : 'bg-white border-slate-300 text-slate-700'
-              }`}>{s}</button>
-          ))}
+      <div className="flex flex-wrap gap-2 text-sm items-center">
+        {user.rol !== 'ce' && ['TODAS', 'CE', 'SIPRESALUD'].map((s) => (
+          <button key={s} onClick={() => setSeccion(s)}
+            className={`px-3 py-1.5 rounded-md border ${
+              seccion === s
+                ? 'bg-igss-primary text-white border-igss-primary'
+                : 'bg-white border-slate-300 text-slate-700'
+            }`}>{s}</button>
+        ))}
+        <label className="flex items-center gap-2 ml-2 px-3 py-1.5 rounded-md border cursor-pointer
+                            border-red-300 bg-red-50 text-red-700 hover:bg-red-100">
+          <input type="checkbox" checked={soloAlertas}
+            onChange={(e) => setSoloAlertas(e.target.checked)} />
+          <span>⚠️ Solo alertas (sin jornada asociada)</span>
+        </label>
+      </div>
+
+      <CalendarMonth
+        month={month}
+        eventos={soloAlertas
+          ? eventos.filter((e) => e.sin_jornada_asociada)
+          : eventos}
+        onEventClick={(e) => setSelected(e.id)} />
+
+      {soloAlertas && eventos.filter((e) => e.sin_jornada_asociada).length === 0 && (
+        <div className="card p-4 bg-green-50 border-green-200">
+          <p className="text-green-800">
+            ✓ Sin alertas en {format(month, 'MMMM yyyy')}. Todas las inauguraciones tienen jornada asociada.
+          </p>
         </div>
       )}
-
-      <CalendarMonth month={month} eventos={eventos} onEventClick={(e) => setSelected(e.id)} />
 
       {/* Leyenda */}
       <div className="flex flex-wrap gap-4 text-xs text-slate-600 pt-2">
