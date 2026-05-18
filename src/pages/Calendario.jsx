@@ -73,8 +73,8 @@ export default function Calendario() {
       <div className="flex flex-wrap gap-4 text-xs text-slate-600 pt-2">
         {[
           ['verde', '≥90% asistencia'],
-          ['amarillo', '70-89% / Reprogramada / Cierre pendiente >7 días'],
-          ['rojo', '<70% / Cancelada / Cierre >14 días'],
+          ['amarillo', '80-89% / Reprogramada / Cierre pendiente >7 días'],
+          ['rojo', '<80% / Cancelada / Cierre >14 días'],
           ['azul', 'Inauguración / En curso'],
           ['gris', 'Programada (futura)'],
         ].map(([c, l]) => (
@@ -82,6 +82,10 @@ export default function Calendario() {
             <span className={`inline-block w-3 h-3 rounded ${SEMAFORO_DOT[c]}`} />{l}
           </span>
         ))}
+        <span className="flex items-center gap-1.5 text-red-700 font-medium">
+          <span className="inline-block w-3 h-3 rounded ring-2 ring-red-500 ring-offset-1 bg-blue-500" />
+          ⚠️ Inauguración SIN jornada asociada
+        </span>
       </div>
 
       {selected && (
