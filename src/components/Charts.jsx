@@ -65,22 +65,46 @@ export function Serie12MesesChart() {
   );
 }
 
+const TIPO_DISPLAY = {
+  CE_JORNADA: { label: 'Jornada CE', color: '#0066B3' },
+  SIPRESALUD_JORNADA: { label: 'Jornada SIPRESALUD', color: '#00A99D' },
+  INAUGURACION_CON_JORNADA: { label: '🎉 Inauguración (coordinada)', color: '#22c55e' },
+  INAUGURACION_SIN_JORNADA: { label: '⚠️ Inauguración SIN jornada', color: '#dc2626' },
+  TALLER: { label: 'Taller', color: '#a855f7' },
+  WEBINAR: { label: 'Webinar', color: '#ec4899' },
+  VISITA_SEGUIMIENTO: { label: 'Visita seguimiento', color: '#3b82f6' },
+  INFORME_OFICINA: { label: 'Informe/Oficina', color: '#9ca3af' },
+};
+
 export function TiposJornadaChart() {
   const { data, err } = useChartData('tipos-jornada');
   if (err === '403' || !data || data.length === 0) return null;
-  const fmt = data.map((d) => ({
-    name: d.tipo.replace(/_/g, ' '), value: d.n,
-    atendidos: d.atendidos,
-  }));
+  const fmt = data.map((d) => {
+    const meta = TIPO_DISPLAY[d.tipo] || { label: d.tipo.replace(/_/g, ' '), color: '#9ca3af' };
+    return {
+      name: meta.label, value: d.n,
+      atendidos: d.atendidos,
+      color: meta.color,
+      esAlerta: d.tipo === 'INAUGURACION_SIN_JORNADA',
+    };
+  });
+  const totalAlertas = fmt.filter(f => f.esAlerta).reduce((s,f) => s + f.value, 0);
   return (
-    <ChartCard title="🍩 Distribución por tipo (mes actual)" height={280}>
+    <ChartCard title={`🍩 Distribución por tipo (mes actual)${totalAlertas > 0 ? ` — ⚠️ ${totalAlertas} alertas` : ''}`}
+                height={300}>
       <ResponsiveContainer>
         <PieChart>
           <Pie data={fmt} dataKey="value" nameKey="name"
-                outerRadius={90} innerRadius={45} label={(e) => `${e.value}`}>
-            {fmt.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                outerRadius={95} innerRadius={45}
+                label={(e) => e.esAlerta ? `⚠️ ${e.value}` : `${e.value}`}
+                labelLine={false}>
+            {fmt.map((entry, i) => (
+              <Cell key={i} fill={entry.color}
+                     stroke={entry.esAlerta ? '#7f1d1d' : '#fff'}
+                     strokeWidth={entry.esAlerta ? 3 : 1} />
+            ))}
           </Pie>
-          <Tooltip />
+          <Tooltip formatter={(v, n) => [`${v}`, n]} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
         </PieChart>
       </ResponsiveContainer>
@@ -261,17 +285,28 @@ export function AlertaInauguracionesSinJornada() {
 export function EstadoJornadasChart() {
   const { data, err } = useChartData('estado-jornadas');
   if (err === '403' || !data || data.length === 0) return null;
+  const ALERT_KEY = '⚠️ INAUG SIN JORNADA';
   const fmt = data.map((d) => ({
     name: d.estado, value: d.n,
-    fill: SEMAFORO_COLORS[d.estado] || '#9ca3af',
+    fill: d.estado === ALERT_KEY
+      ? '#dc2626'  // rojo intenso para alerta
+      : (SEMAFORO_COLORS[d.estado] || '#9ca3af'),
+    esAlerta: d.estado === ALERT_KEY,
   }));
+  const totalAlertas = fmt.filter(f => f.esAlerta).reduce((s,f) => s + f.value, 0);
   return (
-    <ChartCard title="🎯 Estado de jornadas (mes actual)" height={260}>
+    <ChartCard title={`🎯 Estado de jornadas (mes actual)${totalAlertas > 0 ? ` — ⚠️ ${totalAlertas} sin jornada` : ''}`}
+                height={280}>
       <ResponsiveContainer>
         <PieChart>
           <Pie data={fmt} dataKey="value" nameKey="name"
-                outerRadius={90} label={(e) => `${e.name}: ${e.value}`}>
-            {fmt.map((e, i) => <Cell key={i} fill={e.fill} />)}
+                outerRadius={95}
+                label={(e) => `${e.name}: ${e.value}`}>
+            {fmt.map((e, i) => (
+              <Cell key={i} fill={e.fill}
+                     stroke={e.esAlerta ? '#7f1d1d' : '#fff'}
+                     strokeWidth={e.esAlerta ? 3 : 1} />
+            ))}
           </Pie>
           <Tooltip />
         </PieChart>

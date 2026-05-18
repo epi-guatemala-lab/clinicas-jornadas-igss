@@ -9,13 +9,13 @@ import {
 } from '../utils/format';
 
 const TIPOS = [
-  ['CE_JORNADA', 'Jornada CE'],
-  ['SIPRESALUD_JORNADA', 'Jornada SIPRESALUD'],
-  ['INAUGURACION', 'Inauguración (+ jornada)'],
-  ['TALLER', 'Taller'],
-  ['WEBINAR', 'Webinar'],
-  ['VISITA_SEGUIMIENTO', 'Visita de seguimiento'],
-  ['INFORME_OFICINA', 'Informe / Oficina'],
+  ['CE_JORNADA', '🏢 Jornada CE'],
+  ['SIPRESALUD_JORNADA', '💉 Jornada SIPRESALUD'],
+  ['INAUGURACION', '🎉 Inauguración (deja clínica permanente)'],
+  ['TALLER', '📚 Taller'],
+  ['WEBINAR', '💻 Webinar'],
+  ['VISITA_SEGUIMIENTO', '🔍 Visita de seguimiento'],
+  ['INFORME_OFICINA', '📝 Informe / Oficina'],
 ];
 
 const ROLES_JOR = ['LIDER', 'MEDICO', 'ADMIN', 'ENFERMERIA', 'LABORATORISTA', 'DIGITADOR', 'ENCUESTADOR'];
@@ -173,13 +173,18 @@ function NuevaJornadaModal({ onClose, onCreated }) {
     e.preventDefault();
     setErr('');
     try {
+      // El backend hace la coherencia tipo↔inaugura_clinica automáticamente
+      // (no enviamos inaugura_clinica desde el form — se determina por tipo)
       await apiCreateJornada({
         ...form,
+        inaugura_clinica: form.tipo === 'INAUGURACION',
         programados: Number(form.programados) || 0,
         viaticos_presupuesto: Number(form.viaticos_presupuesto) || 0,
         empresa_id: form.empresa_id || null,
         lider_personal_id: form.lider_personal_id || null,
-        inauguracion_jornada_id: form.inauguracion_jornada_id || null,
+        inauguracion_jornada_id: form.tipo === 'INAUGURACION'
+          ? (form.inauguracion_jornada_id || null)
+          : null,
       });
       onCreated();
     } catch (e) {
@@ -248,17 +253,24 @@ function NuevaJornadaModal({ onClose, onCreated }) {
                 </select></div>
             </div>
             <div className="flex gap-4 text-sm">
-              <label className="flex items-center gap-2"><input type="checkbox" checked={form.aplica_kit_lab}
-                onChange={(e) => setField('aplica_kit_lab', e.target.checked)} /> Aplica kit de laboratorio</label>
-              <label className="flex items-center gap-2"><input type="checkbox" checked={form.inaugura_clinica}
-                onChange={(e) => setField('inaugura_clinica', e.target.checked)} /> Esta jornada inaugura clínica permanente</label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={form.aplica_kit_lab}
+                  onChange={(e) => setField('aplica_kit_lab', e.target.checked)} />
+                Aplica kit de laboratorio
+              </label>
+              {form.tipo === 'INAUGURACION' && (
+                <span className="text-emerald-700 font-medium flex items-center gap-1">
+                  🎉 Inaugura clínica permanente (automático por tipo)
+                </span>
+              )}
             </div>
 
             {form.tipo === 'INAUGURACION' && (
               <div className="bg-amber-50 border-l-4 border-amber-400 p-3 rounded">
                 <p className="text-sm text-amber-900 font-medium mb-2">
-                  ⚠️ Las inauguraciones requieren una <b>jornada de tamizaje SIPRESALUD asociada</b>
-                  para llevar equipo médico. Si dejás sin asociar, aparecerá como alerta.
+                  ⚠️ Las inauguraciones requieren <b>jornada de tamizaje SIPRESALUD asociada</b>
+                  para llevar equipo médico. Si dejás sin asociar, aparecerá como alerta roja
+                  en dashboard y calendario.
                 </p>
                 <label className="label">Jornada SIPRESALUD asociada</label>
                 <select className="input" value={form.inauguracion_jornada_id || ''}
