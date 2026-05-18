@@ -119,27 +119,142 @@ export function TopEmpresasChart() {
   );
 }
 
+const SEMAFORO_COLOR = {
+  verde: '#22c55e', amarillo: '#eab308', rojo: '#ef4444', gris: '#9ca3af',
+};
+
+function DeptoTooltip({ active, payload }) {
+  if (!active || !payload || !payload.length) return null;
+  const d = payload[0].payload;
+  const semColor = SEMAFORO_COLOR[d.semaforo] || '#9ca3af';
+  return (
+    <div className="bg-white border border-slate-200 rounded shadow-lg p-3 text-sm">
+      <div className="font-bold text-slate-800">{d.depto_full || d.depto}</div>
+      <div className="text-teal-600">Atendidos: <b>{fmtN(d.atendidos)}</b></div>
+      <div className="text-slate-600">Programados: <b>{fmtN(d.programados)}</b></div>
+      <div className="text-slate-600">N° Jornadas: <b>{d.jornadas}</b></div>
+      {d.programados > 0 && (
+        <div className="mt-1 flex items-center gap-2">
+          <span className="inline-block w-2.5 h-2.5 rounded-full"
+                 style={{ background: semColor }} />
+          <span style={{ color: semColor, fontWeight: 600 }}>
+            % asistencia: {d.pct_asistencia}%
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function DistribucionDepartamentoChart() {
   const { data, err } = useChartData('distribucion-departamento');
   if (err === '403' || !data || data.length === 0) return null;
   const fmt = data.slice(0, 15).map((d) => ({
     depto: d.departamento.length > 12 ? d.departamento.slice(0, 11) + '…' : d.departamento,
+    depto_full: d.departamento,
     atendidos: d.atendidos, jornadas: d.n_jornadas,
+    programados: d.programados, pct_asistencia: d.pct_asistencia,
+    semaforo: d.semaforo,
   }));
   return (
-    <ChartCard title="🗺️ Pacientes atendidos por departamento (año)" height={320}>
+    <ChartCard title="🗺️ Pacientes atendidos por departamento (año)"
+                subtitle="Color de barra = semáforo de % asistencia (verde ≥90, amarillo 80-89, rojo <80)"
+                height={340}>
       <ResponsiveContainer>
         <BarChart data={fmt}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis dataKey="depto" fontSize={10} angle={-45} textAnchor="end" height={70} />
           <YAxis fontSize={11} />
-          <Tooltip formatter={(v) => fmtN(v)} />
+          <Tooltip content={<DeptoTooltip />} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
-          <Bar dataKey="atendidos" name="Atendidos" fill="#00A99D" />
-          <Bar dataKey="jornadas" name="N° Jornadas" fill="#0066B3" />
+          <Bar dataKey="atendidos" name="Atendidos">
+            {fmt.map((entry, i) => (
+              <Cell key={i} fill={SEMAFORO_COLOR[entry.semaforo] || '#00A99D'} />
+            ))}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </ChartCard>
+  );
+}
+
+export function ProgresoDiarioMesChart() {
+  const { data, err } = useChartData('serie-diaria-mes');
+  if (err === '403' || !data) return null;
+  const semColor = SEMAFORO_COLOR[data.semaforo] || '#9ca3af';
+  return (
+    <ChartCard
+      title={`📅 Progreso diario del mes (${data.anio}-${String(data.mes).padStart(2,'0')})`}
+      subtitle={
+        data.meta_mes
+          ? `Meta del mes: ${fmtN(data.meta_mes)} · Acumulado: ${fmtN(data.acumulado_atendidos)} · Falta: ${fmtN(data.falta_para_meta)} (${data.pct_meta}%)`
+          : 'Sin meta configurada para este mes'
+      }
+      height={360}
+    >
+      <ResponsiveContainer>
+        <BarChart data={data.serie}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis dataKey="dia" fontSize={11} label={{ value: 'Día del mes', position: 'insideBottom', offset: -4, fontSize: 11 }} />
+          <YAxis fontSize={11} />
+          <Tooltip formatter={(v) => fmtN(v)}
+                    labelFormatter={(d) => `Día ${d}`} />
+          <Legend wrapperStyle={{ fontSize: 11 }} />
+          <Bar dataKey="atendidos" name="Atendidos del día" fill={semColor} />
+          <Line type="monotone" dataKey="acumulado" name="Acumulado"
+                 stroke="#0066B3" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="meta_acumulada" name="Meta acumulada"
+                 stroke="#9ca3af" strokeDasharray="5 5" strokeWidth={2} dot={false} />
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartCard>
+  );
+}
+
+export function AlertaInauguracionesSinJornada() {
+  const { data, err } = useChartData('inauguraciones-estado');
+  if (err === '403' || !data) return null;
+  const sinJor = data.sin_jornada_asociada_programadas;
+  if (sinJor === 0) {
+    return (
+      <div className="card p-4 bg-green-50 border-green-200">
+        <h3 className="font-semibold text-green-900">✓ Inauguraciones coordinadas</h3>
+        <p className="text-sm text-green-700">
+          Todas las {data.con_jornada_asociada} inauguraciones del año tienen
+          jornada de tamizaje asociada.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="card p-4 bg-red-50 border-red-300 border-2">
+      <h3 className="font-bold text-red-900 flex items-center gap-2">
+        ⚠️ Inauguraciones SIN jornada asociada
+        <span className="badge bg-red-600 text-white">{sinJor}</span>
+      </h3>
+      <p className="text-sm text-red-700 mb-2">
+        Toda inauguración requiere coordinación con SIPRESALUD para llevar
+        equipo médico. Las siguientes inauguraciones programadas NO tienen
+        jornada de tamizaje asociada:
+      </p>
+      <ul className="text-sm space-y-1">
+        {data.alertas.slice(0, 10).map((j) => (
+          <li key={j.id} className="bg-white rounded p-2 border border-red-200">
+            <span className="font-mono text-xs text-red-600">{j.codigo}</span>
+            {' · '}
+            <span className="font-medium">{j.empresa_nombre || '(sin empresa)'}</span>
+            {' · '}
+            <span className="text-slate-600">{j.fecha_inicio}</span>
+            {j.departamento && <span className="text-slate-500"> · {j.departamento}</span>}
+          </li>
+        ))}
+      </ul>
+      {data.alertas.length > 10 && (
+        <p className="text-xs text-red-600 mt-1">
+          + {data.alertas.length - 10} más…
+        </p>
+      )}
+    </div>
   );
 }
 

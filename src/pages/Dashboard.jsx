@@ -5,6 +5,7 @@ import KPICard from '../components/KPICard';
 import {
   Serie12MesesChart, TiposJornadaChart, TopEmpresasChart,
   DistribucionDepartamentoChart, EstadoJornadasChart, CostosMensualesChart,
+  ProgresoDiarioMesChart, AlertaInauguracionesSinJornada,
 } from '../components/Charts';
 import { fmtQ, fmtN, fmtPct, TIPO_LABEL, SEMAFORO_DOT } from '../utils/format';
 
@@ -38,7 +39,13 @@ export default function Dashboard() {
         {data.kpis.map((k, i) => <KPICard key={i} kpi={k} />)}
       </div>
 
-      {/* Sección de gráficos */}
+      {/* Alerta de inauguraciones sin jornada (siempre arriba si hay problema) */}
+      <AlertaInauguracionesSinJornada />
+
+      {/* Progreso diario del mes (reemplaza tendencia 12 meses como vista principal) */}
+      <ProgresoDiarioMesChart />
+
+      {/* Grid de gráficos secundarios */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Serie12MesesChart />
         <DistribucionDepartamentoChart />
