@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Animación pulse para alertas críticas (inauguraciones sin jornada) */
+@keyframes jornada-alerta-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7), 0 4px 6px -1px rgb(220 38 38 / 0.3);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(220, 38, 38, 0), 0 4px 6px -1px rgb(220 38 38 / 0.5);
+    transform: scale(1.02);
+  }
+}
+.jornada-alerta-pulse {
+  animation: jornada-alerta-pulse 2s ease-in-out infinite;
+}
+
 @layer components {
   .btn {
     @apply px-3 py-2 rounded-md font-medium text-sm transition-colors;

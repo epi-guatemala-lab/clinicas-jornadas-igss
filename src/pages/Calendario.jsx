@@ -82,9 +82,9 @@ export default function Calendario() {
             <span className={`inline-block w-3 h-3 rounded ${SEMAFORO_DOT[c]}`} />{l}
           </span>
         ))}
-        <span className="flex items-center gap-1.5 text-red-700 font-medium">
-          <span className="inline-block w-3 h-3 rounded ring-2 ring-red-500 ring-offset-1 bg-blue-500" />
-          ⚠️ Inauguración SIN jornada asociada
+        <span className="flex items-center gap-1.5 text-red-700 font-bold">
+          <span className="inline-block w-4 h-4 rounded ring-2 ring-red-500 bg-red-600 jornada-alerta-pulse" />
+          🚨 INAUGURACIÓN SIN JORNADA (crítico — coordinar con SIPRESALUD)
         </span>
       </div>
 
