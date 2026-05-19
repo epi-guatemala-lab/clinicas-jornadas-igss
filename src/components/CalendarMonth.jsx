@@ -50,16 +50,18 @@ export default function CalendarMonth({ month, eventos, onEventClick }) {
                 {events.map((e) => (
                   <button key={e.id} onClick={() => onEventClick?.(e)}
                     className={`block w-full text-left text-xs rounded px-1.5 py-1 truncate ${
-                      SEMAFORO_BG[e.semaforo] || 'bg-slate-300'
-                    } hover:opacity-90 ${
-                      e.sin_jornada_asociada ? 'ring-2 ring-red-500 ring-offset-1' : ''
+                      e.sin_jornada_asociada
+                        ? 'bg-red-600 text-white font-bold ring-4 ring-red-400 ring-offset-1 shadow-lg shadow-red-300 jornada-alerta-pulse'
+                        : (SEMAFORO_BG[e.semaforo] || 'bg-slate-300') + ' hover:opacity-90'
                     }`}
                     title={`${TIPO_LABEL[e.tipo] || e.tipo} · ${e.empresa || ''}${
-                      e.sin_jornada_asociada ? ' · ⚠️ SIN jornada asociada' : ''
+                      e.sin_jornada_asociada ? ' · ⚠️ INAUGURACIÓN SIN JORNADA ASOCIADA — coordinar con SIPRESALUD' : ''
                     }`}>
-                    {e.sin_jornada_asociada && <span className="mr-1">⚠️</span>}
+                    {e.sin_jornada_asociada && <span className="mr-1 text-base">🚨</span>}
                     {e.hora_inicio && <span className="mr-1 opacity-80">{e.hora_inicio.slice(0,5)}</span>}
-                    <span className="font-medium">{e.empresa || e.tema || TIPO_LABEL[e.tipo]}</span>
+                    <span className={e.sin_jornada_asociada ? 'uppercase tracking-wide' : 'font-medium'}>
+                      {e.empresa || e.tema || TIPO_LABEL[e.tipo]}
+                    </span>
                   </button>
                 ))}
               </div>
