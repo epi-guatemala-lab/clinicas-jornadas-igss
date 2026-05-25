@@ -56,7 +56,7 @@ export function Serie12MesesChart() {
     <MiniChartCard
       title="Tendencia últimos 12 meses"
       subtitle="Pacientes atendidos vs programados"
-      height={300}
+      height={260}
       loading={loading}
       error={err && err !== '403' ? err : null}
       empty={!loading && (!data || data.length === 0)}
@@ -99,9 +99,10 @@ export function TiposJornadaChart() {
   const totalAlertas = fmt.filter((f) => f.esAlerta).reduce((s, f) => s + f.value, 0);
   return (
     <MiniChartCard
-      title={`Distribución por tipo${totalAlertas > 0 ? ` · ${totalAlertas} alertas` : ''}`}
+      title={`Tipos${totalAlertas > 0 ? ` · ${totalAlertas} ⚠` : ''}`}
       subtitle="Mes en curso"
-      height={280}
+      className="h-full"
+      density="compact"
       loading={loading}
       error={err && err !== '403' ? err : null}
       empty={!loading && fmt.length === 0}
@@ -142,9 +143,10 @@ export function TopEmpresasChart({ limit = 10 }) {
   }));
   return (
     <MiniChartCard
-      title="Top empresas por pacientes atendidos"
-      subtitle="Año en curso · verde = Clínica + Jornada activa"
-      height={Math.max(260, 38 * fmt.length + 60)}
+      title="Top 5 empresas"
+      subtitle="Año en curso · verde = Clínica + Jornada"
+      className="h-full"
+      density="compact"
       loading={loading}
       error={err && err !== '403' ? err : null}
       empty={!loading && fmt.length === 0}
@@ -215,9 +217,10 @@ export function DistribucionDepartamentoChart() {
   }));
   return (
     <MiniChartCard
-      title="Atendidos por departamento (año)"
-      subtitle="Color = % asistencia · verde ≥90 · naranja <80"
-      height={300}
+      title="Atendidos por departamento"
+      subtitle="Año en curso · verde ≥90 · naranja <80"
+      className="h-full"
+      density="compact"
       loading={loading}
       error={err && err !== '403' ? err : null}
       empty={!loading && fmt.length === 0}
@@ -265,7 +268,9 @@ export function ProgresoDiarioMesChart({ compact = false }) {
           ? `Meta: ${fmtN(data.meta_mes)} · Acumulado: ${fmtN(data.acumulado_atendidos)} · ${data.pct_meta}% · Falta: ${fmtN(data.falta_para_meta)}`
           : 'Sin meta configurada'
       }
-      height={compact ? 260 : 320}
+      className={compact ? 'h-full' : ''}
+      density={compact ? 'compact' : 'comfortable'}
+      height={compact ? undefined : 320}
       loading={loading}
       error={err && err !== '403' ? err : null}
       empty={!loading && !data}
@@ -331,9 +336,10 @@ export function EstadoJornadasChart() {
   const totalAlertas = fmt.filter((f) => f.esAlerta).reduce((s, f) => s + f.value, 0);
   return (
     <MiniChartCard
-      title={`Estado de jornadas${totalAlertas > 0 ? ` · ${totalAlertas} sin jornada` : ''}`}
+      title={`Estado de jornadas${totalAlertas > 0 ? ` · ${totalAlertas} ⚠` : ''}`}
       subtitle="Mes en curso"
-      height={280}
+      className="h-full"
+      density="compact"
       loading={loading}
       error={err && err !== '403' ? err : null}
       empty={!loading && fmt.length === 0}
@@ -370,7 +376,7 @@ export function CostosMensualesChart() {
     <MiniChartCard
       title="Costos mensuales · kit + personal + viáticos"
       subtitle="Solo visible para gerencia y admin"
-      height={300}
+      height={260}
       loading={loading}
       error={err && err !== '403' ? err : null}
       empty={!loading && (!data || data.length === 0)}
