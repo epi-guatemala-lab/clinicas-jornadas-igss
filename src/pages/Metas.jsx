@@ -39,7 +39,7 @@ export default function Metas() {
           <tbody>
             {list.map((m) => {
               const pct = m.valor_meta ? (100 * (m.valor_logrado || 0) / m.valor_meta) : 0;
-              const color = pct >= 90 ? 'verde' : pct >= 70 ? 'amarillo' : 'rojo';
+              const color = pct >= 90 ? 'verde' : pct >= 80 ? 'amarillo' : 'rojo';
               return (
                 <tr key={m.id} className="border-t">
                   <td className="p-2">{m.anio}{m.mes ? `-${String(m.mes).padStart(2,'0')}` : ''}</td>

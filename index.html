@@ -7,9 +7,20 @@
     <title>Clínicas de Empresa & SIPRESALUD — IGSS</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <!-- Anti-flash: aplica .dark ANTES de React render según localStorage o prefers-color-scheme -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('igss_theme'); // 'light' | 'dark' | 'system' | null
+          var sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var isDark = stored === 'dark' || ((stored === 'system' || !stored) && sysDark);
+          if (isDark) document.documentElement.classList.add('dark');
+        } catch (_) {}
+      })();
+    </script>
   </head>
-  <body class="bg-slate-50 text-slate-900 antialiased">
+  <body class="bg-canvas text-fg antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
