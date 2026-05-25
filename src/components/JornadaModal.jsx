@@ -24,7 +24,7 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
   }, [jornadaId]);
 
   if (!j) return (
-    <Modal onClose={onClose}><div className="p-6 text-slate-500">Cargando…</div></Modal>
+    <Modal onClose={onClose}><div className="p-6 text-fg-muted">Cargando…</div></Modal>
   );
 
   const puedeEditar = !['CERRADA', 'CANCELADA'].includes(j.estado);
@@ -54,13 +54,13 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
 
   return (
     <Modal onClose={onClose}>
-      <div className="border-b p-4 flex items-center justify-between">
+      <div className="border-b border-line-subtle p-4 flex items-center justify-between">
         <div>
-          <div className="text-xs text-slate-500">{j.codigo}</div>
+          <div className="text-xs text-fg-muted">{j.codigo}</div>
           <h2 className="text-xl font-bold">{TIPO_LABEL[j.tipo] || j.tipo}</h2>
-          <div className="text-sm text-slate-600">{j.empresa_nombre} · {j.tema}</div>
+          <div className="text-sm text-fg-muted">{j.empresa_nombre} · {j.tema}</div>
         </div>
-        <span className={`badge ${SEMAFORO_BG[j.semaforo] || 'bg-slate-300'}`}>
+        <span className={`badge ${SEMAFORO_BG[j.semaforo] || 'bg-neutral'}`}>
           {ESTADO_LABEL[j.estado] || j.estado}
         </span>
       </div>
@@ -78,17 +78,17 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
           {j.afiliados_atendidos != null && <Field label="Afiliados atendidos">{fmtN(j.afiliados_atendidos)}</Field>}
           {j.kits_consumidos != null && <Field label="Kits consumidos">{fmtN(j.kits_consumidos)}</Field>}
           {j.viaticos_real != null && <Field label="Viáticos reales">{fmtQ(j.viaticos_real)}</Field>}
-          {j.inaugura_clinica && <Field label="Inaugura clínica" className="col-span-2 text-igss-primary font-medium">✓ Esta jornada inaugura una clínica permanente</Field>}
+          {j.inaugura_clinica && <Field label="Inaugura clínica" className="col-span-2 text-accent font-medium">✓ Esta jornada inaugura una clínica permanente</Field>}
         </div>
 
         {j.personal?.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold text-slate-700 mb-1">Personal asignado ({j.personal.length})</h3>
+            <h3 className="text-sm font-semibold text-fg mb-1">Personal asignado ({j.personal.length})</h3>
             <ul className="text-sm space-y-1">
               {j.personal.map((p) => (
                 <li key={p.id} className="flex justify-between border-b py-1">
-                  <span>{p.personal_nombre} — <span className="text-slate-500">{p.rol_jornada}</span></span>
-                  <span className="text-slate-500">{p.dias_asignados}d</span>
+                  <span>{p.personal_nombre} — <span className="text-fg-muted">{p.rol_jornada}</span></span>
+                  <span className="text-fg-muted">{p.dias_asignados}d</span>
                 </li>
               ))}
             </ul>
@@ -96,15 +96,15 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
         )}
 
         {j.estado === 'CANCELADA' && (
-          <div className="bg-red-50 border border-red-200 rounded p-3 text-sm">
-            <div className="font-semibold text-red-800">Cancelada · {j.justificacion_categoria}</div>
-            <div className="text-red-700 mt-1">{j.justificacion_texto}</div>
+          <div className="bg-danger-soft border border-danger/30 rounded p-3 text-sm">
+            <div className="font-semibold text-danger">Cancelada · {j.justificacion_categoria}</div>
+            <div className="text-danger mt-1">{j.justificacion_texto}</div>
           </div>
         )}
 
         {mode === 'cancel' && (
-          <div className="bg-red-50 border border-red-200 rounded p-3 space-y-2">
-            <h4 className="font-semibold text-red-800">Cancelar jornada</h4>
+          <div className="bg-danger-soft border border-danger/30 rounded p-3 space-y-2">
+            <h4 className="font-semibold text-danger">Cancelar jornada</h4>
             <select className="input" value={form.justificacion_categoria || ''}
               onChange={(e) => setForm({ ...form, justificacion_categoria: e.target.value })}>
               <option value="">— Seleccionar razón —</option>
@@ -121,8 +121,8 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
         )}
 
         {mode === 'close' && (
-          <div className="bg-green-50 border border-green-200 rounded p-3 space-y-2">
-            <h4 className="font-semibold text-green-800">Cerrar jornada con métricas</h4>
+          <div className="bg-success-soft border border-success/30 rounded p-3 space-y-2">
+            <h4 className="font-semibold text-success">Cerrar jornada con métricas</h4>
             <div className="grid grid-cols-2 gap-2">
               <div><label className="label">Atendidos *</label>
                 <input type="number" className="input" min="0"
@@ -160,7 +160,7 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
       </div>
 
       {mode === 'view' && (
-        <div className="border-t p-4 flex justify-between bg-slate-50">
+        <div className="border-t border-line-subtle p-4 flex justify-between bg-surface-elev">
           <button className="btn-secondary" onClick={onClose}>Cerrar</button>
           {puedeEditar && (
             <div className="flex gap-2">
@@ -176,9 +176,9 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
 
 function Modal({ onClose, children }) {
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
          onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+      <div className="bg-surface rounded-2xl shadow-2xl border border-line max-w-2xl w-full max-h-[90vh] overflow-y-auto dark:shadow-glow-accent"
            onClick={(e) => e.stopPropagation()}>
         {children}
       </div>
@@ -189,7 +189,7 @@ function Modal({ onClose, children }) {
 function Field({ label, children, className = '' }) {
   return (
     <div className={className}>
-      <div className="text-xs uppercase text-slate-500 tracking-wide">{label}</div>
+      <div className="text-xs uppercase text-fg-muted tracking-wide">{label}</div>
       <div className="font-medium">{children}</div>
     </div>
   );

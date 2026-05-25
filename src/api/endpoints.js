@@ -77,6 +77,16 @@ export const apiListMetas = (params = {}) =>
 export const apiCreateMeta = (body) =>
   api.post('/api/metas', body).then((r) => r.data);
 
+export const apiMetasPorEmpresa = (params = {}) =>
+  api.get('/api/metas/empresas', { params }).then((r) => r.data);
+
 // ── Dashboards ──────────────────────────────────────────────────────
 export const apiDashboard = (rol, params = {}) =>
   api.get(`/api/dashboard/${rol}`, { params }).then((r) => r.data);
+
+// ── Charts ──────────────────────────────────────────────────────────
+export const apiAlertasUnificadas = (params = {}) =>
+  api.get('/api/charts/alertas-unificadas', { params }).then((r) => r.data);
+
+export const apiSerieDiariaMes = (params = {}) =>
+  api.get('/api/charts/serie-diaria-mes', { params }).then((r) => r.data);
