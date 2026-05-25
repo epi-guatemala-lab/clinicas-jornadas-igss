@@ -57,6 +57,15 @@ export default function Dashboard() {
       .catch((e) => setErr(e.response?.data?.detail || 'Error cargando dashboard'));
   }, [user.rol]);
 
+  // IMPORTANTE: TODOS los hooks deben llamarse en el mismo orden cada render.
+  // No mover useMemo después de early returns — React #310.
+  const alertItems = alertas?.alertas || [];
+  const sortedAlertas = useMemo(
+    () => [...alertItems].sort((a, b) => severityOf(a) - severityOf(b)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [alertas],
+  );
+
   if (err) return <ErrorState message={err} />;
   if (!data) {
     return (
@@ -71,11 +80,6 @@ export default function Dashboard() {
   }
 
   const kpi = derivarKpis(data, serieDiaria);
-  const alertItems = alertas?.alertas || [];
-  const sortedAlertas = useMemo(
-    () => [...alertItems].sort((a, b) => severityOf(a) - severityOf(b)),
-    [alertItems],
-  );
   const proximas = (data.proximas_jornadas || []).slice(0, 5);
 
   return (
