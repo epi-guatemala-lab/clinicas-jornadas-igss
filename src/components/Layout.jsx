@@ -26,7 +26,7 @@ export default function Layout({ children }) {
     <div className="min-h-screen bg-canvas text-fg flex flex-col">
       {/* Header */}
       <header className="bg-igss-primary text-white shadow">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-[1800px] mx-auto px-4 py-2.5 flex items-center justify-between">
           <Link to="/dashboard" className="flex items-center gap-3">
             <img src={`${import.meta.env.BASE_URL}logo_igss.png`}
                   alt="IGSS" className="h-10 w-10 bg-white rounded-full p-0.5"
@@ -52,7 +52,7 @@ export default function Layout({ children }) {
         </div>
         {/* Nav */}
         <nav className="bg-igss-dark">
-          <div className="max-w-7xl mx-auto px-4 flex gap-1 overflow-x-auto">
+          <div className="max-w-[1800px] mx-auto px-4 flex gap-1 overflow-x-auto">
             {visibles.map((l) => (
               <NavLink key={l.to} to={l.to}
                 className={({ isActive }) =>
@@ -66,7 +66,7 @@ export default function Layout({ children }) {
         </nav>
       </header>
 
-      <main className="flex-1 max-w-7xl mx-auto w-full p-4 lg:p-6">
+      <main className="flex-1 mx-auto w-full p-3 lg:p-4 xl:p-5 max-w-[1800px]">
         {children}
       </main>
 

@@ -28,6 +28,7 @@ export default function StatCard({
   onClick,
   className = '',
   icon,
+  compact = false,            // modo denso para grids single-view
 }) {
   const t = useThemedColors();
   const numeric = typeof value === 'number' ? value : Number(value) || 0;
@@ -51,12 +52,17 @@ export default function StatCard({
   };
   const accentColor = toneToColor[tone] || t.accent.primary;
 
+  const padCls = compact ? 'p-3' : 'p-4';
+  const gapCls = compact ? 'gap-2' : 'gap-3';
+  const numFs = compact ? 'clamp(24px, 3vw, 36px)' : 'clamp(28px, 4vw, 44px)';
+  const headerMb = compact ? 'mb-1.5' : 'mb-2';
+
   return (
     <div
       onClick={onClick}
-      className={`group relative rounded-2xl border border-line bg-surface p-4 shadow-sm
+      className={`group relative rounded-2xl border border-line bg-surface ${padCls} shadow-sm
                   hover:shadow-md hover:-translate-y-0.5 transition-all duration-200
-                  dark:hover:shadow-glow-accent-lg
+                  dark:hover:shadow-glow-accent-lg flex flex-col h-full
                   ${onClick ? 'cursor-pointer' : ''} ${className}`}
       style={{ overflow: 'hidden' }}
     >
@@ -67,27 +73,27 @@ export default function StatCard({
         style={{ background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)` }}
       />
 
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-fg-muted font-semibold">
+      <div className={`flex items-center justify-between ${headerMb}`}>
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-fg-muted font-semibold truncate">
           {icon}
-          <span>{label}</span>
+          <span className="truncate">{label}</span>
         </div>
         {delta != null && delta.value != null && (
           <DeltaBadge delta={delta} t={t} />
         )}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className={`flex items-center ${gapCls} flex-1 min-h-0`}>
         <div className="flex-1 min-w-0">
           <div
             className="font-extrabold leading-none tabular-nums truncate"
-            style={{ fontSize: 'clamp(28px, 4vw, 44px)', color: accentColor }}
+            style={{ fontSize: numFs, color: accentColor }}
           >
             {formatVal(animated)}
-            {unit && <span className="text-base font-semibold opacity-70 ml-1">{unit}</span>}
+            {unit && <span className={`${compact ? 'text-sm' : 'text-base'} font-semibold opacity-70 ml-1`}>{unit}</span>}
           </div>
           {subLabel && (
-            <div className="mt-1 text-[11px] text-fg-muted truncate">{subLabel}</div>
+            <div className={`mt-1 ${compact ? 'text-[10px]' : 'text-[11px]'} text-fg-muted truncate`}>{subLabel}</div>
           )}
         </div>
 
