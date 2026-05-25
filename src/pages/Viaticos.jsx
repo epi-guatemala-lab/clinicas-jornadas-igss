@@ -6,10 +6,10 @@ import { fmtQ } from '../utils/format';
 
 const STATUS = ['PENDIENTE', 'UTILIZADO', 'ANULADO', 'EXTRAVIADO'];
 const STATUS_BG = {
-  PENDIENTE: 'bg-slate-100 text-slate-700',
-  UTILIZADO: 'bg-emerald-100 text-emerald-700',
-  ANULADO: 'bg-amber-100 text-amber-700',
-  EXTRAVIADO: 'bg-red-100 text-red-700',
+  PENDIENTE: 'bg-neutral-soft text-fg-muted',
+  UTILIZADO: 'bg-success-soft text-success',
+  ANULADO: 'bg-warning-soft text-warning',
+  EXTRAVIADO: 'bg-danger-soft text-danger',
 };
 
 export default function Viaticos() {
@@ -33,14 +33,14 @@ export default function Viaticos() {
         {['', ...STATUS].map((s) => (
           <button key={s||'all'} onClick={()=>setFilter({ status: s })}
             className={`px-3 py-1.5 rounded border text-sm ${filter.status === s
-              ? 'bg-igss-primary text-white border-igss-primary' : 'bg-white border-slate-300'}`}>
+              ? 'bg-accent text-white border-accent' : 'bg-surface border-line'}`}>
             {s || 'Todos'}
           </button>
         ))}
       </div>
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-600">
+          <thead className="bg-surface-elev text-xs uppercase text-fg-muted">
             <tr>
               <th className="text-left p-2">#</th>
               <th className="text-left p-2">Mes</th>
@@ -57,13 +57,13 @@ export default function Viaticos() {
                 <td className="p-2 font-mono">{v.correlativo}</td>
                 <td className="p-2">{v.mes_anio}</td>
                 <td className="p-2">{v.personal_nombre || '—'}</td>
-                <td className="p-2 text-xs">{v.nombramiento} {v.fecha_nombramiento && <span className="text-slate-500">({v.fecha_nombramiento})</span>}</td>
+                <td className="p-2 text-xs">{v.nombramiento} {v.fecha_nombramiento && <span className="text-fg-muted">({v.fecha_nombramiento})</span>}</td>
                 <td className="p-2 text-right font-mono">{fmtQ(v.monto)}</td>
                 <td className="p-2"><span className={`badge ${STATUS_BG[v.status]}`}>{v.status}</span></td>
                 <td className="p-2 text-xs">{v.jornada_id ? `#${v.jornada_id}` : '—'}</td>
               </tr>
             ))}
-            {list.length === 0 && <tr><td colSpan="7" className="p-6 text-center text-slate-400">Sin viáticos</td></tr>}
+            {list.length === 0 && <tr><td colSpan="7" className="p-6 text-center text-fg-subtle">Sin viáticos</td></tr>}
           </tbody>
         </table>
       </div>
@@ -108,10 +108,10 @@ function NuevoViatico({ onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <form className="bg-white rounded-xl shadow-xl max-w-xl w-full" onClick={(e)=>e.stopPropagation()} onSubmit={submit}>
-        <div className="border-b p-4"><h2 className="text-xl font-bold">Nuevo viático</h2>
-          {next && <div className="text-xs text-slate-500 mt-0.5">Siguiente correlativo automático: <b>{next}</b> (podés cambiarlo)</div>}
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <form className="bg-surface rounded-2xl shadow-2xl max-w-xl w-full border border-line dark:shadow-glow-accent" onClick={(e)=>e.stopPropagation()} onSubmit={submit}>
+        <div className="border-b border-line-subtle p-4"><h2 className="text-xl font-bold">Nuevo viático</h2>
+          {next && <div className="text-xs text-fg-muted mt-0.5">Siguiente correlativo automático: <b>{next}</b> (podés cambiarlo)</div>}
         </div>
         <div className="p-4 grid grid-cols-2 gap-3">
           <div><label className="label">Correlativo</label>
@@ -139,9 +139,9 @@ function NuevoViatico({ onClose, onSaved }) {
             <select className="input" value={form.status} onChange={(e)=>set('status', e.target.value)}>
               {STATUS.map((s)=><option key={s} value={s}>{s}</option>)}
             </select></div>
-          {err && <div className="col-span-2 bg-red-50 text-red-700 p-2 rounded text-sm">{err}</div>}
+          {err && <div className="col-span-2 bg-danger-soft text-danger p-2 rounded text-sm">{err}</div>}
         </div>
-        <div className="border-t p-3 flex justify-end gap-2 bg-slate-50">
+        <div className="border-t p-3 flex justify-end gap-2 bg-surface-elev">
           <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
           <button type="submit" className="btn-primary">Crear viático</button>
         </div>

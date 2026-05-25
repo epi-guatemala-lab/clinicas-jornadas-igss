@@ -26,7 +26,7 @@ export default function Personal() {
         {['', 'CE', 'SIPRESALUD'].map((s) => (
           <button key={s||'all'} onClick={()=>setFilter({ seccion: s })}
             className={`px-3 py-1.5 rounded border ${filter.seccion === s
-              ? 'bg-igss-primary text-white border-igss-primary' : 'bg-white border-slate-300'}`}>
+              ? 'bg-accent text-white border-accent' : 'bg-surface border-line'}`}>
             {s || 'Todas'}
           </button>
         ))}
@@ -34,7 +34,7 @@ export default function Personal() {
 
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-600">
+          <thead className="bg-surface-elev text-xs uppercase text-fg-muted">
             <tr>
               <th className="text-left p-2">Nombre</th>
               <th className="text-left p-2">Sección</th>
@@ -47,12 +47,12 @@ export default function Personal() {
           <tbody>
             {list.map((p) => (
               <tr key={p.id} className="border-t">
-                <td className="p-2 font-medium">{p.nombre_completo}<div className="text-xs text-slate-500">NIT: {p.nit || '—'}</div></td>
+                <td className="p-2 font-medium">{p.nombre_completo}<div className="text-xs text-fg-muted">NIT: {p.nit || '—'}</div></td>
                 <td className="p-2">{p.seccion}</td>
                 <td className="p-2">{p.rol_default}</td>
-                <td className="p-2">{p.renglon} {p.ibm && <span className="text-slate-500 text-xs">({p.ibm})</span>}</td>
+                <td className="p-2">{p.renglon} {p.ibm && <span className="text-fg-muted text-xs">({p.ibm})</span>}</td>
                 <td className="p-2 text-right font-mono">{fmtQ(p.compensacion)}</td>
-                <td className="p-2"><button className="text-igss-primary text-xs hover:underline" onClick={()=>setEditing(p)}>Editar</button></td>
+                <td className="p-2"><button className="text-accent text-xs hover:underline" onClick={()=>setEditing(p)}>Editar</button></td>
               </tr>
             ))}
           </tbody>
@@ -82,9 +82,9 @@ function PersonalForm({ initial, onClose, onSave }) {
     } catch (e) { setErr(e.response?.data?.detail || 'Error'); }
   }
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <form className="bg-white rounded-xl shadow-xl max-w-xl w-full" onClick={(e)=>e.stopPropagation()} onSubmit={submit}>
-        <div className="border-b p-4"><h2 className="text-xl font-bold">{initial ? 'Editar persona' : 'Nueva persona'}</h2></div>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <form className="bg-surface rounded-2xl shadow-2xl max-w-xl w-full border border-line dark:shadow-glow-accent" onClick={(e)=>e.stopPropagation()} onSubmit={submit}>
+        <div className="border-b border-line-subtle p-4"><h2 className="text-xl font-bold">{initial ? 'Editar persona' : 'Nueva persona'}</h2></div>
         <div className="p-4 grid grid-cols-2 gap-3">
           <div className="col-span-2"><label className="label">Nombre completo *</label>
             <input className="input" value={form.nombre_completo} onChange={(e)=>set('nombre_completo', e.target.value)} required /></div>
@@ -110,9 +110,9 @@ function PersonalForm({ initial, onClose, onSave }) {
             <input className="input" type="email" value={form.email || ''} onChange={(e)=>set('email', e.target.value)} /></div>
           <div><label className="label">Teléfono</label>
             <input className="input" value={form.telefono || ''} onChange={(e)=>set('telefono', e.target.value)} /></div>
-          {err && <div className="col-span-2 bg-red-50 text-red-700 p-2 rounded text-sm">{err}</div>}
+          {err && <div className="col-span-2 bg-danger-soft text-danger p-2 rounded text-sm">{err}</div>}
         </div>
-        <div className="border-t p-3 flex justify-end gap-2 bg-slate-50">
+        <div className="border-t border-line-subtle p-3 flex justify-end gap-2 bg-surface-elev">
           <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
           <button type="submit" className="btn-primary">{initial ? 'Guardar' : 'Crear'}</button>
         </div>

@@ -4,6 +4,8 @@ import { apiCalendario } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
 import CalendarMonth from '../components/CalendarMonth';
 import JornadaModal from '../components/JornadaModal';
+import SeccionSwitch from '../components/filters/SeccionSwitch';
+import FilterChip from '../components/filters/FilterChip';
 import { SEMAFORO_DOT } from '../utils/format';
 
 export default function Calendario() {
@@ -21,69 +23,72 @@ export default function Calendario() {
     apiCalendario(desde, hasta, seccion).then((d) => setEventos(d.eventos || []));
   }, [desde, hasta, seccion]);
 
+  const filteredEventos = soloAlertas
+    ? eventos.filter((e) => e.sin_jornada_asociada || e.estado === 'CANCELADA')
+    : eventos;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-xl font-bold text-fg">
             {format(month, 'MMMM yyyy').replace(/^\w/, c => c.toUpperCase())}
           </h1>
-          <p className="text-sm text-slate-500">{eventos.length} eventos en el mes</p>
+          <p className="text-xs text-fg-muted">{eventos.length} eventos en el mes</p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="btn-secondary" onClick={() => setMonth(addMonths(month, -1))}>← Mes anterior</button>
-          <button className="btn-secondary" onClick={() => setMonth(startOfMonth(new Date()))}>Hoy</button>
-          <button className="btn-secondary" onClick={() => setMonth(addMonths(month, 1))}>Mes siguiente →</button>
+          <button onClick={() => setMonth(addMonths(month, -1))}
+                  className="btn-secondary">← Mes anterior</button>
+          <button onClick={() => setMonth(startOfMonth(new Date()))}
+                  className="btn-secondary">Hoy</button>
+          <button onClick={() => setMonth(addMonths(month, 1))}
+                  className="btn-secondary">Mes siguiente →</button>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 text-sm items-center">
-        {user.rol !== 'ce' && ['TODAS', 'CE', 'SIPRESALUD'].map((s) => (
-          <button key={s} onClick={() => setSeccion(s)}
-            className={`px-3 py-1.5 rounded-md border ${
-              seccion === s
-                ? 'bg-igss-primary text-white border-igss-primary'
-                : 'bg-white border-slate-300 text-slate-700'
-            }`}>{s}</button>
-        ))}
-        <label className="flex items-center gap-2 ml-2 px-3 py-1.5 rounded-md border cursor-pointer
-                            border-red-300 bg-red-50 text-red-700 hover:bg-red-100">
-          <input type="checkbox" checked={soloAlertas}
-            onChange={(e) => setSoloAlertas(e.target.checked)} />
-          <span>⚠️ Solo alertas (sin jornada asociada)</span>
-        </label>
+      <div className="flex flex-wrap gap-2 items-center">
+        {user.rol !== 'ce' && (
+          <SeccionSwitch
+            value={seccion === 'TODAS' ? '' : seccion}
+            onChange={(v) => setSeccion(v || 'TODAS')}
+            includeAll
+          />
+        )}
+        <FilterChip
+          active={soloAlertas}
+          onClick={() => setSoloAlertas(!soloAlertas)}
+        >
+          ⚠️ Solo alertas
+        </FilterChip>
       </div>
 
       <CalendarMonth
         month={month}
-        eventos={soloAlertas
-          ? eventos.filter((e) => e.sin_jornada_asociada)
-          : eventos}
+        eventos={filteredEventos}
         onEventClick={(e) => setSelected(e.id)} />
 
-      {soloAlertas && eventos.filter((e) => e.sin_jornada_asociada).length === 0 && (
-        <div className="card p-4 bg-green-50 border-green-200">
-          <p className="text-green-800">
-            ✓ Sin alertas en {format(month, 'MMMM yyyy')}. Todas las inauguraciones tienen jornada asociada.
-          </p>
+      {soloAlertas && filteredEventos.length === 0 && (
+        <div className="rounded-2xl border border-success/40 bg-success-soft/40 px-4 py-2.5 text-sm text-success font-medium">
+          ✓ Sin alertas en {format(month, 'MMMM yyyy')}.
         </div>
       )}
 
-      {/* Leyenda */}
-      <div className="flex flex-wrap gap-4 text-xs text-slate-600 pt-2">
+      {/* Leyenda actualizada — NARANJA separado de ROJO */}
+      <div className="flex flex-wrap gap-3 text-[11px] text-fg-muted pt-2">
         {[
           ['verde', '≥90% asistencia'],
           ['amarillo', '80-89% / Reprogramada / Cierre pendiente >7 días'],
-          ['rojo', '<80% / Cancelada / Cierre >14 días'],
-          ['azul', 'Inauguración / En curso'],
+          ['naranja', '<80% asistencia / Cierre tardío >14 días'],
+          ['rojo', 'CANCELADA (crítica)'],
+          ['azul', 'En curso ahora · Inauguración'],
           ['gris', 'Programada (futura)'],
         ].map(([c, l]) => (
           <span key={c} className="flex items-center gap-1.5">
             <span className={`inline-block w-3 h-3 rounded ${SEMAFORO_DOT[c]}`} />{l}
           </span>
         ))}
-        <span className="flex items-center gap-1.5 text-red-700 font-bold">
-          <span className="inline-block w-4 h-4 rounded ring-2 ring-red-500 bg-red-600 jornada-alerta-pulse" />
+        <span className="flex items-center gap-1.5 text-danger font-bold w-full">
+          <span className="inline-block w-4 h-4 rounded ring-2 ring-danger/60 bg-danger jornada-alerta-pulse" />
           🚨 INAUGURACIÓN SIN JORNADA (crítico — coordinar con SIPRESALUD)
         </span>
       </div>

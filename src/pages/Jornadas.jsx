@@ -59,7 +59,7 @@ export default function Jornadas() {
 
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-600 uppercase text-xs">
+          <thead className="bg-surface-elev text-fg-muted uppercase text-xs">
             <tr>
               <th className="text-left p-2">Código</th>
               <th className="text-left p-2">Fecha</th>
@@ -73,12 +73,12 @@ export default function Jornadas() {
           </thead>
           <tbody>
             {list.map((j) => (
-              <tr key={j.id} className="border-t hover:bg-slate-50">
+              <tr key={j.id} className="border-t border-line-subtle hover:bg-surface-elev">
                 <td className="p-2 font-mono text-xs">{j.codigo}</td>
                 <td className="p-2">{j.fecha_inicio}</td>
                 <td className="p-2">{TIPO_LABEL[j.tipo] || j.tipo}</td>
                 <td className="p-2">{j.empresa_nombre || '—'}</td>
-                <td className="p-2 text-slate-600">{[j.departamento, j.municipio].filter(Boolean).join(', ')}</td>
+                <td className="p-2 text-fg-muted">{[j.departamento, j.municipio].filter(Boolean).join(', ')}</td>
                 <td className="p-2 text-right">
                   {j.atendidos != null ? `${fmtN(j.atendidos)}/${fmtN(j.programados)} (${fmtPct(j.pct_asistencia)})`
                                        : `—/${fmtN(j.programados)}`}
@@ -90,13 +90,13 @@ export default function Jornadas() {
                   </span>
                 </td>
                 <td className="p-2">
-                  <button className="text-igss-primary hover:underline text-xs"
+                  <button className="text-accent hover:underline text-xs"
                     onClick={() => setSelected(j.id)}>Ver</button>
                 </td>
               </tr>
             ))}
             {list.length === 0 && (
-              <tr><td colSpan="8" className="p-8 text-center text-slate-400">Sin jornadas para los filtros aplicados</td></tr>
+              <tr><td colSpan="8" className="p-8 text-center text-fg-subtle">Sin jornadas para los filtros aplicados</td></tr>
             )}
           </tbody>
         </table>
@@ -193,10 +193,10 @@ function NuevaJornadaModal({ onClose, onCreated }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto" onClick={(e)=>e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-surface rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-line dark:shadow-glow-accent" onClick={(e)=>e.stopPropagation()}>
         <form onSubmit={submit}>
-          <div className="border-b p-4">
+          <div className="border-b border-line-subtle p-4">
             <h2 className="text-xl font-bold">Nueva jornada</h2>
           </div>
           <div className="p-4 space-y-3">
@@ -259,15 +259,15 @@ function NuevaJornadaModal({ onClose, onCreated }) {
                 Aplica kit de laboratorio
               </label>
               {form.tipo === 'INAUGURACION' && (
-                <span className="text-emerald-700 font-medium flex items-center gap-1">
+                <span className="text-success font-medium flex items-center gap-1">
                   🎉 Inaugura clínica permanente (automático por tipo)
                 </span>
               )}
             </div>
 
             {form.tipo === 'INAUGURACION' && (
-              <div className="bg-amber-50 border-l-4 border-amber-400 p-3 rounded">
-                <p className="text-sm text-amber-900 font-medium mb-2">
+              <div className="bg-warning-soft border-l-4 border-warning p-3 rounded">
+                <p className="text-sm text-warning font-medium mb-2">
                   ⚠️ Las inauguraciones requieren <b>jornada de tamizaje SIPRESALUD asociada</b>
                   para llevar equipo médico. Si dejás sin asociar, aparecerá como alerta roja
                   en dashboard y calendario.
@@ -288,11 +288,11 @@ function NuevaJornadaModal({ onClose, onCreated }) {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <h3 className="font-semibold">Personal asignado</h3>
-                <button type="button" className="text-igss-primary text-sm hover:underline" onClick={addPersona}>+ Añadir persona</button>
+                <button type="button" className="text-accent text-sm hover:underline" onClick={addPersona}>+ Añadir persona</button>
               </div>
               <div className="space-y-2">
                 {form.personal.map((p, i) => (
-                  <div key={i} className="flex gap-2 items-center bg-slate-50 p-2 rounded">
+                  <div key={i} className="flex gap-2 items-center bg-surface-elev p-2 rounded">
                     <select className="input flex-1" value={p.personal_id}
                       onChange={(e) => updPersona(i, 'personal_id', Number(e.target.value))}>
                       {personalDisponible.map((x) => <option key={x.id} value={x.id}>{x.nombre_completo} ({x.seccion})</option>)}
@@ -303,19 +303,19 @@ function NuevaJornadaModal({ onClose, onCreated }) {
                     </select>
                     <input className="input w-20" type="number" step="0.5" min="0.5" value={p.dias_asignados}
                       onChange={(e) => updPersona(i, 'dias_asignados', Number(e.target.value))} title="Días asignados" />
-                    <button type="button" className="text-red-600 text-sm" onClick={() => removePersona(i)}>✕</button>
+                    <button type="button" className="text-danger text-sm" onClick={() => removePersona(i)}>✕</button>
                   </div>
                 ))}
-                {form.personal.length === 0 && <div className="text-slate-400 text-sm">Sin personal asignado</div>}
+                {form.personal.length === 0 && <div className="text-fg-subtle text-sm">Sin personal asignado</div>}
               </div>
             </div>
 
             <textarea className="input" rows="2" placeholder="Notas internas (opcional)"
               value={form.notas || ''} onChange={(e) => setField('notas', e.target.value)} />
 
-            {err && <div className="bg-red-50 text-red-700 p-2 rounded text-sm">{err}</div>}
+            {err && <div className="bg-danger-soft text-danger p-2 rounded text-sm">{err}</div>}
           </div>
-          <div className="border-t p-3 flex justify-end gap-2 bg-slate-50">
+          <div className="border-t border-line-subtle p-3 flex justify-end gap-2 bg-surface-elev">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
             <button type="submit" className="btn-primary">Crear jornada</button>
           </div>

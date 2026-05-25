@@ -7,19 +7,24 @@ export const fmtN = (n) =>
 export const fmtPct = (n) =>
   n == null ? '—' : `${Number(n).toFixed(1)}%`;
 
+// Maps de semáforo del backend → clases Tailwind. Incluye 'naranja' como
+// warning separado de 'rojo' (crítico). Los aliases en tailwind.config
+// hacen que tanto amarillo como naranja apunten al token warning.
 export const SEMAFORO_BG = {
-  verde:    'bg-semaforo-verde text-white',
-  amarillo: 'bg-semaforo-amarillo text-white',
-  rojo:     'bg-semaforo-rojo text-white',
-  azul:     'bg-semaforo-azul text-white',
-  gris:     'bg-semaforo-gris text-white',
+  verde:    'bg-success text-white',
+  amarillo: 'bg-warning text-white',
+  naranja:  'bg-warning text-white',
+  rojo:     'bg-danger text-white',
+  azul:     'bg-info text-white',
+  gris:     'bg-neutral text-white',
 };
 export const SEMAFORO_DOT = {
-  verde:    'bg-semaforo-verde',
-  amarillo: 'bg-semaforo-amarillo',
-  rojo:     'bg-semaforo-rojo',
-  azul:     'bg-semaforo-azul',
-  gris:     'bg-semaforo-gris',
+  verde:    'bg-success',
+  amarillo: 'bg-warning',
+  naranja:  'bg-warning',
+  rojo:     'bg-danger',
+  azul:     'bg-info',
+  gris:     'bg-neutral',
 };
 
 export const TIPO_LABEL = {
