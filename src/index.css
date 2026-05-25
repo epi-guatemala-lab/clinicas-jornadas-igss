@@ -2,14 +2,123 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Animación pulse para alertas críticas (inauguraciones sin jornada) */
+@layer base {
+  /* ── LIGHT THEME ───────────────────────────────────────────── */
+  :root {
+    color-scheme: light;
+    /* backgrounds */
+    --bg-canvas:        244 247 251;   /* #F4F7FB */
+    --bg-surface:       255 255 255;   /* #FFFFFF */
+    --bg-surface-elev:  250 251 253;   /* #FAFBFD */
+    --bg-sunken:        237 241 247;   /* #EDF1F7 */
+    /* borders */
+    --border-default:   228 232 242;   /* #E4E8F2 */
+    --border-subtle:    238 241 247;   /* #EEF1F7 */
+    --border-strong:    200 209 222;   /* #C8D1DE */
+    /* text */
+    --text-primary:     15 23 42;      /* #0F172A */
+    --text-secondary:   71 85 105;     /* #475569 */
+    --text-muted:       148 163 184;   /* #94A3B8 */
+    --text-inverse:     255 255 255;
+    /* accents (coral primary, teal secondary, azul IGSS tertiary) */
+    --accent-primary:        255 61 127;   /* #FF3D7F coral-rosa */
+    --accent-primary-hover:  219 39 119;   /* #DB2777 */
+    --accent-primary-soft:   254 226 235;  /* #FEE2EB */
+    --accent-secondary:      20 184 166;   /* #14B8A6 teal */
+    --accent-secondary-soft: 204 251 241;  /* #CCFBF1 */
+    --accent-tertiary:       0 102 179;    /* #0066B3 azul IGSS */
+    --accent-tertiary-soft:  219 234 254;  /* #DBEAFE */
+    --accent-tertiary-dark:  0 63 115;     /* #003F73 navy IGSS */
+    /* status */
+    --status-success:      21 128 61;     /* #15803D */
+    --status-success-soft: 220 252 231;   /* #DCFCE7 */
+    --status-warning:      234 88 12;     /* #EA580C naranja */
+    --status-warning-soft: 255 237 213;   /* #FFEDD5 */
+    --status-danger:       220 38 38;     /* #DC2626 rojo crítico */
+    --status-danger-soft:  254 226 226;   /* #FEE2E2 */
+    --status-info:         37 99 235;     /* #2563EB */
+    --status-info-soft:    219 234 254;   /* #DBEAFE */
+    --status-neutral:      100 116 139;   /* #64748B */
+    --status-neutral-soft: 241 245 249;   /* #F1F5F9 */
+    /* chart axes/grid + 7 series (sin morado) */
+    --chart-grid:  229 231 235;
+    --chart-axis:  100 116 139;
+    --chart-1:     255 61 127;     /* coral */
+    --chart-2:     20 184 166;     /* teal */
+    --chart-3:     0 102 179;      /* azul IGSS */
+    --chart-4:     234 88 12;      /* naranja */
+    --chart-5:     132 204 22;     /* verde lima */
+    --chart-6:     202 138 4;      /* dorado */
+    --chart-7:     219 39 119;     /* magenta */
+  }
+
+  /* ── DARK THEME (fondo negro + colores brillantes) ───────── */
+  .dark {
+    color-scheme: dark;
+    --bg-canvas:        10 10 10;       /* #0A0A0A */
+    --bg-surface:       20 20 20;       /* #141414 */
+    --bg-surface-elev:  28 28 28;       /* #1C1C1C */
+    --bg-sunken:        5 5 5;          /* #050505 */
+    --border-default:   42 42 42;       /* #2A2A2A */
+    --border-subtle:    30 30 30;
+    --border-strong:    64 64 64;
+    --text-primary:     250 250 250;    /* #FAFAFA */
+    --text-secondary:   161 161 170;    /* #A1A1AA */
+    --text-muted:       113 113 122;
+    --text-inverse:     10 10 10;
+    --accent-primary:        255 77 136;    /* #FF4D88 rosa brillante */
+    --accent-primary-hover:  251 113 133;   /* #FB7185 */
+    --accent-primary-soft:   76 5 25;       /* #4C0519 */
+    --accent-secondary:      45 212 191;    /* #2DD4BF teal brillante */
+    --accent-secondary-soft: 19 78 74;
+    --accent-tertiary:       34 211 238;    /* #22D3EE cyan brillante */
+    --accent-tertiary-soft:  22 78 99;
+    --accent-tertiary-dark:  14 116 144;
+    --status-success:      52 211 153;     /* #34D399 */
+    --status-success-soft: 6 78 59;
+    --status-warning:      251 146 60;     /* #FB923C */
+    --status-warning-soft: 67 20 7;
+    --status-danger:       248 113 113;    /* #F87171 */
+    --status-danger-soft:  69 10 10;
+    --status-info:         96 165 250;     /* #60A5FA */
+    --status-info-soft:    30 58 138;
+    --status-neutral:      148 163 184;
+    --status-neutral-soft: 30 41 59;
+    --chart-grid:  42 42 42;
+    --chart-axis:  148 163 184;
+    --chart-1:     255 77 136;     /* rosa brillante */
+    --chart-2:     45 212 191;     /* teal brillante */
+    --chart-3:     34 211 238;     /* cyan brillante */
+    --chart-4:     251 146 60;     /* naranja brillante */
+    --chart-5:     163 230 53;     /* verde lima */
+    --chart-6:     250 204 21;     /* amarillo dorado */
+    --chart-7:     244 114 182;    /* rosa claro */
+  }
+
+  body {
+    @apply bg-canvas text-fg antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  /* Transición suave al togglear tema — solo colores, NO transform/opacity */
+  body, .card, .btn, .badge, .input, header, nav, footer, table, thead, tbody, tr, td, th,
+  [class*="bg-"], [class*="text-"], [class*="border-"] {
+    transition: background-color 200ms ease, border-color 200ms ease, color 150ms ease, box-shadow 200ms ease;
+  }
+  /* Respeta usuarios que prefieren no animar */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+}
+
+/* Animación pulse para alertas críticas (inauguraciones sin jornada / canceladas) */
 @keyframes jornada-alerta-pulse {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7), 0 4px 6px -1px rgb(220 38 38 / 0.3);
+    box-shadow: 0 0 0 0 rgb(var(--status-danger) / 0.7), 0 4px 6px -1px rgb(var(--status-danger) / 0.3);
     transform: scale(1);
   }
   50% {
-    box-shadow: 0 0 0 6px rgba(220, 38, 38, 0), 0 4px 6px -1px rgb(220 38 38 / 0.5);
+    box-shadow: 0 0 0 6px rgb(var(--status-danger) / 0), 0 4px 6px -1px rgb(var(--status-danger) / 0.5);
     transform: scale(1.02);
   }
 }
@@ -19,28 +128,35 @@
 
 @layer components {
   .btn {
-    @apply px-3 py-2 rounded-md font-medium text-sm transition-colors;
+    @apply px-3 py-2 rounded-md font-medium text-sm transition-colors
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas;
   }
   .btn-primary {
-    @apply btn bg-igss-primary text-white hover:bg-igss-dark;
+    @apply btn bg-accent text-white hover:bg-accent-hover;
   }
   .btn-secondary {
-    @apply btn bg-white text-slate-700 border border-slate-300 hover:bg-slate-50;
+    @apply btn bg-surface text-fg border border-line hover:bg-surface-elev;
   }
   .btn-danger {
-    @apply btn bg-red-600 text-white hover:bg-red-700;
+    @apply btn bg-danger text-white hover:opacity-90;
   }
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-slate-200;
+    @apply bg-surface rounded-xl shadow-sm border border-line;
   }
   .input {
-    @apply w-full px-3 py-2 rounded-md border border-slate-300 text-sm
-           focus:outline-none focus:ring-2 focus:ring-igss-primary;
+    @apply w-full px-3 py-2 rounded-md border border-line bg-surface text-fg text-sm
+           focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent;
   }
   .label {
-    @apply block text-sm font-medium text-slate-700 mb-1;
+    @apply block text-sm font-medium text-fg-muted mb-1;
   }
   .badge {
     @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
   }
+  /* badges semánticos reusables */
+  .badge-success { @apply badge bg-success-soft text-success; }
+  .badge-warning { @apply badge bg-warning-soft text-warning; }
+  .badge-danger  { @apply badge bg-danger-soft text-danger; }
+  .badge-info    { @apply badge bg-info-soft text-info; }
+  .badge-neutral { @apply badge bg-neutral-soft text-neutral; }
 }

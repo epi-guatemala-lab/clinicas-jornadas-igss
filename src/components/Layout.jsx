@@ -1,5 +1,6 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth, ROL_LABELS } from '../hooks/useAuth';
+import ThemeToggle from '../theme/ThemeToggle.jsx';
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
@@ -22,7 +23,7 @@ export default function Layout({ children }) {
   const visibles = navLinks.filter((l) => l.roles.includes(user.rol));
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-canvas text-fg flex flex-col">
       {/* Header */}
       <header className="bg-igss-primary text-white shadow">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -42,6 +43,7 @@ export default function Layout({ children }) {
               <div className="font-medium">{user.nombre_completo}</div>
               <div className="opacity-80 text-xs">{ROL_LABELS[user.rol]}</div>
             </div>
+            <ThemeToggle />
             <button onClick={() => { logout(); navigate('/login'); }}
               className="bg-igss-dark hover:bg-black/30 px-3 py-1.5 rounded text-xs font-medium">
               Salir
@@ -68,7 +70,7 @@ export default function Layout({ children }) {
         {children}
       </main>
 
-      <footer className="text-center text-xs text-slate-500 py-4 border-t">
+      <footer className="text-center text-xs text-fg-subtle py-4 border-t border-line-subtle">
         IGSS · Subgerencia de Prestaciones en Salud · Departamento de Medicina Preventiva
       </footer>
     </div>
