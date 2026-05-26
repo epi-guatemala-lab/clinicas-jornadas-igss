@@ -73,12 +73,11 @@ export default function Calendario() {
         </div>
       )}
 
-      {/* Leyenda actualizada — NARANJA separado de ROJO */}
+      {/* Leyenda — paleta unificada: verde / naranja / rojo / azul / gris (sin amarillo) */}
       <div className="flex flex-wrap gap-3 text-[11px] text-fg-muted pt-2">
         {[
           ['verde', '≥90% asistencia'],
-          ['amarillo', '80-89% / Reprogramada / Cierre pendiente >7 días'],
-          ['naranja', '<80% asistencia / Cierre tardío >14 días'],
+          ['naranja', '<90% asistencia · Reprogramada · Cierre tardío'],
           ['rojo', 'CANCELADA (crítica)'],
           ['azul', 'En curso ahora · Inauguración'],
           ['gris', 'Programada (futura)'],

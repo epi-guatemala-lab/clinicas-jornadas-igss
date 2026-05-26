@@ -15,9 +15,12 @@ export const ThemeContext = createContext({
 function readStored() {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
-    return VALID.has(v) ? v : 'system';
+    if (VALID.has(v)) return v;
+    // Default: modo oscuro (decisión institucional para el módulo). El usuario
+    // puede cambiarlo con el toggle del header, que persiste su preferencia.
+    return 'dark';
   } catch {
-    return 'system';
+    return 'dark';
   }
 }
 

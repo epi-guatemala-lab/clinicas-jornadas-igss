@@ -8,15 +8,23 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <!-- Anti-flash: aplica .dark ANTES de React render según localStorage o prefers-color-scheme -->
+    <!-- Anti-flash: aplica .dark ANTES de React render según localStorage o default 'dark' -->
     <script>
       (function () {
         try {
           var stored = localStorage.getItem('igss_theme'); // 'light' | 'dark' | 'system' | null
+          // Default 'dark' si no hay preferencia guardada (decisión institucional).
+          // 'system' respeta prefers-color-scheme; 'light' / 'dark' son explícitos.
           var sysDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-          var isDark = stored === 'dark' || ((stored === 'system' || !stored) && sysDark);
+          var isDark =
+            stored === 'dark' ||
+            (stored === 'system' && sysDark) ||
+            (!stored);  // sin preferencia → dark
           if (isDark) document.documentElement.classList.add('dark');
-        } catch (_) {}
+        } catch (_) {
+          // En caso de error, default a dark
+          document.documentElement.classList.add('dark');
+        }
       })();
     </script>
   </head>
