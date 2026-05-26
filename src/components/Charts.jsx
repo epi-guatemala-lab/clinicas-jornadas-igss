@@ -99,8 +99,8 @@ export function TiposJornadaChart() {
   const totalAlertas = fmt.filter((f) => f.esAlerta).reduce((s, f) => s + f.value, 0);
   return (
     <MiniChartCard
-      title={`Tipos${totalAlertas > 0 ? ` · ${totalAlertas} ⚠` : ''}`}
-      subtitle="Mes en curso"
+      title={`Tipos de jornada${totalAlertas > 0 ? ` · ${totalAlertas} ⚠` : ''}`}
+      subtitle="Mes en curso · click para detalle"
       className="h-full"
       density="compact"
       loading={loading}
@@ -111,8 +111,8 @@ export function TiposJornadaChart() {
         <ResponsiveContainer>
           <PieChart>
             <Pie data={fmt} dataKey="value" nameKey="name"
-                 outerRadius={90} innerRadius={45} paddingAngle={2}
-                 label={(e) => (e.esAlerta ? `⚠ ${e.value}` : `${e.value}`)}
+                 cx="40%" cy="50%"
+                 outerRadius="78%" innerRadius="50%" paddingAngle={3}
                  labelLine={false}>
               {fmt.map((entry, i) => (
                 <Cell key={i} fill={entry.color}
@@ -121,7 +121,18 @@ export function TiposJornadaChart() {
               ))}
             </Pie>
             <Tooltip content={<ThemedTooltip formatter={(v) => fmtN(v)} />} />
-            <Legend {...ct.legendProps} />
+            <Legend
+              layout="vertical"
+              verticalAlign="middle"
+              align="right"
+              iconSize={8}
+              wrapperStyle={{ fontSize: 10, color: t.text.secondary, paddingLeft: 4 }}
+              formatter={(value, entry) => {
+                const v = entry?.payload?.value;
+                const name = String(value || '').replace('⚠️ ', '').replace('Jornada ', '');
+                return `${name.length > 18 ? name.slice(0, 16) + '…' : name} · ${v}`;
+              }}
+            />
           </PieChart>
         </ResponsiveContainer>
       )}
@@ -348,8 +359,8 @@ export function EstadoJornadasChart() {
         <ResponsiveContainer>
           <PieChart>
             <Pie data={fmt} dataKey="value" nameKey="name"
-                 outerRadius={90} innerRadius={40} paddingAngle={2}
-                 label={(e) => `${e.value}`}
+                 cx="40%" cy="50%"
+                 outerRadius="78%" innerRadius="50%" paddingAngle={3}
                  labelLine={false}>
               {fmt.map((e, i) => (
                 <Cell key={i} fill={e.fill}
@@ -358,7 +369,18 @@ export function EstadoJornadasChart() {
               ))}
             </Pie>
             <Tooltip content={<ThemedTooltip />} />
-            <Legend {...ct.legendProps} />
+            <Legend
+              layout="vertical"
+              verticalAlign="middle"
+              align="right"
+              iconSize={8}
+              wrapperStyle={{ fontSize: 10, color: t.text.secondary, paddingLeft: 4 }}
+              formatter={(value, entry) => {
+                const v = entry?.payload?.value;
+                const name = String(value || '').replace('⚠️ ', '');
+                return `${name} · ${v}`;
+              }}
+            />
           </PieChart>
         </ResponsiveContainer>
       )}
@@ -372,16 +394,21 @@ export function CostosMensualesChart() {
   const t = useThemedColors();
   const ct = useChartTheme();
   if (err === '403' || !data) return null;
+  // Detectar empty real: incluso si data.length=12, todos pueden ser 0
+  const totalSum = (data || []).reduce((s, d) => s + (d.kit || 0) + (d.personal || 0) + (d.viaticos || 0), 0);
+  const isEmpty = !loading && (!data || data.length === 0 || totalSum === 0);
   return (
     <MiniChartCard
-      title="Costos mensuales · kit + personal + viáticos"
-      subtitle="Solo visible para gerencia y admin"
+      title="Costos mensuales"
+      subtitle="Kit lab + personal + viáticos · últimos 12 meses"
       height={260}
       loading={loading}
       error={err && err !== '403' ? err : null}
-      empty={!loading && (!data || data.length === 0)}
+      empty={isEmpty}
+      emptyTitle="Aún no hay costos registrados"
+      emptyHint="Los costos aparecen cuando se cierran jornadas con métricas"
     >
-      {data && data.length > 0 && (
+      {!isEmpty && data && data.length > 0 && (
         <ResponsiveContainer>
           <BarChart data={data}>
             <CartesianGrid {...ct.gridProps} />

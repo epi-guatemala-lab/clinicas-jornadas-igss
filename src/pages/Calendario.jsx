@@ -86,9 +86,11 @@ export default function Calendario() {
             <span className={`inline-block w-3 h-3 rounded ${SEMAFORO_DOT[c]}`} />{l}
           </span>
         ))}
-        <span className="flex items-center gap-1.5 text-danger font-bold w-full">
-          <span className="inline-block w-4 h-4 rounded ring-2 ring-danger/60 bg-danger jornada-alerta-pulse" />
-          🚨 INAUGURACIÓN SIN JORNADA (crítico — coordinar con SIPRESALUD)
+        <span className="flex items-center gap-1.5 font-bold w-full"
+              style={{ color: 'rgb(168 85 247)' }}>
+          <span className="inline-block w-4 h-4 rounded ring-2 jornada-alerta-pulse"
+                style={{ background: 'rgb(147 51 234)', boxShadow: '0 0 0 2px rgb(168 85 247 / 0.6)' }} />
+          ⚠️ INAUGURACIÓN SIN JORNADA (crítico — coordinar con SIPRESALUD)
         </span>
       </div>
 

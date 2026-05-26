@@ -54,7 +54,7 @@ export default function Metas() {
           subLabel={`${pg.n_jornadas || 0} jornadas totales`}
         />
         <StatCard
-          label="ATENDIDOS YTD"
+          label="ATENDIDOS EN EL AÑO"
           value={pg.atendidos || 0}
           tone="accent-2"
           subLabel={`${fmtN(pg.programados)} programados`}
@@ -100,10 +100,18 @@ export default function Metas() {
               {list.map((m) => {
                 const pct = m.valor_meta ? (100 * (m.valor_logrado || 0) / m.valor_meta) : 0;
                 const color = pct >= 90 ? 'verde' : pct >= 80 ? 'amarillo' : 'naranja';
+                const MES_NOM = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+                const periodoTxt = m.mes ? `${MES_NOM[m.mes]} ${m.anio}` : `Anual ${m.anio}`;
+                const esAnual = !m.mes;
                 return (
                   <tr key={m.id} className="border-t border-line-subtle">
-                    <td className="p-2 tabular-nums">{m.anio}{m.mes ? `-${String(m.mes).padStart(2,'0')}` : ''}</td>
-                    <td className="p-2">{m.seccion}</td>
+                    <td className="p-2">
+                      <span className={esAnual ? 'inline-flex items-center gap-1.5 font-semibold text-fg' : 'text-fg-muted'}>
+                        {esAnual && <span className="px-1.5 py-0.5 rounded text-[9px] uppercase bg-accent-soft text-accent font-bold">Anual</span>}
+                        {periodoTxt}
+                      </span>
+                    </td>
+                    <td className="p-2">{m.seccion === 'GLOBAL' ? <span className="text-fg-muted text-xs">Toda la institución</span> : m.seccion}</td>
                     <td className="p-2">{TIPO_LABEL_MAP[m.tipo_meta] || m.tipo_meta}</td>
                     <td className="p-2 text-right font-mono tabular-nums">{fmtN(m.valor_meta)}</td>
                     <td className="p-2 text-right font-mono tabular-nums">{fmtN(m.valor_logrado)}</td>
