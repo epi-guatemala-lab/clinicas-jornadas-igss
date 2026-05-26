@@ -54,7 +54,9 @@ export default function StatCard({
 
   const padCls = compact ? 'p-3' : 'p-4';
   const gapCls = compact ? 'gap-2' : 'gap-3';
-  const numFs = compact ? 'clamp(24px, 3vw, 36px)' : 'clamp(28px, 4vw, 44px)';
+  // Tamaño del número más conservador en compact: empieza más chico para
+  // caber bien en cards de ~150-180px ancho (responsive split-view).
+  const numFs = compact ? 'clamp(20px, 2.2vw, 32px)' : 'clamp(26px, 3.5vw, 42px)';
   const headerMb = compact ? 'mb-1.5' : 'mb-2';
 
   return (
@@ -84,7 +86,7 @@ export default function StatCard({
       </div>
 
       <div className={`flex items-center ${gapCls} flex-1 min-h-0`}>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 overflow-hidden" title={String(formatVal(animated))}>
           <div
             className="font-extrabold leading-none tabular-nums truncate"
             style={{ fontSize: numFs, color: accentColor }}
@@ -97,40 +99,50 @@ export default function StatCard({
           )}
         </div>
 
+        {/* Viz lateral SOLO en cards ≥ 180px (sm: hidden, md+: visible). Las cards de
+            132px de ancho en mobile se ven mejor sin viz. */}
         {viz === 'gauge' && (
-          <Gauge
-            value={vizData.value ?? numeric}
-            size={vizData.size ?? 84}
-            thickness={vizData.thickness ?? 9}
-            thresholds={vizData.thresholds}
-          />
+          <div className="hidden sm:block flex-shrink-0">
+            <Gauge
+              value={vizData.value ?? numeric}
+              size={vizData.size ?? 84}
+              thickness={vizData.thickness ?? 9}
+              thresholds={vizData.thresholds}
+            />
+          </div>
         )}
         {viz === 'donut' && (
-          <Donut
-            value={vizData.value ?? numeric}
-            max={vizData.max ?? 100}
-            size={vizData.size ?? 72}
-            thickness={vizData.thickness ?? 9}
-            color={vizData.color || accentColor}
-            centerLabel={vizData.centerLabel}
-          />
+          <div className="hidden sm:block flex-shrink-0">
+            <Donut
+              value={vizData.value ?? numeric}
+              max={vizData.max ?? 100}
+              size={vizData.size ?? 72}
+              thickness={vizData.thickness ?? 9}
+              color={vizData.color || accentColor}
+              centerLabel={vizData.centerLabel}
+            />
+          </div>
         )}
         {viz === 'spark' && (
-          <Sparkline
-            data={vizData.data || []}
-            color={accentColor}
-            height={vizData.height ?? 48}
-            width={vizData.width ?? 110}
-          />
+          <div className="hidden sm:block flex-shrink-0">
+            <Sparkline
+              data={vizData.data || []}
+              color={accentColor}
+              height={vizData.height ?? 48}
+              width={vizData.width ?? 110}
+            />
+          </div>
         )}
         {viz === 'bar' && (
-          <ProgressBar
-            value={vizData.value ?? numeric}
-            max={vizData.max ?? 100}
-            color={accentColor}
-            label={vizData.label}
-            t={t}
-          />
+          <div className="hidden sm:block flex-shrink-0">
+            <ProgressBar
+              value={vizData.value ?? numeric}
+              max={vizData.max ?? 100}
+              color={accentColor}
+              label={vizData.label}
+              t={t}
+            />
+          </div>
         )}
       </div>
     </div>
