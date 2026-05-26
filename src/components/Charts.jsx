@@ -396,7 +396,9 @@ export function CostosMensualesChart() {
   if (err === '403' || !data) return null;
   // Detectar empty real: incluso si data.length=12, todos pueden ser 0
   const totalSum = (data || []).reduce((s, d) => s + (d.kit || 0) + (d.personal || 0) + (d.viaticos || 0), 0);
-  const isEmpty = !loading && (!data || data.length === 0 || totalSum === 0);
+  // Si no hay costos registrados, ocultar TODO el card (no mostrar solo
+  // título vacío que confunde — la imagen del usuario reportaba esto).
+  if (!loading && totalSum === 0) return null;
   return (
     <MiniChartCard
       title="Costos mensuales"
@@ -404,11 +406,8 @@ export function CostosMensualesChart() {
       height={260}
       loading={loading}
       error={err && err !== '403' ? err : null}
-      empty={isEmpty}
-      emptyTitle="Aún no hay costos registrados"
-      emptyHint="Los costos aparecen cuando se cierran jornadas con métricas"
     >
-      {!isEmpty && data && data.length > 0 && (
+      {data && data.length > 0 && (
         <ResponsiveContainer>
           <BarChart data={data}>
             <CartesianGrid {...ct.gridProps} />
