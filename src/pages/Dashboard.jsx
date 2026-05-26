@@ -131,15 +131,16 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* MAIN GRID 2D — 5 cols × 3 rows, sidebar derecho row-span-3 */}
-      <div
-        className="grid gap-3"
-        style={{
-          gridTemplateColumns: 'repeat(4, minmax(0, 1fr)) minmax(240px, 280px)',
-        }}
-      >
-        {/* ── Row 1: 4 KPIs ───────────────────────────────────────────── */}
-        <div style={{ height: 132 }}>
+      {/* MAIN GRID 2D — responsive:
+          - xl (≥1280): grid 5cols [4 KPIs + sidebar 280px row-span-3] (desktop intacto)
+          - lg (1024-1279): grid 4cols (sidebar abajo, no a la derecha)
+          - md (768-1023): grid 2cols
+          - mobile (<768): stack 1col
+      */}
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4
+                      xl:[grid-template-columns:repeat(4,minmax(0,1fr))_minmax(240px,280px)]">
+        {/* ── Row 1: 4 KPIs (mobile: stack, tablet: 2×2, lg+: 4 en fila) ── */}
+        <div className="min-h-[132px]">
           <StatCard
             label="% META MENSUAL"
             value={kpi.pctMeta ?? 0}
@@ -154,7 +155,7 @@ export default function Dashboard() {
             compact
           />
         </div>
-        <div style={{ height: 132 }}>
+        <div className="min-h-[132px]">
           <StatCard
             label="ATENDIDOS"
             value={kpi.atendidos ?? 0}
@@ -170,7 +171,7 @@ export default function Dashboard() {
             compact
           />
         </div>
-        <div style={{ height: 132 }}>
+        <div className="min-h-[132px]">
           <StatCard
             label="% AUSENTISMO"
             value={pctAusentismo ?? 0}
@@ -190,7 +191,7 @@ export default function Dashboard() {
             compact
           />
         </div>
-        <div style={{ height: 132 }}>
+        <div className="min-h-[132px]">
           <StatCard
             label="DÍAS RESTANTES"
             value={kpi.diasRestantes ?? 0}
@@ -208,8 +209,12 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Sidebar derecho — Próximas jornadas (HOY + MAÑANA, con fallback) (row-span 3) */}
-        <div className="row-span-3 min-h-0">
+        {/* Sidebar derecho — Próximas jornadas
+            - xl: row-span 3 (a la derecha de TODOS los KPIs + chart + mini-charts)
+            - lg y abajo: ocupa toda la fila debajo
+        */}
+        <div className="col-span-1 sm:col-span-2 lg:col-span-4 xl:col-span-1 xl:row-span-3
+                        min-h-[200px] xl:min-h-0">
           <MiniChartCard
             title="Próximas jornadas"
             subtitle={
@@ -218,7 +223,7 @@ export default function Dashboard() {
                 : `Hoy y mañana · ${proximasInfo.items.length}`
             }
             density="compact"
-            bodyClassName="-mx-1 overflow-y-auto"
+            bodyClassName="-mx-1 overflow-y-auto overflow-x-hidden"
             className="h-full flex flex-col"
           >
             <DataList
@@ -230,13 +235,18 @@ export default function Dashboard() {
           </MiniChartCard>
         </div>
 
-        {/* ── Row 2: Chart hero (col-span 4) ──────────────────────────── */}
-        <div className="col-span-4" style={{ height: 280 }}>
+        {/* ── Row 2: Chart hero
+            - mobile: col-span-1
+            - sm: col-span-2
+            - lg+: col-span-4 (ancho completo de los 4 KPIs)
+        */}
+        <div className="col-span-1 sm:col-span-2 lg:col-span-4 xl:col-span-4"
+             style={{ height: 280 }}>
           <ProgresoDiarioMesChart compact />
         </div>
 
-        {/* ── Row 3: Promedios + Estado + Costos/Depto ────────────────── */}
-        <div style={{ height: 220 }}>
+        {/* ── Row 3: Promedios + Estado + Costos/Depto (4 cards) ────────── */}
+        <div className="min-h-[220px]">
           <PromedioCard
             label="PROMEDIO POR JORNADA"
             value={kpi.promedioPorJornada}
@@ -245,7 +255,7 @@ export default function Dashboard() {
             t={t}
           />
         </div>
-        <div style={{ height: 220 }}>
+        <div className="min-h-[220px]">
           <PromedioCard
             label="EMPRESAS ACTIVAS"
             value={kpi.nEmpresasActivas ?? 0}
@@ -255,10 +265,10 @@ export default function Dashboard() {
             t={t}
           />
         </div>
-        <div style={{ height: 220 }}>
+        <div className="min-h-[220px]">
           <EstadoJornadasChart />
         </div>
-        <div style={{ height: 220 }}>
+        <div className="min-h-[220px]">
           {data.costos
             ? <CostosCard costos={data.costos} t={t} />
             : <DistribucionDepartamentoChart />}
