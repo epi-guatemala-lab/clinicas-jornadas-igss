@@ -82,8 +82,8 @@ export default function Personal() {
               <th className="text-left p-2">Nombre</th>
               <th className="text-left p-2">Sección</th>
               <th className="text-left p-2">Rol default</th>
-              <th className="text-left p-2">Renglón</th>
-              <th className="text-right p-2">Compensación (Q/mes)</th>
+              <th className="text-left p-2">Partida (renglón)</th>
+              <th className="text-right p-2">Salario mensual (Q)</th>
               <th></th>
             </tr>
           </thead>
@@ -133,12 +133,14 @@ function PersonalForm({ initial, onClose, onSave }) {
             <input className="input" value={form.nombre_completo} onChange={(e)=>set('nombre_completo', e.target.value)} required /></div>
           <div><label className="label">NIT</label>
             <input className="input" value={form.nit || ''} onChange={(e)=>set('nit', e.target.value)} /></div>
-          <div><label className="label">Renglón</label>
+          <div><label className="label">Partida presupuestaria (renglón)</label>
             <select className="input" value={form.renglon || ''} onChange={(e)=>set('renglon', e.target.value)}>
-              <option value="011">011 (regular)</option><option value="022">022</option><option value="029">029 (honorarios)</option>
+              <option value="011">011 — Personal permanente</option>
+              <option value="022">022 — Personal por contrato</option>
+              <option value="029">029 — Honorarios</option>
             </select></div>
-          <div><label className="label">IBM</label>
-            <input className="input" value={form.ibm || ''} onChange={(e)=>set('ibm', e.target.value)} /></div>
+          <div><label className="label">Código interno IGSS</label>
+            <input className="input" value={form.ibm || ''} onChange={(e)=>set('ibm', e.target.value)} placeholder="ej. IBM o código de planilla" /></div>
           <div><label className="label">Rol default</label>
             <select className="input" value={form.rol_default} onChange={(e)=>set('rol_default', e.target.value)}>
               {ROLES.map((r)=><option key={r} value={r}>{r}</option>)}
@@ -147,8 +149,11 @@ function PersonalForm({ initial, onClose, onSave }) {
             <select className="input" value={form.seccion} onChange={(e)=>set('seccion', e.target.value)}>
               <option value="SIPRESALUD">SIPRESALUD</option><option value="CE">CE</option>
             </select></div>
-          <div className="col-span-2"><label className="label">Compensación Q/mes (cifrada)</label>
-            <input className="input" type="number" step="0.01" value={form.compensacion} onChange={(e)=>set('compensacion', e.target.value)} />
+          <div className="col-span-2"><label className="label">Salario mensual en Quetzales</label>
+            <input className="input" type="number" step="0.01" value={form.compensacion} onChange={(e)=>set('compensacion', e.target.value)} placeholder="ej. 15000.00" />
+            <p className="text-[10px] text-fg-subtle mt-1">
+              Se guarda cifrado en la BD. Solo gerencia y admin pueden ver el valor.
+            </p>
             {/* Cálculo costo diario derivado en tiempo real para 011 y 022 */}
             <CostoDiarioPreview compensacion={form.compensacion} renglon={form.renglon} />
           </div>

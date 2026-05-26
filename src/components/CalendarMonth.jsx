@@ -67,17 +67,24 @@ export default function CalendarMonth({ month, eventos, onEventClick }) {
                     ? 'azul'  // override visual: en curso
                     : mapSemaforoLegacy(e.semaforo, e);
                   const critico = !!e.sin_jornada_asociada || e.estado === 'CANCELADA';
+                  // Inauguración sin jornada → morado (distinto del rojo cancelada)
+                  const inaugSinClass = 'text-white font-bold ring-2 shadow-md jornada-alerta-pulse';
+                  const inaugSinStyle = {
+                    background: 'rgb(147 51 234)',  // purple-600
+                    boxShadow: '0 0 0 2px rgb(168 85 247 / 0.6)',
+                  };
                   return (
                     <button key={e.id} onClick={() => onEventClick?.(e)}
                       className={`block w-full text-left text-xs rounded px-1.5 py-1 truncate transition ${
                         e.sin_jornada_asociada
-                          ? 'bg-danger text-white font-bold ring-2 ring-danger/60 shadow-md jornada-alerta-pulse'
+                          ? inaugSinClass
                           : (SEMAFORO_BG[semNorm] || 'bg-neutral text-white') + ' hover:opacity-90'
                       }`}
+                      style={e.sin_jornada_asociada ? inaugSinStyle : undefined}
                       title={`${TIPO_LABEL[e.tipo] || e.tipo} · ${e.empresa || ''}${
                         e.sin_jornada_asociada ? ' · ⚠️ INAUGURACIÓN SIN JORNADA ASOCIADA — coordinar con SIPRESALUD' : ''
                       }${enCursoLocal ? ' · 🔵 EN CURSO ahora' : ''}`}>
-                      {e.sin_jornada_asociada && <span className="mr-1">🚨</span>}
+                      {e.sin_jornada_asociada && <span className="mr-1">⚠️</span>}
                       {enCursoLocal && !critico && <span className="mr-1">●</span>}
                       {e.hora_inicio && <span className="mr-1 opacity-80">{e.hora_inicio.slice(0,5)}</span>}
                       <span className={e.sin_jornada_asociada ? 'uppercase tracking-wide' : 'font-medium'}>
