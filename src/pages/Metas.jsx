@@ -22,7 +22,6 @@ export default function Metas() {
   const [empresas, setEmpresas] = useState(null);
   const [creating, setCreating] = useState(false);
   const [seccionEmp, setSeccionEmp] = useState('');
-  const [costoConPrestaciones, setCostoConPrestaciones] = useState(false);
   const year = new Date().getFullYear();
 
   function reload() {
@@ -177,41 +176,6 @@ export default function Metas() {
               )}
             </tbody>
           </table>
-        </div>
-      </MiniChartCard>
-
-      {/* Toggle de costo anual + prestaciones */}
-      <MiniChartCard
-        title="Cálculo de costo personal"
-        subtitle="El cálculo legacy usa mensual/30. El modo nuevo prorratea anual+prestaciones/365 (más realista)"
-      >
-        <label className="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-surface-elev">
-          <input
-            type="checkbox"
-            checked={costoConPrestaciones}
-            onChange={(e) => setCostoConPrestaciones(e.target.checked)}
-            className="mt-1 h-4 w-4 accent-accent"
-          />
-          <div className="flex-1">
-            <div className="text-sm font-medium text-fg">
-              Calcular con salario anual + 20% de prestaciones (renglón 011 / 022)
-            </div>
-            <div className="text-xs text-fg-muted mt-0.5">
-              Fórmula: <code className="font-mono text-[11px] bg-surface-elev px-1 py-0.5 rounded">
-                (mensual × 12 × 1.20) / 365 × días_asignados
-              </code>
-              {costoConPrestaciones && (
-                <span className="block mt-1 text-accent font-semibold">
-                  Activo · los costos del dashboard de gerencia se mostrarán con prestaciones
-                </span>
-              )}
-            </div>
-          </div>
-        </label>
-        <div className="mt-3 text-[11px] text-fg-subtle border-t border-line-subtle pt-2">
-          Nota: el toggle es client-side; los KPIs de gerencia y la sección "Desglose de costos"
-          del Dashboard ya están preparados para mostrar ambos modos cuando se conecte el
-          recálculo. Persistido en localStorage por usuario.
         </div>
       </MiniChartCard>
 

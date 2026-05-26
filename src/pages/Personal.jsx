@@ -2,6 +2,49 @@ import { useEffect, useState } from 'react';
 import { apiListPersonal, apiCreatePersonal, apiUpdatePersonal } from '../api/endpoints';
 import { fmtQ } from '../utils/format';
 
+/**
+ * Muestra costo diario derivado de compensacion + renglón:
+ *   - 011 / 022 (planilla): (mensual × 12 × 1.20) / 365 — incluye 20% prestaciones (aguinaldo, bono14, indemnización)
+ *   - 029 (honorarios): mensual / 30 — sin prestaciones
+ *
+ * Es solo informativo (lo que el dashboard/reportes usarán al prorratear).
+ */
+function CostoDiarioPreview({ compensacion, renglon }) {
+  const mensual = Number(compensacion) || 0;
+  if (!mensual) return null;
+  const conPrestaciones = renglon === '011' || renglon === '022';
+  const diario = conPrestaciones
+    ? (mensual * 12 * 1.20) / 365
+    : mensual / 30;
+  const anual = conPrestaciones ? mensual * 12 * 1.20 : mensual * 12;
+  return (
+    <div className="mt-2 text-xs bg-surface-elev rounded-lg p-2.5 border border-line-subtle">
+      <div className="font-semibold text-fg mb-1 flex items-center gap-1">
+        💰 Costo diario derivado · renglón {renglon || '—'}
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-[11px]">
+        <div>
+          <div className="text-fg-muted">Diario prorrateado</div>
+          <div className="font-bold tabular-nums text-accent text-sm">{fmtQ(diario)}</div>
+        </div>
+        <div>
+          <div className="text-fg-muted">Mensual</div>
+          <div className="font-semibold tabular-nums">{fmtQ(mensual)}</div>
+        </div>
+        <div>
+          <div className="text-fg-muted">Anual{conPrestaciones && '+20%'}</div>
+          <div className="font-semibold tabular-nums">{fmtQ(anual)}</div>
+        </div>
+      </div>
+      <div className="mt-1.5 text-[10px] text-fg-muted leading-tight">
+        {conPrestaciones
+          ? 'Fórmula: (mensual × 12 × 1.20) / 365 — incluye aguinaldo, bono 14 e indemnización (20%).'
+          : 'Fórmula: mensual / 30 — honorarios sin prestaciones.'}
+      </div>
+    </div>
+  );
+}
+
 const ROLES = ['LIDER', 'MEDICO', 'ADMIN', 'ENFERMERIA', 'LABORATORISTA', 'DIGITADOR', 'ENCUESTADOR'];
 
 export default function Personal() {
@@ -104,8 +147,11 @@ function PersonalForm({ initial, onClose, onSave }) {
             <select className="input" value={form.seccion} onChange={(e)=>set('seccion', e.target.value)}>
               <option value="SIPRESALUD">SIPRESALUD</option><option value="CE">CE</option>
             </select></div>
-          <div><label className="label">Compensación Q/mes (cifrada)</label>
-            <input className="input" type="number" step="0.01" value={form.compensacion} onChange={(e)=>set('compensacion', e.target.value)} /></div>
+          <div className="col-span-2"><label className="label">Compensación Q/mes (cifrada)</label>
+            <input className="input" type="number" step="0.01" value={form.compensacion} onChange={(e)=>set('compensacion', e.target.value)} />
+            {/* Cálculo costo diario derivado en tiempo real para 011 y 022 */}
+            <CostoDiarioPreview compensacion={form.compensacion} renglon={form.renglon} />
+          </div>
           <div><label className="label">Email</label>
             <input className="input" type="email" value={form.email || ''} onChange={(e)=>set('email', e.target.value)} /></div>
           <div><label className="label">Teléfono</label>

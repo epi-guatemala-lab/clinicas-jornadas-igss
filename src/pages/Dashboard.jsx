@@ -3,13 +3,11 @@ import { apiDashboard, apiAlertasUnificadas, apiSerieDiariaMes } from '../api/en
 import { useAuth } from '../hooks/useAuth';
 import StatCard from '../components/cards/StatCard';
 import MiniChartCard from '../components/cards/MiniChartCard';
-import AlertBanner from '../components/cards/AlertBanner';
 import DataList from '../components/lists/DataList';
 import JornadaRow from '../components/lists/JornadaRow';
 import {
-  Serie12MesesChart, TiposJornadaChart, TopEmpresasChart,
-  DistribucionDepartamentoChart, EstadoJornadasChart, CostosMensualesChart,
-  ProgresoDiarioMesChart,
+  Serie12MesesChart, DistribucionDepartamentoChart, CostosMensualesChart,
+  ProgresoDiarioMesChart, EstadoJornadasChart,
 } from '../components/Charts';
 import { fmtQ, fmtN } from '../utils/format';
 import ErrorState from '../components/feedback/ErrorState';
@@ -20,24 +18,6 @@ const ENDPOINT_POR_ROL = {
   admin: 'gerencia', gerencia: 'gerencia', ce: 'ce', sipresalud: 'sipresalud',
 };
 
-/**
- * Dashboard single-view 1920×1080 (sin scroll en pantallas anchas).
- *
- * Layout CSS Grid 2D:
- *   ┌──────────────────────────────────────────────────────────────────┐
- *   │ HEADER (chip días + título)                       50px           │
- *   ├──────────────────────────────────────────────────────────────────┤
- *   │ ALERTBANNER (slim/colapsable)                     60-90px        │
- *   ├──────┬──────┬──────┬──────┬──────────────────────────────────────┤
- *   │ KPI1 │ KPI2 │ KPI3 │ KPI4 │ ┐                                   │
- *   ├──────┴──────┴──────┴──────┤ │ SIDEBAR R                          │
- *   │ ProgresoDiarioMes hero    │ │ Próximas 5 jornadas                │
- *   │ (col-span 4)              │ │ (row-span 3)                       │
- *   ├──────┬──────┬──────┬──────┤ │                                    │
- *   │ Tipos│Estado│Top 5 │ Cost │ ┘                                   │
- *   └──────┴──────┴──────┴──────┴──────────────────────────────────────┘
- *   Total alturas: 130 + 280 + 220 = 630px + 60 alert + 50 hdr + 32 ftr = 772px → cabe en 1080
- */
 export default function Dashboard() {
   const { user } = useAuth();
   const t = useThemedColors();
@@ -45,6 +25,7 @@ export default function Dashboard() {
   const [alertas, setAlertas] = useState(null);
   const [serieDiaria, setSerieDiaria] = useState(null);
   const [err, setErr] = useState('');
+  const [histOpen, setHistOpen] = useState(false);  // lazy-load análisis histórico
 
   useEffect(() => {
     const rol = ENDPOINT_POR_ROL[user.rol];
@@ -57,14 +38,32 @@ export default function Dashboard() {
       .catch((e) => setErr(e.response?.data?.detail || 'Error cargando dashboard'));
   }, [user.rol]);
 
-  // IMPORTANTE: TODOS los hooks deben llamarse en el mismo orden cada render.
-  // No mover useMemo después de early returns — React #310.
+  // HOOKS — siempre llamarlos ANTES de cualquier early return
   const alertItems = alertas?.alertas || [];
   const sortedAlertas = useMemo(
     () => [...alertItems].sort((a, b) => severityOf(a) - severityOf(b)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [alertas],
   );
+
+  const splitAlertas = useMemo(() => {
+    const cancel = sortedAlertas.filter((a) => a.source === 'CANCELADA');
+    const inaug = sortedAlertas.filter((a) => a.source === 'INAUGURACION_SIN_JORNADA');
+    const warn = sortedAlertas.filter((a) => a.severity === 'warning');
+    return { cancel, inaug, warn };
+  }, [sortedAlertas]);
+
+  const proximas = useMemo(() => {
+    if (!data?.proximas_jornadas) return [];
+    const now = new Date();
+    const hoy = now.toISOString().slice(0, 10);
+    const tmp = new Date(now);
+    tmp.setDate(tmp.getDate() + 1);
+    const manana = tmp.toISOString().slice(0, 10);
+    return data.proximas_jornadas.filter(
+      (j) => j.fecha_inicio === hoy || j.fecha_inicio === manana,
+    );
+  }, [data]);
 
   if (err) return <ErrorState message={err} />;
   if (!data) {
@@ -80,11 +79,13 @@ export default function Dashboard() {
   }
 
   const kpi = derivarKpis(data, serieDiaria);
-  const proximas = (data.proximas_jornadas || []).slice(0, 5);
+  const pctAusentismo = kpi.pctAsistencia != null
+    ? Math.max(0, Math.round((100 - kpi.pctAsistencia) * 10) / 10)
+    : null;
 
   return (
     <div className="space-y-3">
-      {/* HEADER — fila slim con título + chip días restantes + filtros futuros */}
+      {/* HEADER slim */}
       <header className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-baseline gap-3">
           <h1 className="text-lg font-bold text-fg leading-none">
@@ -102,11 +103,23 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* ALERT BANNER — slim, abierto solo si hay alertas, máx 3 visibles inline */}
-      {alertItems.length > 0 && (
-        <AlertBanner items={sortedAlertas} defaultOpen maxVisible={3} />
-      )}
-      {alertItems.length === 0 && alertas && (
+      {/* ALERTAS SEPARADAS: 2 cards rojas (cancelación + inaug-sin-jornada) */}
+      {(splitAlertas.cancel.length > 0 || splitAlertas.inaug.length > 0) ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <AlertCard
+            title="Jornadas canceladas"
+            count={splitAlertas.cancel.length}
+            items={splitAlertas.cancel}
+            icon="🚨"
+          />
+          <AlertCard
+            title="Inauguración sin jornada coordinada"
+            count={splitAlertas.inaug.length}
+            items={splitAlertas.inaug}
+            icon="⚠️"
+          />
+        </div>
+      ) : alertas && (
         <div className="rounded-xl border border-success/40 bg-success-soft/30 px-3 py-1.5 text-xs text-success flex items-center gap-2">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3.5 w-3.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -120,10 +133,9 @@ export default function Dashboard() {
         className="grid gap-3"
         style={{
           gridTemplateColumns: 'repeat(4, minmax(0, 1fr)) minmax(240px, 280px)',
-          gridTemplateRows: 'auto auto auto',
         }}
       >
-        {/* ── Row 1: 4 KPIs + arranque sidebar (row-span 3) ───────────── */}
+        {/* ── Row 1: 4 KPIs ───────────────────────────────────────────── */}
         <div style={{ height: 132 }}>
           <StatCard
             label="% META MENSUAL"
@@ -157,21 +169,21 @@ export default function Dashboard() {
         </div>
         <div style={{ height: 132 }}>
           <StatCard
-            label="% ASISTENCIA"
-            value={kpi.pctAsistencia ?? 0}
+            label="% AUSENTISMO"
+            value={pctAusentismo ?? 0}
             format="percent"
             decimals={1}
-            tone="accent-3"
+            tone={pctAusentismo == null ? 'neutral' : pctAusentismo <= 10 ? 'success' : pctAusentismo <= 20 ? 'warning' : 'danger'}
             viz="donut"
             vizData={{
-              value: kpi.pctAsistencia ?? 0,
+              value: pctAusentismo ?? 0,
               max: 100,
-              color: t.accent.tertiary,
+              color: pctAusentismo <= 10 ? t.status.success : pctAusentismo <= 20 ? t.status.warning : t.status.danger,
               size: 60, thickness: 8,
-              centerLabel: `${Math.round(kpi.pctAsistencia || 0)}%`,
+              centerLabel: pctAusentismo != null ? `${Math.round(pctAusentismo)}%` : '—',
             }}
-            subLabel="Aten / progr"
-            icon={<CheckCircleIcon />}
+            subLabel={kpi.pctAsistencia != null ? `${kpi.pctAsistencia.toFixed(1)}% asistencia` : 'Sin jornadas cerradas'}
+            icon={<UserMinusIcon />}
             compact
           />
         </div>
@@ -193,11 +205,11 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Sidebar derecho — Próximas 5 jornadas (row-span 3) */}
+        {/* Sidebar derecho — Próximas jornadas (HOY + MAÑANA) (row-span 3) */}
         <div className="row-span-3 min-h-0">
           <MiniChartCard
             title="Próximas jornadas"
-            subtitle={`Las siguientes ${proximas.length}`}
+            subtitle={`Hoy y mañana · ${proximas.length}`}
             density="compact"
             bodyClassName="-mx-1 overflow-y-auto"
             className="h-full flex flex-col"
@@ -205,7 +217,7 @@ export default function Dashboard() {
             <DataList
               items={proximas}
               renderItem={(j) => <JornadaRow jornada={j} dense />}
-              empty="Sin próximas jornadas"
+              empty="Sin jornadas hoy ni mañana"
               density="compact"
             />
           </MiniChartCard>
@@ -216,43 +228,144 @@ export default function Dashboard() {
           <ProgresoDiarioMesChart compact />
         </div>
 
-        {/* ── Row 3: 4 mini-charts ────────────────────────────────────── */}
-        <div style={{ height: 230 }}>
-          <TiposJornadaChart />
+        {/* ── Row 3: Promedios + Estado + Costos/Depto ────────────────── */}
+        <div style={{ height: 220 }}>
+          <PromedioCard
+            label="PROMEDIO POR JORNADA"
+            value={kpi.promedioPorJornada}
+            subLabel={kpi.promedioPorEmpresa != null ? `${fmtN(kpi.promedioPorEmpresa)} por empresa` : ''}
+            tone="primary"
+            t={t}
+          />
         </div>
-        <div style={{ height: 230 }}>
+        <div style={{ height: 220 }}>
+          <PromedioCard
+            label="EMPRESAS ACTIVAS"
+            value={kpi.nEmpresasActivas ?? 0}
+            valueFmt="number"
+            subLabel="Con jornadas cerradas este mes"
+            tone="accent-2"
+            t={t}
+          />
+        </div>
+        <div style={{ height: 220 }}>
           <EstadoJornadasChart />
         </div>
-        <div style={{ height: 230 }}>
-          <TopEmpresasChart limit={5} />
-        </div>
-        <div style={{ height: 230 }}>
+        <div style={{ height: 220 }}>
           {data.costos
             ? <CostosCard costos={data.costos} t={t} />
             : <DistribucionDepartamentoChart />}
         </div>
       </div>
 
-      {/* Análisis histórico — colapsado por default, fuera del viewport prime */}
-      <details className="rounded-2xl border border-line-subtle bg-surface mt-2">
-        <summary className="cursor-pointer px-4 py-2 text-sm font-semibold text-fg-muted hover:text-fg flex items-center gap-2">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+      {/* Análisis histórico — LAZY LOAD: solo se montan los charts al expandir */}
+      <details
+        className="rounded-2xl border border-line-subtle bg-surface mt-2"
+        open={histOpen}
+        onToggle={(e) => setHistOpen(e.target.open)}
+      >
+        <summary className="cursor-pointer px-4 py-2 text-sm font-semibold text-fg-muted hover:text-fg flex items-center gap-2 select-none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+               className={`h-4 w-4 transition-transform ${histOpen ? 'rotate-180' : ''}`}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
           Análisis histórico · serie 12 meses · distribución por departamento
           {data.costos && ' · costos mensuales'}
+          <span className="text-[10px] text-fg-subtle ml-1">(carga al expandir)</span>
         </summary>
-        <div className="p-4 pt-0 grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Serie12MesesChart />
-          <DistribucionDepartamentoChart />
-          {data.costos && <CostosMensualesChart />}
-        </div>
+        {histOpen && (
+          <div className="p-4 pt-0 grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Serie12MesesChart />
+            <DistribucionDepartamentoChart />
+            {data.costos && <CostosMensualesChart />}
+          </div>
+        )}
       </details>
     </div>
   );
 }
 
-// ───────────── Card compacta de costos para Row 3 col 4 ─────────────
+// ───────────── Alert card: 1 sola severidad (cancelación o inaug-sin) ─────────
+function AlertCard({ title, count, items, icon }) {
+  const [open, setOpen] = useState(true);
+  if (count === 0) return null;
+  const visible = open ? items.slice(0, 4) : [];
+
+  return (
+    <div className="rounded-2xl border-2 border-danger/50 bg-danger-soft/30 relative overflow-hidden">
+      <div aria-hidden
+           className="absolute left-0 inset-y-0 w-1 bg-danger jornada-alerta-pulse" />
+      <div className="pl-3 pr-3 py-2.5">
+        <div className="flex items-center justify-between gap-2 mb-1.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-lg leading-none">{icon}</span>
+            <span className="font-bold text-fg text-sm truncate">{title}</span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-danger text-white flex-shrink-0">
+              {count}
+            </span>
+          </div>
+          <button onClick={() => setOpen(!open)}
+                  className="text-[10px] font-semibold text-fg-muted hover:text-fg transition-colors flex-shrink-0">
+            {open ? 'Ocultar' : 'Ver'}
+          </button>
+        </div>
+        {open && (
+          <ul className="space-y-1">
+            {visible.map((a) => (
+              <li key={a.id}
+                  className="flex items-start gap-2 text-[11px] rounded px-1.5 py-1 hover:bg-surface/60">
+                <span aria-hidden className="flex-shrink-0 mt-1 h-1.5 w-1.5 rounded-full bg-danger" />
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-fg">
+                    {a.codigo && <span className="font-mono text-[10px] mr-1 text-fg-muted">{a.codigo}</span>}
+                    {a.title}
+                  </div>
+                  {a.detail && <div className="text-fg-muted truncate">{a.detail}</div>}
+                </div>
+                {a.fecha && <span className="text-[9px] text-fg-muted tabular-nums flex-shrink-0 mt-0.5">{a.fecha}</span>}
+              </li>
+            ))}
+            {items.length > 4 && (
+              <li className="text-[10px] text-fg-muted px-1.5">+{items.length - 4} más</li>
+            )}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ───────────── Promedio card (big number + sublabel) ─────────────
+function PromedioCard({ label, value, valueFmt = 'number', subLabel, tone, t }) {
+  const toneColor = {
+    primary: t.accent.primary,
+    'accent-2': t.accent.secondary,
+    'accent-3': t.accent.tertiary,
+  }[tone] || t.accent.primary;
+
+  const fmt = (v) =>
+    valueFmt === 'percent' ? `${v}%` : Number(v ?? 0).toLocaleString('es-GT', { maximumFractionDigits: 1 });
+
+  return (
+    <div className="h-full rounded-2xl border border-line bg-surface p-4 flex flex-col justify-between
+                    hover:shadow-md hover:-translate-y-0.5 transition-all duration-200
+                    dark:hover:shadow-glow-accent-lg group relative overflow-hidden">
+      <span aria-hidden
+            className="absolute inset-x-0 top-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ background: `linear-gradient(90deg, transparent, ${toneColor}, transparent)` }} />
+      <div className="text-[10px] uppercase tracking-wider text-fg-muted font-semibold">{label}</div>
+      <div className="flex-1 flex flex-col justify-center">
+        <div className="font-extrabold tabular-nums leading-none"
+             style={{ fontSize: 'clamp(36px, 4vw, 56px)', color: toneColor }}>
+          {value != null ? fmt(value) : '—'}
+        </div>
+        {subLabel && <div className="text-[11px] text-fg-muted mt-2">{subLabel}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ───────────── Costos card vertical compacta ─────────────
 function CostosCard({ costos, t }) {
   const items = [
     { label: 'Kit lab', value: costos.kit, color: t.accent.tertiary },
@@ -260,7 +373,6 @@ function CostosCard({ costos, t }) {
     { label: 'Viáticos', value: costos.viaticos, color: t.status.warning },
   ];
   const total = costos.total || items.reduce((s, i) => s + (i.value || 0), 0);
-
   return (
     <div className="h-full flex flex-col rounded-2xl border border-line bg-surface p-3">
       <div className="flex items-center justify-between mb-2">
@@ -307,7 +419,7 @@ function derivarKpis(data, serieDiaria) {
   const faltaMeta = serieDiaria?.falta_para_meta;
 
   const pctMetaPrev = aux.pct_meta_mes_anterior;
-  const pctMetaDelta = (pctMeta != null && pctMetaPrev != null)
+  const pctMetaDelta = (pctMeta != null && pctMetaPrev != null && pctMetaPrev > 0)
     ? Number((pctMeta - pctMetaPrev).toFixed(1))
     : null;
 
@@ -318,36 +430,22 @@ function derivarKpis(data, serieDiaria) {
     diasConsumidos: aux.dias_consumidos_mes,
     diasTotales: aux.dias_totales_mes,
     jornadasRestantes: aux.jornadas_programadas_restantes,
+    promedioPorJornada: aux.promedio_por_jornada,
+    promedioPorEmpresa: aux.promedio_por_empresa,
+    nEmpresasActivas: aux.n_empresas_activas,
   };
 }
 
 // ───────────── Iconos inline ─────────────
 function TargetIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
-      <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" />
-    </svg>
-  );
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg>;
 }
 function UsersIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-2a4 4 0 100-8 4 4 0 000 8z" />
-    </svg>
-  );
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-2a4 4 0 100-8 4 4 0 000 8z" /></svg>;
 }
-function CheckCircleIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a10 10 0 11-20 0 10 10 0 0120 0z" />
-    </svg>
-  );
+function UserMinusIcon() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0zm-6-4a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
 }
 function CalendarIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3">
-      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-      <line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
-    </svg>
-  );
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3 w-3"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>;
 }
