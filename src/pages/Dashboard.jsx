@@ -53,16 +53,19 @@ export default function Dashboard() {
     return { cancel, inaug, warn };
   }, [sortedAlertas]);
 
-  const proximas = useMemo(() => {
-    if (!data?.proximas_jornadas) return [];
+  const proximasInfo = useMemo(() => {
+    const all = data?.proximas_jornadas || [];
+    if (!all.length) return { items: [], showingFallback: false, nextDate: null };
     const now = new Date();
     const hoy = now.toISOString().slice(0, 10);
-    const tmp = new Date(now);
-    tmp.setDate(tmp.getDate() + 1);
+    const tmp = new Date(now); tmp.setDate(tmp.getDate() + 1);
     const manana = tmp.toISOString().slice(0, 10);
-    return data.proximas_jornadas.filter(
-      (j) => j.fecha_inicio === hoy || j.fecha_inicio === manana,
-    );
+    const hoyManana = all.filter((j) => j.fecha_inicio === hoy || j.fecha_inicio === manana);
+    if (hoyManana.length > 0) {
+      return { items: hoyManana, showingFallback: false, nextDate: null };
+    }
+    // Fallback: si no hay hoy/mañana, mostrar las próximas 3 con badge "futura"
+    return { items: all.slice(0, 3), showingFallback: true, nextDate: all[0].fecha_inicio };
   }, [data]);
 
   if (err) return <ErrorState message={err} />;
@@ -205,19 +208,23 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* Sidebar derecho — Próximas jornadas (HOY + MAÑANA) (row-span 3) */}
+        {/* Sidebar derecho — Próximas jornadas (HOY + MAÑANA, con fallback) (row-span 3) */}
         <div className="row-span-3 min-h-0">
           <MiniChartCard
             title="Próximas jornadas"
-            subtitle={`Hoy y mañana · ${proximas.length}`}
+            subtitle={
+              proximasInfo.showingFallback
+                ? `Siguiente: ${proximasInfo.nextDate}`
+                : `Hoy y mañana · ${proximasInfo.items.length}`
+            }
             density="compact"
             bodyClassName="-mx-1 overflow-y-auto"
             className="h-full flex flex-col"
           >
             <DataList
-              items={proximas}
+              items={proximasInfo.items}
               renderItem={(j) => <JornadaRow jornada={j} dense />}
-              empty="Sin jornadas hoy ni mañana"
+              empty="Sin jornadas programadas"
               density="compact"
             />
           </MiniChartCard>
