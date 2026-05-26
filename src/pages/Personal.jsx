@@ -3,24 +3,37 @@ import { apiListPersonal, apiCreatePersonal, apiUpdatePersonal } from '../api/en
 import { fmtQ } from '../utils/format';
 
 /**
- * Muestra costo diario derivado de compensacion + renglón:
- *   - 011 / 022 (planilla): (mensual × 12 × 1.20) / 365 — incluye 20% prestaciones (aguinaldo, bono14, indemnización)
- *   - 029 (honorarios): mensual / 30 — sin prestaciones
+ * Muestra costo diario derivado del salario ingresado + renglón.
  *
- * Es solo informativo (lo que el dashboard/reportes usarán al prorratear).
+ * Para 011/022 (personal permanente/contrato): el usuario ingresa SALARIO ANUAL.
+ *   diario = (anual × 1.20) / 365  — incluye 20% prestaciones (aguinaldo, bono14, indemnización)
+ *
+ * Para 029 (honorarios): el usuario ingresa SALARIO MENSUAL.
+ *   diario = mensual / 30
+ *
+ * Recibe `salarioInput` (lo que el usuario tipea) y `renglon`. Internamente
+ * decide si es anual o mensual.
  */
-function CostoDiarioPreview({ compensacion, renglon }) {
-  const mensual = Number(compensacion) || 0;
-  if (!mensual) return null;
+function CostoDiarioPreview({ salarioInput, renglon }) {
+  const v = Number(salarioInput) || 0;
+  if (!v) return null;
   const conPrestaciones = renglon === '011' || renglon === '022';
-  const diario = conPrestaciones
-    ? (mensual * 12 * 1.20) / 365
-    : mensual / 30;
-  const anual = conPrestaciones ? mensual * 12 * 1.20 : mensual * 12;
+  let anual, mensual, diario;
+  if (conPrestaciones) {
+    // 011/022: el input ES el salario anual
+    anual = v * 1.20;        // anual + 20% prestaciones
+    mensual = v / 12;        // mensual equivalente (sin prestaciones, base)
+    diario = anual / 365;
+  } else {
+    // 029: el input ES el salario mensual
+    mensual = v;
+    anual = v * 12;
+    diario = v / 30;
+  }
   return (
     <div className="mt-2 text-xs bg-surface-elev rounded-lg p-2.5 border border-line-subtle">
       <div className="font-semibold text-fg mb-1 flex items-center gap-1">
-        💰 Costo diario derivado · renglón {renglon || '—'}
+        💰 Costo diario derivado · partida {renglon || '—'}
       </div>
       <div className="grid grid-cols-3 gap-2 text-[11px]">
         <div>
@@ -28,18 +41,18 @@ function CostoDiarioPreview({ compensacion, renglon }) {
           <div className="font-bold tabular-nums text-accent text-sm">{fmtQ(diario)}</div>
         </div>
         <div>
-          <div className="text-fg-muted">Mensual</div>
+          <div className="text-fg-muted">{conPrestaciones ? 'Mensual base' : 'Mensual'}</div>
           <div className="font-semibold tabular-nums">{fmtQ(mensual)}</div>
         </div>
         <div>
-          <div className="text-fg-muted">Anual{conPrestaciones && '+20%'}</div>
+          <div className="text-fg-muted">Anual{conPrestaciones && ' +20%'}</div>
           <div className="font-semibold tabular-nums">{fmtQ(anual)}</div>
         </div>
       </div>
       <div className="mt-1.5 text-[10px] text-fg-muted leading-tight">
         {conPrestaciones
-          ? 'Fórmula: (mensual × 12 × 1.20) / 365 — incluye aguinaldo, bono 14 e indemnización (20%).'
-          : 'Fórmula: mensual / 30 — honorarios sin prestaciones.'}
+          ? 'Fórmula: (salario anual × 1.20) / 365 — incluye aguinaldo, bono 14 e indemnización (20%).'
+          : 'Fórmula: salario mensual / 30 — honorarios sin prestaciones.'}
       </div>
     </div>
   );
@@ -108,17 +121,59 @@ export default function Personal() {
 }
 
 function PersonalForm({ initial, onClose, onSave }) {
-  const [form, setForm] = useState(initial || {
-    nombre_completo: '', nit: '', renglon: '029', ibm: '',
-    rol_default: 'MEDICO', seccion: 'SIPRESALUD', compensacion: '',
-    email: '', telefono: '',
+  // La BD guarda `compensacion` SIEMPRE en mensual (Q/mes), independiente del renglón.
+  // En la UI:
+  //   - 011/022 (planilla): el usuario ingresa SALARIO ANUAL — al guardar dividimos /12.
+  //   - 029 (honorarios): el usuario ingresa SALARIO MENSUAL — se guarda directo.
+  // Al cargar para edición, multiplicamos la compensacion mensual × 12 si es 011/022
+  // para que el input muestre el valor anual que el usuario espera ver.
+  const initialRenglon = initial?.renglon || '029';
+  const initialSalarioInput =
+    initial?.compensacion != null
+      ? ((initialRenglon === '011' || initialRenglon === '022')
+          ? initial.compensacion * 12   // mensual BD → anual UI
+          : initial.compensacion)
+      : '';
+
+  const [form, setForm] = useState({
+    nombre_completo: initial?.nombre_completo || '',
+    nit: initial?.nit || '',
+    renglon: initialRenglon,
+    ibm: initial?.ibm || '',
+    rol_default: initial?.rol_default || 'MEDICO',
+    seccion: initial?.seccion || 'SIPRESALUD',
+    salarioInput: initialSalarioInput,    // lo que muestra el input (anual o mensual según renglón)
+    email: initial?.email || '',
+    telefono: initial?.telefono || '',
   });
   const [err, setErr] = useState('');
   const set = (k,v)=>setForm(f=>({...f, [k]:v}));
+
+  const esPlanilla = form.renglon === '011' || form.renglon === '022';
+  const labelSalario = esPlanilla
+    ? 'Salario ANUAL en Quetzales · 011 / 022'
+    : 'Salario MENSUAL en Quetzales · 029 honorarios';
+  const placeholderSalario = esPlanilla ? 'ej. 180000.00 (anual)' : 'ej. 15000.00 (mensual)';
+
   async function submit(e) {
     e.preventDefault(); setErr('');
     try {
-      const body = { ...form, compensacion: form.compensacion === '' ? null : Number(form.compensacion) };
+      const inputVal = form.salarioInput === '' ? null : Number(form.salarioInput);
+      // Convertir a mensual antes de guardar en BD (contrato existente)
+      const compensacion = inputVal == null
+        ? null
+        : (esPlanilla ? inputVal / 12 : inputVal);
+      const body = {
+        nombre_completo: form.nombre_completo,
+        nit: form.nit,
+        renglon: form.renglon,
+        ibm: form.ibm,
+        rol_default: form.rol_default,
+        seccion: form.seccion,
+        compensacion,
+        email: form.email,
+        telefono: form.telefono,
+      };
       if (initial) await apiUpdatePersonal(initial.id, body);
       else await apiCreatePersonal(body);
       onSave();
@@ -149,13 +204,18 @@ function PersonalForm({ initial, onClose, onSave }) {
             <select className="input" value={form.seccion} onChange={(e)=>set('seccion', e.target.value)}>
               <option value="SIPRESALUD">SIPRESALUD</option><option value="CE">CE</option>
             </select></div>
-          <div className="col-span-2"><label className="label">Salario mensual en Quetzales</label>
-            <input className="input" type="number" step="0.01" value={form.compensacion} onChange={(e)=>set('compensacion', e.target.value)} placeholder="ej. 15000.00" />
+          <div className="col-span-2"><label className="label">{labelSalario}</label>
+            <input className="input" type="number" step="0.01"
+                   value={form.salarioInput}
+                   onChange={(e)=>set('salarioInput', e.target.value)}
+                   placeholder={placeholderSalario} />
             <p className="text-[10px] text-fg-subtle mt-1">
-              Se guarda cifrado en la BD. Solo gerencia y admin pueden ver el valor.
+              {esPlanilla
+                ? 'Las partidas 011 y 022 se ingresan como salario anual. El sistema lo convierte automáticamente al guardar.'
+                : 'Los honorarios (029) se ingresan como salario mensual.'}
+              {' '}Se guarda cifrado en la BD. Solo gerencia y admin pueden ver el valor.
             </p>
-            {/* Cálculo costo diario derivado en tiempo real para 011 y 022 */}
-            <CostoDiarioPreview compensacion={form.compensacion} renglon={form.renglon} />
+            <CostoDiarioPreview salarioInput={form.salarioInput} renglon={form.renglon} />
           </div>
           <div><label className="label">Email</label>
             <input className="input" type="email" value={form.email || ''} onChange={(e)=>set('email', e.target.value)} /></div>
