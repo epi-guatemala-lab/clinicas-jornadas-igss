@@ -286,14 +286,20 @@ export default function Dashboard() {
                className={`h-4 w-4 transition-transform ${histOpen ? 'rotate-180' : ''}`}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
-          Análisis histórico · serie 12 meses · distribución por departamento
-          {data.costos && ' · costos mensuales'}
+          {/* Solo gerencia ve el bloque completo (con distribución repetida +
+              costos mensuales). Admin ya tiene DistribucionDepartamento en
+              row 3 col 4 (en lugar del CostosCard), así que aquí solo ve
+              "serie 12 meses" para evitar duplicar la distribución. */}
+          Análisis histórico · serie 12 meses
+          {data.costos && ' · distribución por departamento · costos mensuales'}
           <span className="text-[10px] text-fg-subtle ml-1">(carga al expandir)</span>
         </summary>
         {histOpen && (
           <div className="p-4 pt-0 grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Serie12MesesChart />
-            <DistribucionDepartamentoChart />
+            {/* Distribución por departamento NO se duplica: para admin
+                (sin costos) ya está en row 3 col 4. Solo gerencia la ve aquí. */}
+            {data.costos && <DistribucionDepartamentoChart />}
             {data.costos && <CostosMensualesChart />}
           </div>
         )}
