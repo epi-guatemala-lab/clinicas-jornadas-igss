@@ -4,7 +4,7 @@ import { useApi } from '../hooks/useApi';
 import { useThemedColors } from '../theme/useThemedColors';
 import MiniChartCard from './cards/MiniChartCard';
 import { fmtN } from '../utils/format';
-import { normDepto, choroColor, choroLegend, loadDeptosGeoJSON } from '../utils/geo';
+import { normDepto, choroScale, loadDeptosGeoJSON } from '../utils/geo';
 
 // viewBox fijo con la proporción de Guatemala (bbox ~4.02° x 4.08°).
 const VBW = 1000;
@@ -69,7 +69,12 @@ export default function EpiMapChart({ params = {}, selected, onPick }) {
   }, [geo]);
 
   const isError = err && err !== '403';
-  const legend = choroLegend(t);
+  // Escala por cuantiles adaptada al rango real de las tasas con dato.
+  const scale = useMemo(
+    () => choroScale(Object.values(byDepto).map((d) => d.tasa), t),
+    [byDepto, t],
+  );
+  const legend = scale.legend;
 
   return (
     <MiniChartCard
@@ -97,7 +102,7 @@ export default function EpiMapChart({ params = {}, selected, onPick }) {
                 const name = f.properties?.nombre_normalizado;
                 const rec = byDepto[name];
                 const tasa = rec ? rec.tasa : null;
-                const fill = choroColor(tasa, t);
+                const fill = scale.colorFor(tasa);
                 const isSel = selected && normDepto(selected) === name;
                 const d = path(f);
                 if (!d) return null;
@@ -109,7 +114,8 @@ export default function EpiMapChart({ params = {}, selected, onPick }) {
                     stroke={isSel ? t.accent.primary : t.bg.surface}
                     strokeWidth={isSel ? 2.4 : 0.8}
                     style={{
-                      cursor: 'pointer',
+                      // A3: solo es clickeable si el depto tiene datos.
+                      cursor: rec ? 'pointer' : 'default',
                       transition: 'fill 200ms ease, opacity 150ms ease, stroke 150ms ease',
                       opacity: hover && hover.name !== name ? 0.78 : 1,
                       filter: isSel ? `drop-shadow(0 0 6px ${t.accent.primary}aa)` : 'none',
@@ -126,9 +132,11 @@ export default function EpiMapChart({ params = {}, selected, onPick }) {
                         y: ev.clientY - (box?.top || 0),
                       });
                     }}
-                    onClick={() => onPick && (isSel
-                      ? onPick(null, null)
-                      : onPick(name, rec?.raw ?? null))}
+                    onClick={() => {
+                      // A3: no crear "chip fantasma" en deptos sin datos.
+                      if (!onPick || !rec) return;
+                      isSel ? onPick(null, null) : onPick(name, rec.raw);
+                    }}
                   />
                 );
               })}
@@ -156,7 +164,7 @@ export default function EpiMapChart({ params = {}, selected, onPick }) {
                 <div className="text-[11px] text-fg-muted mt-0.5">Sin tamizajes</div>
               ) : (
                 <div className="mt-1 space-y-0.5 text-[11px]">
-                  <Row label="Prevalencia" value={`${hover.tasa}%`} strong color={choroColor(hover.tasa, t)} />
+                  <Row label="Prevalencia" value={`${hover.tasa}%`} strong color={scale.colorFor(hover.tasa)} />
                   <Row label="Casos" value={fmtN(hover.casos ?? 0)} />
                   <Row label="Tamizados" value={fmtN(hover.tamizados ?? 0)} />
                   {hover.inestable && (
