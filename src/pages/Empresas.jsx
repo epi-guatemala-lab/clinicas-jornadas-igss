@@ -3,6 +3,7 @@ import { apiListEmpresas, apiCreateEmpresa, apiUpdateEmpresa } from '../api/endp
 import { fmtN } from '../utils/format';
 import Modal from '../components/forms/Modal';
 import Field from '../components/forms/Field';
+import GeoSelects from '../components/forms/GeoSelects';
 import MiniChartCard from '../components/cards/MiniChartCard';
 
 export default function Empresas() {
@@ -114,8 +115,8 @@ function EmpresaForm({ initial, onClose, onSave }) {
                options={[['privada','Privada'],['publica','Pública'],['ong','ONG'],['otro','Otro']]} />
         <Field label="# Empleados (estimado)" type="number" min="0"
                value={form.n_empleados_estimado || ''} onChange={set('n_empleados_estimado')} />
-        <Field label="Departamento" value={form.departamento || ''} onChange={set('departamento')} />
-        <Field label="Municipio" value={form.municipio || ''} onChange={set('municipio')} />
+        <GeoSelects departamento={form.departamento} municipio={form.municipio}
+                    onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} />
         <Field label="Zona" value={form.zona || ''} onChange={set('zona')} />
         <Field className="col-span-2" label="Dirección" value={form.direccion || ''} onChange={set('direccion')} />
         <Field label="Contacto (nombre)" value={form.contacto_nombre || ''} onChange={set('contacto_nombre')} />

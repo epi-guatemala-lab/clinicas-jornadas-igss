@@ -3,6 +3,7 @@ import {
   apiListJornadas, apiListEmpresas, apiListPersonal, apiCreateJornada,
 } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
+import { useApi } from '../hooks/useApi';
 import JornadaModal from '../components/JornadaModal';
 import {
   SEMAFORO_DOT, TIPO_LABEL, ESTADO_LABEL, fmtN, fmtPct,
@@ -157,6 +158,14 @@ function NuevaJornadaModal({ onClose, onCreated }) {
 
   function setField(k, v) { setForm((f) => ({ ...f, [k]: v })); }
 
+  // Catálogo GT canónico (cascada departamento → municipio)
+  const { data: deptosCat } = useApi('/api/catalogos/departamentos');
+  const { data: munisCat } = useApi(
+    '/api/catalogos/municipios',
+    { departamento: form.departamento || '' },
+    { enabled: !!form.departamento },
+  );
+
   function addPersona() {
     const primero = personalDisponible[0];
     if (!primero) { alert(`No hay personal activo en la sección ${form.seccion_responsable}`); return; }
@@ -235,9 +244,17 @@ function NuevaJornadaModal({ onClose, onCreated }) {
                 <input className="input" type="number" min="0" value={form.programados}
                   onChange={(e) => setField('programados', e.target.value)} /></div>
               <div><label className="label">Departamento</label>
-                <input className="input" value={form.departamento || ''} onChange={(e) => setField('departamento', e.target.value)} /></div>
+                <select className="input" value={form.departamento || ''}
+                  onChange={(e) => setForm((f) => ({ ...f, departamento: e.target.value, municipio: '' }))}>
+                  <option value="">— Seleccione —</option>
+                  {(deptosCat?.items || []).map((d) => <option key={d} value={d}>{d}</option>)}
+                </select></div>
               <div><label className="label">Municipio</label>
-                <input className="input" value={form.municipio || ''} onChange={(e) => setField('municipio', e.target.value)} /></div>
+                <select className="input" value={form.municipio || ''}
+                  onChange={(e) => setField('municipio', e.target.value)}>
+                  <option value="">{form.departamento ? '— Seleccione —' : '(elija departamento)'}</option>
+                  {(munisCat?.items || []).map((m) => <option key={m} value={m}>{m}</option>)}
+                </select></div>
               <div><label className="label">Zona</label>
                 <input className="input" value={form.zona || ''} onChange={(e) => setField('zona', e.target.value)} /></div>
               <div><label className="label">Viáticos presupuesto (Q)</label>
