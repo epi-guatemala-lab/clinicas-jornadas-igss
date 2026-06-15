@@ -18,6 +18,9 @@ const ENDPOINT_POR_ROL = {
   admin: 'gerencia', gerencia: 'gerencia', ce: 'ce', sipresalud: 'sipresalud',
 };
 
+const MES_NOM = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio',
+  'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
 export default function Dashboard() {
   const { user } = useAuth();
   const t = useThemedColors();
@@ -27,16 +30,29 @@ export default function Dashboard() {
   const [err, setErr] = useState('');
   const [histOpen, setHistOpen] = useState(false);  // lazy-load análisis histórico
 
+  // Período seleccionado (patrón ← Hoy → como Calendario). Default = mes en curso.
+  const now = new Date();
+  const [periodo, setPeriodo] = useState({ anio: now.getFullYear(), mes: now.getMonth() + 1 });
+  const esMesActual = periodo.anio === now.getFullYear() && periodo.mes === now.getMonth() + 1;
+
+  const irMes = (delta) => setPeriodo((p) => {
+    const d = new Date(p.anio, p.mes - 1 + delta, 1);
+    return { anio: d.getFullYear(), mes: d.getMonth() + 1 };
+  });
+  const irHoy = () => setPeriodo({ anio: now.getFullYear(), mes: now.getMonth() + 1 });
+
   useEffect(() => {
     const rol = ENDPOINT_POR_ROL[user.rol];
+    const periodParams = { anio: periodo.anio, mes: periodo.mes };
+    setData(null);  // muestra skeleton al cambiar de período
     Promise.all([
-      apiDashboard(rol),
+      apiDashboard(rol, periodParams),
       apiAlertasUnificadas().catch(() => ({ alertas: [], counts: { total: 0 } })),
-      apiSerieDiariaMes().catch(() => null),
+      apiSerieDiariaMes(periodParams).catch(() => null),
     ])
       .then(([d, a, s]) => { setData(d); setAlertas(a); setSerieDiaria(s); })
       .catch((e) => setErr(e.response?.data?.detail || 'Error cargando dashboard'));
-  }, [user.rol]);
+  }, [user.rol, periodo.anio, periodo.mes]);
 
   // HOOKS — siempre llamarlos ANTES de cualquier early return
   const alertItems = alertas?.alertas || [];
@@ -86,18 +102,40 @@ export default function Dashboard() {
     ? Math.max(0, Math.round((100 - kpi.pctAsistencia) * 10) / 10)
     : null;
 
+  // "Sin actividad en {mes}": no hubo atendidos ni jornadas en el período.
+  const totalJornadasMes = (data.kpis || []).find((k) => /jornadas/i.test(k.label || ''))?.value;
+  const sinActividad =
+    (kpi.atendidos == null || kpi.atendidos === 0) &&
+    (!totalJornadasMes || totalJornadasMes === 0);
+
+  const periodoLabel = `${MES_NOM[periodo.mes]} ${periodo.anio}`;
+
   return (
     <div className="space-y-3">
-      {/* HEADER slim */}
+      {/* HEADER slim + navegador de período (← Hoy → como Calendario) */}
       <header className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-baseline gap-3">
+        <div className="flex items-baseline gap-3 flex-wrap">
           <h1 className="text-lg font-bold text-fg leading-none">
-            Resumen · <span className="tabular-nums">{data.periodo}</span>
+            Resumen · <span className="tabular-nums">{periodoLabel}</span>
           </h1>
-          <span className="text-[11px] text-fg-muted">Mes en curso · semáforos en vivo</span>
+          <span className="text-[11px] text-fg-muted">
+            {esMesActual ? 'Mes en curso · semáforos en vivo' : 'Período histórico'}
+          </span>
         </div>
         <div className="flex items-center gap-2">
-          {kpi.diasRestantes != null && (
+          <div className="flex items-center gap-1">
+            <button onClick={() => irMes(-1)} className="btn-secondary px-2.5 py-1 text-sm"
+                    aria-label="Mes anterior" title="Mes anterior">←</button>
+            <button onClick={irHoy}
+                    className={`px-2.5 py-1 text-sm rounded-md border transition
+                                ${esMesActual
+                                  ? 'border-line bg-surface text-fg-muted cursor-default'
+                                  : 'border-igss-primary bg-igss-primary text-white'}`}
+                    disabled={esMesActual} title="Ir al mes en curso">Hoy</button>
+            <button onClick={() => irMes(1)} className="btn-secondary px-2.5 py-1 text-sm"
+                    aria-label="Mes siguiente" title="Mes siguiente">→</button>
+          </div>
+          {esMesActual && kpi.diasRestantes != null && (
             <div className={`text-xs rounded-full px-2.5 py-1 border tabular-nums
                             ${kpi.diasRestantes <= 3 ? 'border-warning/50 bg-warning-soft text-warning' : 'border-line bg-surface text-fg-muted'}`}>
               <span className="font-bold">{kpi.diasRestantes}</span> días restantes
@@ -105,6 +143,16 @@ export default function Dashboard() {
           )}
         </div>
       </header>
+
+      {/* Banner: sin actividad en el período seleccionado */}
+      {sinActividad && (
+        <div className="rounded-xl border border-line bg-surface-elev px-4 py-2.5 text-sm text-fg-muted flex items-center gap-2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 flex-shrink-0">
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span>Sin actividad en <span className="font-semibold text-fg">{periodoLabel}</span> — no se registraron jornadas ni personas atendidas en este período.</span>
+        </div>
+      )}
 
       {/* ALERTAS SEPARADAS: 2 cards rojas (cancelación + inaug-sin-jornada) */}
       {(splitAlertas.cancel.length > 0 || splitAlertas.inaug.length > 0) ? (
@@ -172,24 +220,33 @@ export default function Dashboard() {
           />
         </div>
         <div className="min-h-[132px]">
-          <StatCard
-            label="% AUSENTISMO"
-            value={pctAusentismo ?? 0}
-            format="percent"
-            decimals={1}
-            tone={pctAusentismo == null ? 'neutral' : pctAusentismo <= 10 ? 'success' : pctAusentismo <= 20 ? 'warning' : 'danger'}
-            viz="donut"
-            vizData={{
-              value: pctAusentismo ?? 0,
-              max: 100,
-              color: pctAusentismo <= 10 ? t.status.success : pctAusentismo <= 20 ? t.status.warning : t.status.danger,
-              size: 60, thickness: 8,
-              centerLabel: pctAusentismo != null ? `${Math.round(pctAusentismo)}%` : '—',
-            }}
-            subLabel={kpi.pctAsistencia != null ? `${kpi.pctAsistencia.toFixed(1)}% asistencia` : 'Sin jornadas cerradas'}
-            icon={<UserMinusIcon />}
-            compact
-          />
+          {pctAusentismo == null ? (
+            // A3: sin jornadas cerradas → "—" neutral (NO 100%/0%, que sería engañoso)
+            <NeutralKpiCard
+              label="% AUSENTISMO"
+              icon={<UserMinusIcon />}
+              subLabel="Sin jornadas cerradas"
+            />
+          ) : (
+            <StatCard
+              label="% AUSENTISMO"
+              value={pctAusentismo}
+              format="percent"
+              decimals={1}
+              tone={pctAusentismo <= 10 ? 'success' : pctAusentismo <= 20 ? 'warning' : 'danger'}
+              viz="donut"
+              vizData={{
+                value: pctAusentismo,
+                max: 100,
+                color: pctAusentismo <= 10 ? t.status.success : pctAusentismo <= 20 ? t.status.warning : t.status.danger,
+                size: 60, thickness: 8,
+                centerLabel: `${Math.round(pctAusentismo)}%`,
+              }}
+              subLabel={kpi.pctAsistencia != null ? `${kpi.pctAsistencia.toFixed(1)}% asistencia` : 'Sin jornadas cerradas'}
+              icon={<UserMinusIcon />}
+              compact
+            />
+          )}
         </div>
         <div className="min-h-[132px]">
           <StatCard
@@ -235,14 +292,30 @@ export default function Dashboard() {
           </MiniChartCard>
         </div>
 
-        {/* ── Row 2: Chart hero
+        {/* ── Row 2: Chart hero (progreso diario)
             - mobile: col-span-1
             - sm: col-span-2
             - lg+: col-span-4 (ancho completo de los 4 KPIs)
-        */}
+            El chart se auto-sirve del mes EN CURSO; para períodos históricos
+            mostramos un placeholder porque los KPIs de arriba ya reflejan
+            el período seleccionado. */}
         <div className="col-span-1 sm:col-span-2 lg:col-span-4 xl:col-span-4"
              style={{ height: 280 }}>
-          <ProgresoDiarioMesChart compact />
+          {esMesActual ? (
+            <ProgresoDiarioMesChart compact />
+          ) : (
+            <MiniChartCard title="Progreso diario del mes"
+                           subtitle={`Disponible solo para el mes en curso · viendo ${periodoLabel}`}
+                           className="h-full" density="compact">
+              <div className="h-full flex flex-col items-center justify-center text-center text-fg-muted gap-2 py-6">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-9 w-9 opacity-40">
+                  <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="3" y1="10" x2="21" y2="10" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="16" y1="2" x2="16" y2="6" />
+                </svg>
+                <div className="text-sm">El progreso diario se muestra para el mes en curso.</div>
+                <button onClick={irHoy} className="btn-secondary text-xs px-3 py-1">Volver al mes actual</button>
+              </div>
+            </MiniChartCard>
+          )}
         </div>
 
         {/* ── Row 3: Promedios + Estado + Costos/Depto (4 cards) ────────── */}
@@ -383,6 +456,30 @@ function PromedioCard({ label, value, valueFmt = 'number', subLabel, tone, t }) 
           {value != null ? fmt(value) : '—'}
         </div>
         {subLabel && <div className="text-[11px] text-fg-muted mt-2">{subLabel}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ───────────── KPI neutral "—" (sin dato medible) ─────────────
+// Replica el chrome de StatCard compact pero muestra "—" en vez de 0%/100%
+// cuando no hay base para calcular el indicador.
+function NeutralKpiCard({ label, icon, subLabel }) {
+  return (
+    <div className="group relative rounded-2xl border border-line bg-surface p-3 shadow-sm
+                    flex flex-col h-full" style={{ overflow: 'hidden' }}>
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-fg-muted font-semibold truncate">
+          {icon}
+          <span className="truncate">{label}</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 flex-1 min-h-0">
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <div className="font-extrabold leading-none tabular-nums text-fg-subtle"
+               style={{ fontSize: 'clamp(20px, 2.2vw, 32px)' }}>—</div>
+          {subLabel && <div className="mt-1 text-[10px] text-fg-muted truncate">{subLabel}</div>}
+        </div>
       </div>
     </div>
   );

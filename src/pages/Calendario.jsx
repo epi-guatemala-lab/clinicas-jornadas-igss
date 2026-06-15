@@ -15,13 +15,39 @@ export default function Calendario() {
   const [eventos, setEventos] = useState([]);
   const [selected, setSelected] = useState(null);
   const [soloAlertas, setSoloAlertas] = useState(false);
+  const [ultimoMes, setUltimoMes] = useState(null);  // último mes con jornadas (lookback)
 
   const desde = useMemo(() => format(startOfMonth(month), 'yyyy-MM-dd'), [month]);
   const hasta = useMemo(() => format(endOfMonth(month), 'yyyy-MM-dd'), [month]);
 
   useEffect(() => {
-    apiCalendario(desde, hasta, seccion).then((d) => setEventos(d.eventos || []));
-  }, [desde, hasta, seccion]);
+    let cancelled = false;
+    apiCalendario(desde, hasta, seccion).then((d) => {
+      if (cancelled) return;
+      const evs = d.eventos || [];
+      setEventos(evs);
+      // Si el mes está vacío, buscar el último mes (12 meses atrás) con jornadas
+      // para dar un hint accionable. Si hay eventos, no hace falta.
+      if (evs.length === 0) {
+        const lookbackDesde = format(addMonths(startOfMonth(month), -12), 'yyyy-MM-dd');
+        const lookbackHasta = format(endOfMonth(addMonths(startOfMonth(month), -1)), 'yyyy-MM-dd');
+        apiCalendario(lookbackDesde, lookbackHasta, seccion)
+          .then((p) => {
+            if (cancelled) return;
+            const prev = (p.eventos || []).filter((e) => e.fecha_inicio);
+            if (prev.length === 0) { setUltimoMes(null); return; }
+            // fecha más reciente entre los eventos del lookback
+            const maxFecha = prev.reduce((mx, e) => (e.fecha_inicio > mx ? e.fecha_inicio : mx), prev[0].fecha_inicio);
+            const [y, m] = maxFecha.split('-').map(Number);
+            setUltimoMes({ date: startOfMonth(new Date(y, m - 1, 1)) });
+          })
+          .catch(() => { if (!cancelled) setUltimoMes(null); });
+      } else {
+        setUltimoMes(null);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [desde, hasta, seccion, month]);
 
   const filteredEventos = soloAlertas
     ? eventos.filter((e) => e.sin_jornada_asociada || e.estado === 'CANCELADA')
@@ -66,6 +92,28 @@ export default function Calendario() {
         month={month}
         eventos={filteredEventos}
         onEventClick={(e) => setSelected(e.id)} />
+
+      {/* Mes sin eventos: hint accionable hacia el último mes con jornadas */}
+      {!soloAlertas && eventos.length === 0 && (
+        <div className="rounded-2xl border border-line bg-surface-elev px-4 py-3 text-sm text-fg-muted flex flex-wrap items-center gap-2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 flex-shrink-0">
+            <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="3" y1="10" x2="21" y2="10" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="16" y1="2" x2="16" y2="6" />
+          </svg>
+          <span>
+            Sin eventos en <span className="font-semibold text-fg">{format(month, 'MMMM yyyy').replace(/^\w/, c => c.toUpperCase())}</span>.
+          </span>
+          {ultimoMes ? (
+            <button
+              onClick={() => setMonth(ultimoMes.date)}
+              className="font-semibold text-igss-primary hover:underline"
+            >
+              Ir al último mes con jornadas: {format(ultimoMes.date, 'MMMM yyyy').replace(/^\w/, c => c.toUpperCase())} →
+            </button>
+          ) : (
+            <span className="text-fg-subtle">No hay jornadas en los 12 meses previos.</span>
+          )}
+        </div>
+      )}
 
       {soloAlertas && filteredEventos.length === 0 && (
         <div className="rounded-2xl border border-success/40 bg-success-soft/40 px-4 py-2.5 text-sm text-success font-medium">
