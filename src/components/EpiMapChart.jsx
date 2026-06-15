@@ -23,7 +23,7 @@ const VBH = 1015;
  * Renderizado como SVG puro (geoMercator().fitSize + geoPath) para tener control
  * total sobre hover/click/leyenda y respetar dark-mode con los tokens del theme.
  */
-export default function EpiMapChart({ params = {}, selected, onPick }) {
+export default function EpiMapChart({ params = {}, selected, onPick, ajustada = false }) {
   const { data, err, loading } = useApi('/api/epi/prevalencia-por/departamento', { ...params, limit: 25 });
   const t = useThemedColors();
 
@@ -41,15 +41,29 @@ export default function EpiMapChart({ params = {}, selected, onPick }) {
     return () => { alive = false; };
   }, []);
 
-  // Mapa nombre_normalizado → {tasa, tamizados, casos, raw}
+  // ¿el backend devolvió tasa ajustada? (toggle solo aplica si hay dato)
+  const hasAdj = useMemo(
+    () => (data?.items || []).some((it) => it.tasa_ajustada_por_100 != null),
+    [data],
+  );
+  const usaAjuste = ajustada && hasAdj;
+
+  // Mapa nombre_normalizado → {tasa, tamizados, casos, raw, ...}
   // `raw` = nombre tal cual en la BD ("Guatemala", "Petén"), necesario para
   // filtrar la API: el backend hace match EXACTO sobre departamento, así que
   // enviar la versión normalizada (MAYÚSC sin tildes) devolvería 0 filas.
+  // `tasa` es la que COLOREA el mapa: cruda u ajustada según el toggle.
   const byDepto = useMemo(() => {
     const m = {};
     for (const it of data?.items || []) {
+      const tasaCol = usaAjuste && it.tasa_ajustada_por_100 != null
+        ? it.tasa_ajustada_por_100 : it.tasa_por_100;
       m[normDepto(it.grupo)] = {
-        tasa: it.tasa_por_100,
+        tasa: tasaCol,
+        tasa_cruda: it.tasa_por_100,
+        tasa_ajustada: it.tasa_ajustada_por_100,
+        ci_low: it.ci_low,
+        ci_high: it.ci_high,
         tamizados: it.tamizados,
         casos: it.casos,
         inestable: it.inestable,
@@ -57,7 +71,7 @@ export default function EpiMapChart({ params = {}, selected, onPick }) {
       };
     }
     return m;
-  }, [data]);
+  }, [data, usaAjuste]);
 
   // Proyección + path generador con viewBox FIJO (Guatemala ~ 1000×1015) +
   // preserveAspectRatio: el SVG escala con CSS, así el mapa nunca depende de
@@ -79,7 +93,9 @@ export default function EpiMapChart({ params = {}, selected, onPick }) {
   return (
     <MiniChartCard
       title="Mapa de prevalencia por departamento"
-      subtitle="Tasa de tamizados con ≥1 hallazgo · clic en un departamento para filtrar"
+      subtitle={usaAjuste
+        ? 'Tasa AJUSTADA por edad-sexo · clic en un departamento para filtrar'
+        : 'Tasa de tamizados con ≥1 hallazgo · clic en un departamento para filtrar'}
       className="h-full"
       loading={loading && !geo}
       error={isError ? err : (geoErr || null)}
@@ -125,6 +141,10 @@ export default function EpiMapChart({ params = {}, selected, onPick }) {
                       setHover({
                         name,
                         tasa,
+                        tasa_cruda: rec?.tasa_cruda,
+                        tasa_ajustada: rec?.tasa_ajustada,
+                        ci_low: rec?.ci_low,
+                        ci_high: rec?.ci_high,
                         tamizados: rec?.tamizados,
                         casos: rec?.casos,
                         inestable: rec?.inestable,
@@ -164,10 +184,20 @@ export default function EpiMapChart({ params = {}, selected, onPick }) {
                 <div className="text-[11px] text-fg-muted mt-0.5">Sin tamizajes</div>
               ) : (
                 <div className="mt-1 space-y-0.5 text-[11px]">
-                  <Row label="Prevalencia" value={`${hover.tasa}%`} strong color={scale.colorFor(hover.tasa)} />
+                  <Row label={usaAjuste ? 'Ajustada' : 'Prevalencia'} value={`${hover.tasa}%`}
+                       strong color={scale.colorFor(hover.tasa)} />
+                  {hover.ci_low != null && hover.ci_high != null && (
+                    <Row label="IC95%" value={`${hover.ci_low} – ${hover.ci_high}`} />
+                  )}
+                  {usaAjuste && hover.tasa_cruda != null && (
+                    <Row label="Cruda" value={`${hover.tasa_cruda}%`} />
+                  )}
+                  {!usaAjuste && hover.tasa_ajustada != null && (
+                    <Row label="Ajustada" value={`${hover.tasa_ajustada}%`} />
+                  )}
                   <Row label="Casos" value={fmtN(hover.casos ?? 0)} />
                   <Row label="Tamizados" value={fmtN(hover.tamizados ?? 0)} />
-                  {hover.inestable && (
+                  {hover.ci_low == null && hover.inestable && (
                     <div className="text-[10px] text-fg-subtle italic">n&lt;30 · tasa inestable</div>
                   )}
                 </div>

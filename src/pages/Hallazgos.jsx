@@ -5,6 +5,7 @@ import EpiMapChart from '../components/EpiMapChart';
 import {
   PrevalenciaPatologiaChart, PrevalenciaGrupoChart, DistribucionHallazgosChart,
   PiramidePoblacionalChart, PrevalenciaPorChart, EmpresasTabla, TendenciaEpiChart,
+  HeatmapPatologiaEdad, CoOcurrenciaChart, ComparacionSexoChart,
 } from '../components/EpiCharts';
 import { fmtN } from '../utils/format';
 
@@ -87,6 +88,9 @@ export default function Hallazgos() {
   const [patologiaId, setPatologiaId] = useState(null);
   const [patologiaNombre, setPatologiaNombre] = useState(null);
   const [grupoEtario, setGrupoEtario] = useState(null);
+  // Toggle CRUDA ↔ AJUSTADA (estandarización por edad-sexo). Lo comparten el
+  // mapa y las barras de gremio/departamento, para leer la misma vista.
+  const [ajustada, setAjustada] = useState(false);
 
   const p = PERIODOS.find((x) => x.key === periodo) || PERIODOS[0];
 
@@ -240,7 +244,7 @@ export default function Hallazgos() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3" style={{ minHeight: 460 }}>
         <div className="lg:col-span-7 min-h-[440px]">
           <EpiMapChart params={mapParams} selected={departamento}
-                       onPick={pickDepto} />
+                       onPick={pickDepto} ajustada={ajustada} />
         </div>
         <div className="lg:col-span-5 min-h-[440px]">
           <PrevalenciaPatologiaChart params={params}
@@ -258,10 +262,23 @@ export default function Hallazgos() {
         <DistribucionHallazgosChart params={params} />
       </div>
 
-      {/* ── Fila: Gremio + Departamento (barras) ─────────────────────── */}
+      {/* ── Fila: Gremio + Departamento (barras, toggle cruda/ajustada) ─ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3" style={{ minHeight: 400 }}>
-        <PrevalenciaPorChart dimension="gremio" titulo="Prevalencia por gremio" params={params} limit={25} />
-        <PrevalenciaPorChart dimension="departamento" titulo="Prevalencia por departamento" params={params} limit={25} />
+        <PrevalenciaPorChart dimension="gremio" titulo="Prevalencia por gremio" params={params} limit={25}
+                             ajustada={ajustada} onToggleAjustada={setAjustada} />
+        <PrevalenciaPorChart dimension="departamento" titulo="Prevalencia por departamento" params={params} limit={25}
+                             ajustada={ajustada} onToggleAjustada={setAjustada} />
+      </div>
+
+      {/* ── Fila: Comparación M vs F + Co-ocurrencia ─────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3" style={{ minHeight: 400 }}>
+        <ComparacionSexoChart params={params} />
+        <CoOcurrenciaChart params={params} top={12} />
+      </div>
+
+      {/* ── Fila: Heatmap patología × edad (ancho completo) ──────────── */}
+      <div className="grid grid-cols-1 gap-3">
+        <HeatmapPatologiaEdad params={resumenParams} />
       </div>
 
       {/* ── Fila: Empresas (tabla) + Tendencia ───────────────────────── */}
@@ -273,7 +290,8 @@ export default function Hallazgos() {
       {/* ── Nota de privacidad k-anon ────────────────────────────────── */}
       <p className="text-[11px] text-fg-subtle text-center pt-1 pb-2">
         Datos agregados. El DPI nunca se expone; las celdas con menos de 5 personas se
-        suprimen (k-anonimato) y las tasas con denominador &lt;30 se marcan como inestables.
+        suprimen (k-anonimato). La incertidumbre de cada tasa se expresa con su
+        intervalo de confianza al 95% (IC95% de Wilson).
       </p>
     </div>
   );

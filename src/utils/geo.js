@@ -17,50 +17,11 @@ export function normDepto(s) {
     .trim();
 }
 
-// ── Escala coroplética por TASA (% prevalencia) ─────────────────────────
-// Buckets pedidos por el contrato:
-//   sin dato → gris · >0–10 → amarillo · 10–25 → naranja · >25 → rojo
-// Los colores se resuelven contra los tokens del theme activo (useThemedColors)
-// para respetar dark-mode; este módulo solo define los umbrales + qué token usar.
-
-export const CHORO_BUCKETS = [
-  { key: 'nodata', label: 'Sin dato',  test: (v) => v == null,            token: 'neutral' },
-  { key: 'low',    label: '> 0 – 10%', test: (v) => v > 0 && v <= 10,     token: 'warning_soft' },
-  { key: 'mid',    label: '10 – 25%',  test: (v) => v > 10 && v <= 25,    token: 'warning' },
-  { key: 'high',   label: '> 25%',     test: (v) => v > 25,               token: 'danger' },
-  // tasa exactamente 0 (hay tamizados pero ningún hallazgo) → cuenta como "low"
-  // visualmente; lo tratamos junto a sin dato sólo si v==null. v===0 cae aquí:
-  { key: 'zero',   label: '0%',        test: (v) => v === 0,              token: 'neutral_soft' },
-];
-
-/**
- * Devuelve el color hex para una tasa, resolviendo el token contra el theme.
- * @param {number|null} tasa  - tasa por 100 (0..100) o null si no hay dato
- * @param {object} t          - objeto de useThemedColors()
- */
-export function choroColor(tasa, t) {
-  if (tasa == null) return t.status.neutral;          // sin dato → gris
-  if (tasa === 0) return t.status.neutralSoft;        // 0% → gris claro
-  if (tasa <= 10) return t.status.warningSoft;        // amarillo suave
-  if (tasa <= 25) return t.status.warning;            // naranja
-  return t.status.danger;                             // rojo
-}
-
-/**
- * Items de leyenda (label + color) ordenados para coincidir con el mapa.
- * @param {object} t - useThemedColors()
- */
-export function choroLegend(t) {
-  return [
-    { label: '> 25%',     color: t.status.danger },
-    { label: '10 – 25%',  color: t.status.warning },
-    { label: '> 0 – 10%', color: t.status.warningSoft },
-    { label: '0%',        color: t.status.neutralSoft },
-    { label: 'Sin dato',  color: t.status.neutral },
-  ];
-}
-
 // ── Escala por CUANTILES (adaptativa al rango real de los datos) ────────
+//
+// A10 (cleanup): se eliminaron CHORO_BUCKETS / choroColor / choroLegend
+// (umbrales fijos 0–10–25 muertos). El mapa SIEMPRE usa choroScale, que
+// reparte por cuantiles y es la única fuente de verdad de la coloración.
 // Las tasas de "≥1 hallazgo" por depto caen en 52–86%, así que umbrales fijos
 // (>25→rojo) pintan TODO rojo. choroScale reparte los deptos CON dato en 5
 // tramos por cuantiles, con rampa secuencial YlOrRd, para que el mapa

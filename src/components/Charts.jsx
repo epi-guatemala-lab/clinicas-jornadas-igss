@@ -258,8 +258,11 @@ export function DistribucionDepartamentoChart() {
 }
 
 // ───────────────────── progreso diario del mes ──────────────────────
-export function ProgresoDiarioMesChart({ compact = false }) {
-  const { data, err, loading } = useChartData('serie-diaria-mes');
+export function ProgresoDiarioMesChart({ compact = false, anio, mes }) {
+  // Acepta período explícito (anio/mes); si no se pasan, el backend cae al mes
+  // en curso. Permite renderizar la serie diaria también para meses históricos.
+  const params = (anio != null && mes != null) ? { anio, mes } : {};
+  const { data, err, loading } = useChartData('serie-diaria-mes', params);
   const t = useThemedColors();
   const ct = useChartTheme();
   if (err === '403') return null;
@@ -270,10 +273,18 @@ export function ProgresoDiarioMesChart({ compact = false }) {
   const metaColor = t.accent.secondary;
   const hoyStr = new Date().toISOString().slice(0, 10);
   const hoyData = data?.serie?.find((d) => d.fecha === hoyStr);
+  const MES_NOM = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio',
+    'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+  // Título con período: usa anio/mes prop o lo que resolvió el backend en data.
+  const ty = data?.anio ?? anio;
+  const tm = data?.mes ?? mes;
+  const tituloPeriodo = (ty && tm)
+    ? `Progreso diario · ${MES_NOM[tm]} ${ty}`
+    : 'Progreso diario del mes';
 
   return (
     <MiniChartCard
-      title="Progreso diario del mes"
+      title={tituloPeriodo}
       subtitle={
         data?.meta_mes
           ? `Meta: ${fmtN(data.meta_mes)} · Acumulado: ${fmtN(data.acumulado_atendidos)} · ${data.pct_meta}% · Falta: ${fmtN(data.falta_para_meta)}`
