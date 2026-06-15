@@ -30,29 +30,42 @@ export default function Dashboard() {
   const [err, setErr] = useState('');
   const [histOpen, setHistOpen] = useState(false);  // lazy-load análisis histórico
 
-  // Período seleccionado (patrón ← Hoy → como Calendario). Default = mes en curso.
+  // Período seleccionado (patrón ← Hoy → como Calendario). Default = null →
+  // en la 1ª carga NO forzamos mes (dejamos que el backend caiga al último mes
+  // CON datos vía _periodo_default), y sincronizamos el selector con lo que
+  // devuelve (response.periodo "YYYY-MM"). Así el usuario aterriza donde hay
+  // data, no en un mes en curso vacío.
   const now = new Date();
-  const [periodo, setPeriodo] = useState({ anio: now.getFullYear(), mes: now.getMonth() + 1 });
-  const esMesActual = periodo.anio === now.getFullYear() && periodo.mes === now.getMonth() + 1;
+  const [periodo, setPeriodo] = useState(null);
+  const esMesActual = !!periodo && periodo.anio === now.getFullYear() && periodo.mes === now.getMonth() + 1;
 
   const irMes = (delta) => setPeriodo((p) => {
-    const d = new Date(p.anio, p.mes - 1 + delta, 1);
+    const base = p || { anio: now.getFullYear(), mes: now.getMonth() + 1 };
+    const d = new Date(base.anio, base.mes - 1 + delta, 1);
     return { anio: d.getFullYear(), mes: d.getMonth() + 1 };
   });
   const irHoy = () => setPeriodo({ anio: now.getFullYear(), mes: now.getMonth() + 1 });
 
   useEffect(() => {
     const rol = ENDPOINT_POR_ROL[user.rol];
-    const periodParams = { anio: periodo.anio, mes: periodo.mes };
+    // periodo null → params vacíos → el backend decide (último mes con datos).
+    const periodParams = periodo ? { anio: periodo.anio, mes: periodo.mes } : {};
     setData(null);  // muestra skeleton al cambiar de período
     Promise.all([
       apiDashboard(rol, periodParams),
       apiAlertasUnificadas().catch(() => ({ alertas: [], counts: { total: 0 } })),
       apiSerieDiariaMes(periodParams).catch(() => null),
     ])
-      .then(([d, a, s]) => { setData(d); setAlertas(a); setSerieDiaria(s); })
+      .then(([d, a, s]) => {
+        setData(d); setAlertas(a); setSerieDiaria(s);
+        // Sincroniza el selector con el período resuelto por el backend (1ª carga).
+        if (!periodo && d?.periodo) {
+          const [yy, mm] = String(d.periodo).split('-').map(Number);
+          if (yy && mm) setPeriodo({ anio: yy, mes: mm });
+        }
+      })
       .catch((e) => setErr(e.response?.data?.detail || 'Error cargando dashboard'));
-  }, [user.rol, periodo.anio, periodo.mes]);
+  }, [user.rol, periodo]);
 
   // HOOKS — siempre llamarlos ANTES de cualquier early return
   const alertItems = alertas?.alertas || [];
@@ -108,7 +121,9 @@ export default function Dashboard() {
     (kpi.atendidos == null || kpi.atendidos === 0) &&
     (!totalJornadasMes || totalJornadasMes === 0);
 
-  const periodoLabel = `${MES_NOM[periodo.mes]} ${periodo.anio}`;
+  const periodoLabel = periodo
+    ? `${MES_NOM[periodo.mes]} ${periodo.anio}`
+    : (data.periodo || '');
 
   return (
     <div className="space-y-3">
