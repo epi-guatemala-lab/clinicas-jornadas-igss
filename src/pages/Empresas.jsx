@@ -26,7 +26,7 @@ export default function Empresas() {
           <table className="w-full text-sm">
             <thead className="bg-surface-elev text-fg-muted uppercase text-xs">
               <tr>
-                <th className="text-left p-2">Nombre</th>
+                <th className="text-left p-2">Razón Social</th>
                 <th className="text-left p-2">NIT</th>
                 <th className="text-left p-2">Empleados</th>
                 <th className="text-left p-2">Ubicación</th>
@@ -106,7 +106,7 @@ function EmpresaForm({ initial, onClose, onSave }) {
       }
     >
       <form id="empresa-form" onSubmit={submit} className="grid grid-cols-2 gap-3">
-        <Field className="col-span-2" label="Nombre legal" name="nombre_legal" required
+        <Field className="col-span-2" label="Razón Social" name="nombre_legal" required
                value={form.nombre_legal} onChange={set('nombre_legal')} />
         <Field label="Nombre comercial" value={form.nombre_comercial || ''} onChange={set('nombre_comercial')} />
         <Field label="NIT" value={form.nit || ''} onChange={set('nit')} />
