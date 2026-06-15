@@ -9,6 +9,7 @@ import EmptyState from '../components/feedback/EmptyState';
 
 // Tipos de meta (con rename: "Clínicas amarradas" → "Clínica + Jornada")
 const TIPOS = [
+  ['PERSONAS_TAMIZADAS', 'Personas tamizadas'],
   ['PACIENTES_ATENDIDOS', 'Pacientes atendidos'],
   ['JORNADAS_EJECUTADAS', 'Jornadas ejecutadas'],
   ['CLINICAS_AMARRADAS', 'Clínica + Jornada'],
@@ -17,12 +18,29 @@ const TIPOS = [
 
 const TIPO_LABEL_MAP = Object.fromEntries(TIPOS);
 
+// Años con datos epi (mismo set que Hallazgos). Default = año más reciente
+// con datos (2026), NO el getFullYear() del sistema.
+const ANIOS = [2026, 2025];
+const ANIO_DEFAULT = ANIOS[0];
+
+function Pill({ active, onClick, children }) {
+  return (
+    <button onClick={onClick}
+      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition border ${
+        active ? 'bg-igss-primary text-white border-igss-primary'
+               : 'bg-surface text-fg-muted border-line hover:text-fg'
+      }`}>
+      {children}
+    </button>
+  );
+}
+
 export default function Metas() {
   const [list, setList] = useState([]);
   const [empresas, setEmpresas] = useState(null);
   const [creating, setCreating] = useState(false);
   const [seccionEmp, setSeccionEmp] = useState('');
-  const year = new Date().getFullYear();
+  const [year, setYear] = useState(ANIO_DEFAULT);
 
   function reload() {
     apiListMetas({ anio: year }).then(setList);
@@ -31,7 +49,7 @@ export default function Metas() {
       .catch(() => setEmpresas({ empresas: [], promedio_general: {} }));
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { reload(); }, [seccionEmp]);
+  useEffect(() => { reload(); }, [seccionEmp, year]);
 
   const pg = empresas?.promedio_general || {};
 
@@ -42,7 +60,14 @@ export default function Metas() {
           <h1 className="text-xl font-bold text-fg">Metas {year}</h1>
           <p className="text-xs text-fg-muted">Cumplimiento institucional y por empresa</p>
         </div>
-        <button className="btn-primary" onClick={() => setCreating(true)}>+ Nueva meta</button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            {ANIOS.map((a) => (
+              <Pill key={a} active={year === a} onClick={() => setYear(a)}>{a}</Pill>
+            ))}
+          </div>
+          <button className="btn-primary" onClick={() => setCreating(true)}>+ Nueva meta</button>
+        </div>
       </div>
 
       {/* KPIs agregados — promedio general */}
@@ -98,7 +123,12 @@ export default function Metas() {
                 </td></tr>
               )}
               {list.map((m) => {
-                const pct = m.valor_meta ? (100 * (m.valor_logrado || 0) / m.valor_meta) : 0;
+                const logrado = m.valor_logrado || 0;
+                const pctRaw = m.valor_meta ? (100 * logrado / m.valor_meta) : 0;
+                // % logrado capeado a 100% (no se muestra >100 en la columna).
+                const pct = Math.min(100, pctRaw);
+                const sinData = logrado === 0;          // sin operativo en el período
+                const cumplida = pctRaw >= 100;
                 const color = pct >= 90 ? 'verde' : pct >= 80 ? 'amarillo' : 'naranja';
                 const MES_NOM = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
                 const periodoTxt = m.mes ? `${MES_NOM[m.mes]} ${m.anio}` : `Anual ${m.anio}`;
@@ -116,10 +146,22 @@ export default function Metas() {
                     <td className="p-2 text-right font-mono tabular-nums">{fmtN(m.valor_meta)}</td>
                     <td className="p-2 text-right font-mono tabular-nums">{fmtN(m.valor_logrado)}</td>
                     <td className="p-2 text-right">
-                      <span className="inline-flex items-center gap-1.5 justify-end">
-                        <span className={`w-2 h-2 rounded-full ${SEMAFORO_DOT[color]}`}/>
-                        {fmtPct(pct)}
-                      </span>
+                      {sinData ? (
+                        <span className="inline-flex items-center gap-1.5 justify-end text-fg-subtle">
+                          <span className="w-2 h-2 rounded-full bg-neutral" />
+                          <span className="text-xs">sin data</span>
+                        </span>
+                      ) : cumplida ? (
+                        <span className="inline-flex items-center gap-1.5 justify-end">
+                          <span className="badge-success text-[10px]">cumplida</span>
+                          <span className="font-semibold text-success">100%</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 justify-end">
+                          <span className={`w-2 h-2 rounded-full ${SEMAFORO_DOT[color]}`}/>
+                          {fmtPct(pct)}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );
@@ -194,8 +236,8 @@ export default function Metas() {
 
 function MetaForm({ onClose, onSaved }) {
   const [form, setForm] = useState({
-    anio: new Date().getFullYear(), mes: '', seccion: 'SIPRESALUD',
-    tipo_meta: 'PACIENTES_ATENDIDOS', valor_meta: 5000, notas: '',
+    anio: ANIO_DEFAULT, mes: '', seccion: 'SIPRESALUD',
+    tipo_meta: 'PERSONAS_TAMIZADAS', valor_meta: 5000, notas: '',
   });
   const [err, setErr] = useState('');
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e?.target ? e.target.value : e }));
