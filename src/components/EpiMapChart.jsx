@@ -6,6 +6,10 @@ import MiniChartCard from './cards/MiniChartCard';
 import { fmtN } from '../utils/format';
 import { normDepto, choroColor, choroLegend, loadDeptosGeoJSON } from '../utils/geo';
 
+// viewBox fijo con la proporción de Guatemala (bbox ~4.02° x 4.08°).
+const VBW = 1000;
+const VBH = 1015;
+
 /**
  * Mapa coroplético de Guatemala por tasa de prevalencia (% con hallazgo).
  *
@@ -27,7 +31,6 @@ export default function EpiMapChart({ params = {}, selected, onPick }) {
   const [geoErr, setGeoErr] = useState(null);
   const [hover, setHover] = useState(null); // { name, tasa, tamizados, x, y }
   const wrapRef = useRef(null);
-  const [size, setSize] = useState({ w: 520, h: 420 });
 
   // Cargar GeoJSON una vez
   useEffect(() => {
@@ -36,20 +39,6 @@ export default function EpiMapChart({ params = {}, selected, onPick }) {
       .then((gj) => { if (alive) setGeo(gj); })
       .catch((e) => { if (alive) setGeoErr(e.message || 'No se pudo cargar el mapa'); });
     return () => { alive = false; };
-  }, []);
-
-  // Medir el contenedor para hacer el mapa responsive
-  useEffect(() => {
-    if (!wrapRef.current) return;
-    const ro = new ResizeObserver((entries) => {
-      for (const e of entries) {
-        const w = Math.max(280, e.contentRect.width);
-        const h = Math.max(320, Math.min(560, w * 0.82));
-        setSize({ w, h });
-      }
-    });
-    ro.observe(wrapRef.current);
-    return () => ro.disconnect();
   }, []);
 
   // Mapa nombre_normalizado → {tasa, tamizados, casos, raw}
@@ -70,12 +59,14 @@ export default function EpiMapChart({ params = {}, selected, onPick }) {
     return m;
   }, [data]);
 
-  // Proyección + path generador (fitSize al tamaño actual)
+  // Proyección + path generador con viewBox FIJO (Guatemala ~ 1000×1015) +
+  // preserveAspectRatio: el SVG escala con CSS, así el mapa nunca depende de
+  // medir el contenedor en píxeles (evita el race que lo achicaba).
   const { path, features } = useMemo(() => {
     if (!geo) return { path: null, features: [] };
-    const proj = geoMercator().fitSize([size.w, size.h], geo);
+    const proj = geoMercator().fitSize([VBW, VBH], geo);
     return { path: geoPath(proj), features: geo.features || [] };
-  }, [geo, size.w, size.h]);
+  }, [geo]);
 
   const isError = err && err !== '403';
   const legend = choroLegend(t);
@@ -89,13 +80,14 @@ export default function EpiMapChart({ params = {}, selected, onPick }) {
       error={isError ? err : (geoErr || null)}
     >
       <div ref={wrapRef} className="relative w-full h-full flex flex-col min-h-0">
-        {/* Mapa */}
-        <div className="relative flex-1 min-h-0">
+        {/* Mapa — altura fija y SVG con aspect-ratio bloqueado */}
+        <div className="relative flex-1 min-h-0" style={{ minHeight: 380 }}>
           {path && features.length > 0 ? (
             <svg
               width="100%"
-              height={size.h}
-              viewBox={`0 0 ${size.w} ${size.h}`}
+              height="100%"
+              viewBox={`0 0 ${VBW} ${VBH}`}
+              preserveAspectRatio="xMidYMid meet"
               role="img"
               aria-label="Mapa coroplético de Guatemala por prevalencia"
               style={{ display: 'block' }}
@@ -152,7 +144,7 @@ export default function EpiMapChart({ params = {}, selected, onPick }) {
             <div
               className="pointer-events-none absolute z-10 rounded-lg border border-line bg-surface/95 backdrop-blur px-3 py-2 shadow-lg"
               style={{
-                left: Math.min(hover.x + 14, size.w - 170),
+                left: Math.min(hover.x + 14, (wrapRef.current?.clientWidth || 520) - 170),
                 top: Math.max(hover.y - 10, 4),
                 minWidth: 150,
               }}
