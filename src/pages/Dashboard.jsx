@@ -311,26 +311,16 @@ export default function Dashboard() {
             - mobile: col-span-1
             - sm: col-span-2
             - lg+: col-span-4 (ancho completo de los 4 KPIs)
-            El chart se auto-sirve del mes EN CURSO; para períodos históricos
-            mostramos un placeholder porque los KPIs de arriba ya reflejan
-            el período seleccionado. */}
+            El backend serie-diaria-mes acepta anio/mes, así que el chart se
+            renderiza también para meses históricos (la línea "HOY" solo
+            aparece cuando el día actual cae dentro del período visto). */}
         <div className="col-span-1 sm:col-span-2 lg:col-span-4 xl:col-span-4"
              style={{ height: 280 }}>
-          {esMesActual ? (
-            <ProgresoDiarioMesChart compact />
-          ) : (
-            <MiniChartCard title="Progreso diario del mes"
-                           subtitle={`Disponible solo para el mes en curso · viendo ${periodoLabel}`}
-                           className="h-full" density="compact">
-              <div className="h-full flex flex-col items-center justify-center text-center text-fg-muted gap-2 py-6">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-9 w-9 opacity-40">
-                  <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="3" y1="10" x2="21" y2="10" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="16" y1="2" x2="16" y2="6" />
-                </svg>
-                <div className="text-sm">El progreso diario se muestra para el mes en curso.</div>
-                <button onClick={irHoy} className="btn-secondary text-xs px-3 py-1">Volver al mes actual</button>
-              </div>
-            </MiniChartCard>
-          )}
+          <ProgresoDiarioMesChart
+            compact
+            anio={periodo?.anio}
+            mes={periodo?.mes}
+          />
         </div>
 
         {/* ── Row 3: Promedios + Estado + Costos/Depto (4 cards) ────────── */}

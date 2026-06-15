@@ -123,13 +123,18 @@ export default function Metas() {
                 </td></tr>
               )}
               {list.map((m) => {
-                const logrado = m.valor_logrado || 0;
+                // A5: el backend devuelve valor_logrado=null cuando NO hubo base
+                // en el período (cero operativo / cero personas epi). 0 real
+                // (hubo base pero logro 0) se pinta como 0% rojo, NO gris.
+                const sinData = m.valor_logrado == null;   // sin base en el período
+                const logrado = m.valor_logrado ?? 0;
                 const pctRaw = m.valor_meta ? (100 * logrado / m.valor_meta) : 0;
                 // % logrado capeado a 100% (no se muestra >100 en la columna).
                 const pct = Math.min(100, pctRaw);
-                const sinData = logrado === 0;          // sin operativo en el período
                 const cumplida = pctRaw >= 100;
-                const color = pct >= 90 ? 'verde' : pct >= 80 ? 'amarillo' : 'naranja';
+                // 0% real (hubo base, logro 0) → rojo, NO gris. <80% pero >0 →
+                // naranja (warning). El branch "sin data" se evalúa antes.
+                const color = pct >= 90 ? 'verde' : pct >= 80 ? 'amarillo' : pct > 0 ? 'naranja' : 'rojo';
                 const MES_NOM = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
                 const periodoTxt = m.mes ? `${MES_NOM[m.mes]} ${m.anio}` : `Anual ${m.anio}`;
                 const esAnual = !m.mes;
@@ -235,18 +240,32 @@ export default function Metas() {
 }
 
 function MetaForm({ onClose, onSaved }) {
+  // A6: PERSONAS_TAMIZADAS solo tiene sentido GLOBAL (epi no tiene sección).
+  // El default es PERSONAS_TAMIZADAS, así que la sección arranca en GLOBAL.
   const [form, setForm] = useState({
-    anio: ANIO_DEFAULT, mes: '', seccion: 'SIPRESALUD',
+    anio: ANIO_DEFAULT, mes: '', seccion: 'GLOBAL',
     tipo_meta: 'PERSONAS_TAMIZADAS', valor_meta: 5000, notas: '',
   });
   const [err, setErr] = useState('');
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e?.target ? e.target.value : e }));
+  const set = (k) => (e) => setForm((f) => {
+    const val = e?.target ? e.target.value : e;
+    const next = { ...f, [k]: val };
+    // A6: al cambiar a PERSONAS_TAMIZADAS, forzar sección GLOBAL (el backend
+    // rechaza con 400 cualquier otra sección para este tipo).
+    if (k === 'tipo_meta' && val === 'PERSONAS_TAMIZADAS') {
+      next.seccion = 'GLOBAL';
+    }
+    return next;
+  });
+  const seccionForzadaGlobal = form.tipo_meta === 'PERSONAS_TAMIZADAS';
 
   async function submit(e) {
     e.preventDefault(); setErr('');
     try {
       await apiCreateMeta({
         ...form,
+        // A6: defensa en profundidad — PERSONAS_TAMIZADAS siempre GLOBAL.
+        seccion: form.tipo_meta === 'PERSONAS_TAMIZADAS' ? 'GLOBAL' : form.seccion,
         mes: form.mes === '' ? null : Number(form.mes),
         valor_meta: Number(form.valor_meta),
       });
@@ -269,7 +288,11 @@ function MetaForm({ onClose, onSaved }) {
         <Field label="Año" type="number" name="anio" value={form.anio} onChange={set('anio')} />
         <Field label="Mes (vacío = anual)" type="select" name="mes" value={form.mes} onChange={set('mes')}
                options={[['', 'Anual'], ...Array.from({length:12},(_,i)=>[String(i+1), String(i+1)])]} />
-        <Field label="Sección" type="select" name="seccion" value={form.seccion} onChange={set('seccion')}
+        <Field label="Sección" type="select" name="seccion"
+               value={seccionForzadaGlobal ? 'GLOBAL' : form.seccion}
+               onChange={set('seccion')}
+               disabled={seccionForzadaGlobal}
+               hint={seccionForzadaGlobal ? 'Personas tamizadas es siempre GLOBAL' : undefined}
                options={[['GLOBAL','GLOBAL'],['CE','CE'],['SIPRESALUD','SIPRESALUD']]} />
         <Field label="Tipo" type="select" name="tipo_meta" value={form.tipo_meta} onChange={set('tipo_meta')}
                options={TIPOS} />
