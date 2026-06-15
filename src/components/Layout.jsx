@@ -12,6 +12,8 @@ export default function Layout({ children }) {
     { to: '/dashboard', label: 'Dashboard', roles: ['admin', 'gerencia', 'ce', 'sipresalud'] },
     { to: '/calendario', label: 'Calendario', roles: ['admin', 'gerencia', 'ce', 'sipresalud'] },
     { to: '/jornadas', label: 'Jornadas', roles: ['admin', 'gerencia', 'ce', 'sipresalud'] },
+    // Epidemiología: hallazgos de tamizaje SIPRESALUD (no CE)
+    { to: '/hallazgos', label: 'Epidemiología', roles: ['admin', 'gerencia', 'sipresalud'] },
     { to: '/empresas', label: 'Empresas', roles: ['admin', 'gerencia', 'ce', 'sipresalud'] },
     // Viáticos: todos pueden cargar y ver los SUYOS (backend filtra por personal_id)
     { to: '/viaticos', label: 'Viáticos', roles: ['admin', 'gerencia', 'ce', 'sipresalud'] },

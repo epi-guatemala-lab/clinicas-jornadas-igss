@@ -9,6 +9,7 @@ import Empresas from './pages/Empresas';
 import Personal from './pages/Personal';
 import Viaticos from './pages/Viaticos';
 import Metas from './pages/Metas';
+import Hallazgos from './pages/Hallazgos';
 
 function Protected({ children, roles }) {
   const { user } = useAuth();
@@ -32,6 +33,7 @@ export default function App() {
             <Route path="/viaticos" element={<Protected><Viaticos /></Protected>} />
             <Route path="/personal" element={<Protected roles={['admin','gerencia']}><Personal /></Protected>} />
             <Route path="/metas" element={<Protected roles={['admin','gerencia']}><Metas /></Protected>} />
+            <Route path="/hallazgos" element={<Protected roles={['admin','gerencia','sipresalud']}><Hallazgos /></Protected>} />
           </Routes>
         </Layout>
       } />
