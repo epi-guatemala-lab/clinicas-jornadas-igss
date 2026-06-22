@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiListPersonal, apiCreatePersonal, apiUpdatePersonal } from '../api/endpoints';
+import { useAuth } from '../hooks/useAuth';
 import { fmtQ } from '../utils/format';
 
 /**
@@ -61,6 +62,7 @@ function CostoDiarioPreview({ salarioInput, renglon }) {
 const ROLES = ['LIDER', 'MEDICO', 'ADMIN', 'ENFERMERIA', 'LABORATORISTA', 'DIGITADOR', 'ENCUESTADOR'];
 
 export default function Personal() {
+  const { canWrite } = useAuth();
   const [list, setList] = useState([]);
   const [filter, setFilter] = useState({ seccion: '' });
   const [editing, setEditing] = useState(null);
@@ -75,7 +77,9 @@ export default function Personal() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Personal IGSS</h1>
-        <button className="btn-primary" onClick={() => setCreating(true)}>+ Agregar</button>
+        {canWrite && (
+          <button className="btn-primary" onClick={() => setCreating(true)}>+ Agregar</button>
+        )}
       </div>
 
       <div className="flex gap-2">
@@ -108,7 +112,7 @@ export default function Personal() {
                 <td className="p-2">{p.rol_default}</td>
                 <td className="p-2">{p.renglon} {p.ibm && <span className="text-fg-muted text-xs">({p.ibm})</span>}</td>
                 <td className="p-2 text-right font-mono">{fmtQ(p.compensacion)}</td>
-                <td className="p-2"><button className="text-accent text-xs hover:underline" onClick={()=>setEditing(p)}>Editar</button></td>
+                <td className="p-2">{canWrite && <button className="text-accent text-xs hover:underline" onClick={()=>setEditing(p)}>Editar</button>}</td>
               </tr>
             ))}
           </tbody>

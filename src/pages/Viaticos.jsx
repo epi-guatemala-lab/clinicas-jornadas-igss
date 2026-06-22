@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   apiListViaticos, apiCreateViatico, apiNextCorrelativo, apiListPersonal, apiListJornadas,
 } from '../api/endpoints';
+import { useAuth } from '../hooks/useAuth';
 import { fmtQ } from '../utils/format';
 
 const STATUS = ['PENDIENTE', 'UTILIZADO', 'ANULADO', 'EXTRAVIADO'];
@@ -13,6 +14,7 @@ const STATUS_BG = {
 };
 
 export default function Viaticos() {
+  const { canWrite } = useAuth();
   const [list, setList] = useState([]);
   const [creating, setCreating] = useState(false);
   const [filter, setFilter] = useState({ status: '' });
@@ -27,7 +29,9 @@ export default function Viaticos() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Viáticos · Correlativo {new Date().getFullYear()}</h1>
-        <button className="btn-primary" onClick={()=>setCreating(true)}>+ Nuevo viático</button>
+        {canWrite && (
+          <button className="btn-primary" onClick={()=>setCreating(true)}>+ Nuevo viático</button>
+        )}
       </div>
       <div className="flex gap-2">
         {['', ...STATUS].map((s) => (

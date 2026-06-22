@@ -10,10 +10,12 @@ export function AuthProvider({ children }) {
   });
   const [loading, setLoading] = useState(false);
 
-  // Si hay token guardado, refresca user al cargar
+  // Si hay token guardado, RE-VALIDA contra /me al cargar (siempre, no solo si
+  // falta en localStorage): así un cambio de rol/permiso (visor↔editor) toma
+  // efecto al recargar y no queda cacheado con permisos viejos.
   useEffect(() => {
     const tok = localStorage.getItem('jornadas_token');
-    if (tok && !user) {
+    if (tok) {
       apiMe().then((u) => {
         setUser(u);
         localStorage.setItem('jornadas_user', JSON.stringify(u));
@@ -41,8 +43,12 @@ export function AuthProvider({ children }) {
     setUser(null);
   }
 
+  // canWrite: el permiso (no el rol) decide si el usuario puede modificar datos.
+  // Espejo del guard require_write del backend; el enforcement real es la API.
+  const canWrite = user?.permiso === 'editor';
+
   return (
-    <AuthCtx.Provider value={{ user, login, logout, loading }}>
+    <AuthCtx.Provider value={{ user, login, logout, loading, canWrite }}>
       {children}
     </AuthCtx.Provider>
   );

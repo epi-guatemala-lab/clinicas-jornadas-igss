@@ -3,8 +3,9 @@ import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   addDays, format, isSameMonth, isSameDay,
 } from 'date-fns';
-import { SEMAFORO_BG, TIPO_LABEL } from '../utils/format';
-import { isEnCurso, mapSemaforoLegacy } from '../utils/derived';
+import { TIPO_LABEL, ESTADO_LABEL } from '../utils/format';
+import { getChipDescriptor } from '../utils/derived';
+import TipoIcon from './TipoIcon';
 
 const DAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 
@@ -60,35 +61,37 @@ export default function CalendarMonth({ month, eventos, onEventClick }) {
               }`}>{format(d, 'd')}</div>
               <div className="space-y-1">
                 {events.map((e) => {
-                  // 1) ¿Está realmente en curso (hoy + horario)?
-                  const enCursoLocal = isEnCurso(e, now);
-                  // 2) Mapear naranja vs rojo según contexto
-                  const semNorm = enCursoLocal
-                    ? 'azul'  // override visual: en curso
-                    : mapSemaforoLegacy(e.semaforo, e);
-                  const critico = !!e.sin_jornada_asociada || e.estado === 'CANCELADA';
-                  // Inauguración sin jornada → morado (distinto del rojo cancelada)
-                  const inaugSinClass = 'text-white font-bold ring-2 shadow-md jornada-alerta-pulse';
-                  const inaugSinStyle = {
-                    background: 'rgb(147 51 234)',  // purple-600
-                    boxShadow: '0 0 0 2px rgb(168 85 247 / 0.6)',
-                  };
+                  const d = getChipDescriptor(e, now);
+                  const label = e.empresa || e.tema || TIPO_LABEL[e.tipo] || e.tipo;
+                  const trailGlifo = d.saludGlifo || d.estadoGlifo;
+                  const seccionNombre = d.seccionPrefijo === 'CE' ? 'Clínicas de Empresa' : 'SIPRESALUD';
+                  const title = [
+                    `${TIPO_LABEL[e.tipo] || e.tipo} · ${seccionNombre}`,
+                    e.empresa || null,
+                    ESTADO_LABEL[e.estado] || e.estado,
+                    e.pct_asistencia != null ? `${e.pct_asistencia}% asistencia` : null,
+                    e.charla_tema ? `Charla: ${e.charla_tema}` : null,
+                    d.esAlertaInaug ? '⚠️ INAUGURACIÓN SIN JORNADA ASOCIADA — coordinar con SIPRESALUD' : null,
+                    d.esEnCurso ? '🔵 EN CURSO ahora' : null,
+                  ].filter(Boolean).join(' · ');
                   return (
                     <button key={e.id} onClick={() => onEventClick?.(e)}
-                      className={`block w-full text-left text-xs rounded px-1.5 py-1 truncate transition ${
-                        e.sin_jornada_asociada
-                          ? inaugSinClass
-                          : (SEMAFORO_BG[semNorm] || 'bg-neutral text-white') + ' hover:opacity-90'
-                      }`}
-                      style={e.sin_jornada_asociada ? inaugSinStyle : undefined}
-                      title={`${TIPO_LABEL[e.tipo] || e.tipo} · ${e.empresa || ''}${
-                        e.sin_jornada_asociada ? ' · ⚠️ INAUGURACIÓN SIN JORNADA ASOCIADA — coordinar con SIPRESALUD' : ''
-                      }${enCursoLocal ? ' · 🔵 EN CURSO ahora' : ''}`}>
-                      {e.sin_jornada_asociada && <span className="mr-1">⚠️</span>}
-                      {enCursoLocal && !critico && <span className="mr-1">●</span>}
-                      {e.hora_inicio && <span className="mr-1 opacity-80">{e.hora_inicio.slice(0,5)}</span>}
-                      <span className={e.sin_jornada_asociada ? 'uppercase tracking-wide' : 'font-medium'}>
-                        {e.empresa || e.tema || TIPO_LABEL[e.tipo]}
+                      title={title}
+                      className={`relative block w-full text-left text-[11px] rounded-r py-1 pr-1 truncate text-white transition hover:opacity-90 ${d.pulseClass} ${d.esEnCurso ? 'ring-1 ring-white/90' : ''}`}
+                      style={{
+                        backgroundColor: `rgb(var(${d.bgVar}))`,
+                        borderLeft: `4px ${d.seccionDashed ? 'dashed' : 'solid'} rgb(var(${d.seccionVar}))`,
+                      }}>
+                      <span className="flex items-center gap-1 pl-1 max-w-full">
+                        <span className="text-[8px] font-bold leading-none px-1 py-0.5 rounded bg-white/25">{d.seccionPrefijo}</span>
+                        <TipoIcon tipo={e.tipo} />
+                        {d.esAlertaInaug && <span aria-hidden>⚠️</span>}
+                        {d.leadGlifo && <span aria-hidden className="leading-none">{d.leadGlifo}</span>}
+                        {e.hora_inicio && <span className="opacity-80">{e.hora_inicio.slice(0, 5)}</span>}
+                        <span className={`truncate ${d.tachado ? 'line-through opacity-90' : 'font-medium'} ${d.esAlertaInaug ? 'uppercase tracking-wide font-bold' : ''}`}>
+                          {label}
+                        </span>
+                        {trailGlifo && <span aria-hidden className="ml-auto font-bold pl-0.5">{trailGlifo}</span>}
                       </span>
                     </button>
                   );

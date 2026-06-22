@@ -14,7 +14,7 @@ const CATEGORIAS = [
 ];
 
 export default function JornadaModal({ jornadaId, onClose, onChanged }) {
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
   const [j, setJ] = useState(null);
   const [mode, setMode] = useState('view');  // view | cancel | close
   const [form, setForm] = useState({});
@@ -79,6 +79,12 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
           {j.kits_consumidos != null && <Field label="Kits consumidos">{fmtN(j.kits_consumidos)}</Field>}
           {j.viaticos_real != null && <Field label="Viáticos reales">{fmtQ(j.viaticos_real)}</Field>}
           {j.inaugura_clinica && <Field label="Inaugura clínica" className="col-span-2 text-accent font-medium">✓ Esta jornada inaugura una clínica permanente</Field>}
+          {(j.charla_tema || j.charla_responsable) && (
+            <Field label="Charla de educación en salud" className="col-span-2">
+              {j.charla_tema || '—'}
+              {j.charla_responsable ? <span className="text-fg-muted"> · Responsable: {j.charla_responsable}</span> : null}
+            </Field>
+          )}
         </div>
 
         {j.personal?.length > 0 && (
@@ -162,7 +168,7 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
       {mode === 'view' && (
         <div className="border-t border-line-subtle p-4 flex justify-between bg-surface-elev">
           <button className="btn-secondary" onClick={onClose}>Cerrar</button>
-          {puedeEditar && (
+          {puedeEditar && canWrite && (
             <div className="flex gap-2">
               <button className="btn-danger" onClick={() => { setForm({}); setMode('cancel'); }}>Cancelar</button>
               <button className="btn-primary" onClick={() => { setForm({}); setMode('close'); }}>Cerrar con métricas</button>

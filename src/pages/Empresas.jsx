@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiListEmpresas, apiCreateEmpresa, apiUpdateEmpresa } from '../api/endpoints';
+import { useAuth } from '../hooks/useAuth';
 import { fmtN } from '../utils/format';
 import Modal from '../components/forms/Modal';
 import Field from '../components/forms/Field';
@@ -7,6 +8,7 @@ import GeoSelects from '../components/forms/GeoSelects';
 import MiniChartCard from '../components/cards/MiniChartCard';
 
 export default function Empresas() {
+  const { canWrite } = useAuth();
   const [list, setList] = useState([]);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -20,7 +22,9 @@ export default function Empresas() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h1 className="text-xl font-bold text-fg">Empresas</h1>
-        <button className="btn-primary" onClick={() => setCreating(true)}>+ Nueva empresa</button>
+        {canWrite && (
+          <button className="btn-primary" onClick={() => setCreating(true)}>+ Nueva empresa</button>
+        )}
       </div>
       <MiniChartCard title={`${list.length} empresas activas`} density="compact">
         <div className="overflow-x-auto">
@@ -53,9 +57,11 @@ export default function Empresas() {
                       : <span className="text-fg-subtle">—</span>}
                   </td>
                   <td className="p-2">
-                    <button className="text-accent text-sm hover:underline" onClick={() => setEditing(e)}>
-                      Editar
-                    </button>
+                    {canWrite && (
+                      <button className="text-accent text-sm hover:underline" onClick={() => setEditing(e)}>
+                        Editar
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -65,6 +65,73 @@ export function isEnCurso(jornada, now = new Date()) {
 }
 
 /**
+ * Descriptor visual de un evento del calendario (Opción 2: color de fondo = ESTADO/salud).
+ * Centraliza TODA la gramática del chip para que CalendarMonth solo pinte.
+ *
+ * Devuelve:
+ *  - bgVar: nombre de CSS var del fondo del chip (rgb(var(bgVar)))
+ *  - seccionPrefijo: 'CE' | 'SP'
+ *  - seccionVar: '--seccion-ce' | '--seccion-sip' (color del borde izquierdo + cápsula)
+ *  - seccionDashed: bool (SIPRESALUD → borde a guiones)
+ *  - esEnCurso, esCancelada, esAlertaInaug, esReprogramada: flags
+ *  - leadGlifo: '●' si en curso (antes del texto), null si no
+ *  - estadoGlifo: '⧖' (ejecutada) | '↻' (reprogramada) | '✕' (cancelada) | null (tras el texto)
+ *  - saludGlifo: '✓' (cerrada OK) | '!' (cerrada baja) | null
+ *  - tachado: bool (cancelada → line-through)
+ *  - pulseClass: clase de animación ('' / 'jornada-alerta-pulse-inaug' / 'jornada-encurso-pulse')
+ *
+ * @param {object} e - evento de /calendario (tipo, seccion, estado, semaforo, sin_jornada_asociada…)
+ * @param {Date} now
+ */
+export function getChipDescriptor(e, now = new Date()) {
+  const estado = e.estado;
+  const esAlertaInaug = e.sin_jornada_asociada === true;
+  const esCancelada = estado === 'CANCELADA';
+  const esReprogramada = estado === 'REPROGRAMADA';
+  const esEnCurso = !esCancelada && isEnCurso(e, now);
+
+  // Sección (prefijo + borde) con fallback por tipo.
+  const sec = e.seccion
+    || (e.tipo === 'CE_JORNADA' ? 'CE'
+      : e.tipo === 'SIPRESALUD_JORNADA' ? 'SIPRESALUD' : null);
+  const esCE = sec === 'CE';
+  const seccionPrefijo = esCE ? 'CE' : 'SP';
+  const seccionVar = esCE ? '--seccion-ce' : '--seccion-sip';
+  const seccionDashed = !esCE; // SIPRESALUD = guiones
+
+  // Salud (solo CERRADA): verde = OK, resto = baja.
+  let saludGlifo = null;
+  if (estado === 'CERRADA') saludGlifo = e.semaforo === 'verde' ? '✓' : '!';
+
+  // Fondo de chip = ESTADO/salud, con overrides de alerta (orden de prioridad).
+  let bgVar;
+  if (esAlertaInaug) bgVar = '--alert-inaug-chip';
+  else if (esCancelada) bgVar = '--estado-cancelada-chip';
+  else if (esEnCurso) bgVar = '--estado-encurso-chip';
+  else if (estado === 'EJECUTADA') bgVar = '--estado-ejecutada-chip';
+  else if (estado === 'CERRADA') bgVar = e.semaforo === 'verde' ? '--estado-cerrada-ok-chip' : '--estado-cerrada-baja-chip';
+  else bgVar = '--estado-programada-chip'; // PROGRAMADA + REPROGRAMADA (gris)
+
+  // Glifo de estado (forma, tras el texto) — refuerzo colorblind.
+  let estadoGlifo = null;
+  if (esCancelada) estadoGlifo = '✕';
+  else if (esReprogramada) estadoGlifo = '↻';
+  else if (estado === 'EJECUTADA') estadoGlifo = '⧖';
+
+  const pulseClass = esAlertaInaug ? 'jornada-alerta-pulse-inaug'
+    : esEnCurso ? 'jornada-encurso-pulse' : '';
+
+  return {
+    bgVar, seccionPrefijo, seccionVar, seccionDashed,
+    esEnCurso, esCancelada, esAlertaInaug, esReprogramada,
+    leadGlifo: esEnCurso ? '●' : null,
+    estadoGlifo, saludGlifo,
+    tachado: esCancelada,
+    pulseClass,
+  };
+}
+
+/**
  * Severidad numérica para ordenar alertas (menor = mayor prioridad).
  *
  * @param {object} alerta - { severity: 'critical' | 'warning' | 'info' }
