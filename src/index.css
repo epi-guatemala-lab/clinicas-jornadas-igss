@@ -50,6 +50,16 @@
     --chart-5:     132 204 22;     /* verde lima */
     --chart-6:     202 138 4;      /* dorado */
     --chart-7:     219 39 119;     /* magenta */
+    /* calendario — fondo de chip = ESTADO/asistencia (texto blanco AA) */
+    --estado-programada-chip:   71 85 105;    /* #475569 gris */
+    --estado-encurso-chip:      29 78 216;    /* #1D4ED8 azul */
+    --estado-ejecutada-chip:    146 81 14;    /* #92510E ámbar */
+    --estado-cerrada-ok-chip:   21 128 61;    /* #15803D verde */
+    --estado-cerrada-baja-chip: 194 65 12;    /* #C2410C naranja */
+    --estado-cancelada-chip:    220 38 38;    /* #DC2626 rojo */
+    --seccion-ce:   0 102 179;     /* #0066B3 */
+    --seccion-sip:  15 118 110;    /* #0F766E */
+    --alert-inaug-chip: 126 34 206; /* #7E22CE morado */
   }
 
   /* ── DARK THEME (fondo negro + colores brillantes) ───────── */
@@ -93,6 +103,16 @@
     --chart-5:     163 230 53;     /* verde lima */
     --chart-6:     250 204 21;     /* amarillo dorado */
     --chart-7:     244 114 182;    /* rosa claro */
+    /* calendario dark (mismos significados, ajustados AA con texto blanco) */
+    --estado-programada-chip:   91 107 130;   /* #5B6B82 */
+    --estado-encurso-chip:      30 111 176;   /* #1E6FB0 */
+    --estado-ejecutada-chip:    168 98 15;    /* #A8620F */
+    --estado-cerrada-ok-chip:   27 138 74;    /* #1B8A4A */
+    --estado-cerrada-baja-chip: 180 83 9;     /* #B45309 */
+    --estado-cancelada-chip:    194 52 52;    /* #C23434 */
+    --seccion-ce:   59 158 224;    /* #3B9EE0 */
+    --seccion-sip:  45 212 191;    /* #2DD4BF */
+    --alert-inaug-chip: 139 63 208; /* #8B3FD0 */
   }
 
   body {
@@ -124,6 +144,30 @@
 }
 .jornada-alerta-pulse {
   animation: jornada-alerta-pulse 2s ease-in-out infinite;
+}
+
+/* Pulse MORADO para inauguración sin jornada (no rojo — color propio de la alerta) */
+@keyframes jornada-alerta-pulse-inaug {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgb(var(--alert-inaug-chip) / 0.7), 0 4px 6px -1px rgb(var(--alert-inaug-chip) / 0.3);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgb(var(--alert-inaug-chip) / 0), 0 4px 6px -1px rgb(var(--alert-inaug-chip) / 0.5);
+    transform: scale(1.02);
+  }
+}
+.jornada-alerta-pulse-inaug {
+  animation: jornada-alerta-pulse-inaug 2s ease-in-out infinite;
+}
+
+/* Pulse AZUL suave para 'en curso ahora' (anillo blanco + halo azul) */
+@keyframes jornada-encurso-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--status-info) / 0.6); }
+  50%      { box-shadow: 0 0 0 5px rgb(var(--status-info) / 0); }
+}
+.jornada-encurso-pulse {
+  animation: jornada-encurso-pulse 1.8s ease-in-out infinite;
 }
 
 @layer components {

@@ -55,6 +55,22 @@ export const lightTokens = {
       '#DB2777', // 7 magenta
     ],
   },
+  // ── Calendario (Opción 2: color de fondo = ESTADO/asistencia) ──
+  // Espejo de las CSS vars --estado-*-chip / --seccion-* / --alert-inaug-chip
+  // en index.css. Texto BLANCO sobre cada fondo (verificado WCAG AA).
+  calendar: {
+    estado: {
+      programada:  '#475569',  // gris — futura
+      enCurso:     '#1D4ED8',  // azul — en curso ahora
+      ejecutada:   '#92510E',  // ámbar oscuro — falta cierre
+      cerradaOk:   '#15803D',  // verde — cerrada, asistencia OK
+      cerradaBaja: '#C2410C',  // naranja — cerrada, asistencia baja
+      cancelada:   '#DC2626',  // rojo — cancelada
+      reprogramada:'#475569',  // gris (se distingue por borde dashed + ↻)
+    },
+    seccion: { ce: '#0066B3', sip: '#0F766E' },  // borde + cápsula CE/SP
+    alertInaug: '#7E22CE',     // morado — inauguración sin jornada
+  },
 };
 
 export const darkTokens = {
@@ -109,6 +125,20 @@ export const darkTokens = {
       '#FACC15', // 6 amarillo dorado
       '#F472B6', // 7 rosa claro
     ],
+  },
+  // ── Calendario dark (mismos significados, ajustados para AA con texto blanco) ──
+  calendar: {
+    estado: {
+      programada:  '#5B6B82',
+      enCurso:     '#1E6FB0',
+      ejecutada:   '#A8620F',
+      cerradaOk:   '#1B8A4A',
+      cerradaBaja: '#B45309',
+      cancelada:   '#C23434',
+      reprogramada:'#5B6B82',
+    },
+    seccion: { ce: '#3B9EE0', sip: '#2DD4BF' },
+    alertInaug: '#8B3FD0',     // morado dark AA (5.65:1 con blanco)
   },
 };
 

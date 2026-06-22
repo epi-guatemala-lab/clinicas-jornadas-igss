@@ -6,7 +6,7 @@ import CalendarMonth from '../components/CalendarMonth';
 import JornadaModal from '../components/JornadaModal';
 import SeccionSwitch from '../components/filters/SeccionSwitch';
 import FilterChip from '../components/filters/FilterChip';
-import { SEMAFORO_DOT } from '../utils/format';
+import TipoIcon from '../components/TipoIcon';
 
 export default function Calendario() {
   const { user } = useAuth();
@@ -121,25 +121,45 @@ export default function Calendario() {
         </div>
       )}
 
-      {/* Leyenda — paleta unificada: verde / naranja / rojo / azul / gris (sin amarillo) */}
-      <div className="flex flex-wrap gap-3 text-[11px] text-fg-muted pt-2">
-        {[
-          ['verde', '≥90% asistencia'],
-          ['naranja', '<90% asistencia · Reprogramada · Cierre tardío'],
-          ['rojo', 'CANCELADA (crítica)'],
-          ['azul', 'En curso ahora · Inauguración'],
-          ['gris', 'Programada (futura)'],
-        ].map(([c, l]) => (
-          <span key={c} className="flex items-center gap-1.5">
-            <span className={`inline-block w-3 h-3 rounded ${SEMAFORO_DOT[c]}`} />{l}
+      {/* Leyenda — color de fondo = ESTADO/asistencia · ícono = TIPO · CE/SP+borde = SECCIÓN */}
+      <div className="rounded-xl border border-line bg-surface-elev p-3 space-y-2 text-[11px] text-fg-muted">
+        <div className="flex flex-wrap gap-x-3 gap-y-1.5 items-center">
+          <span className="font-semibold text-fg">Estado / asistencia (color):</span>
+          {[
+            ['--estado-programada-chip', 'Programada'],
+            ['--estado-encurso-chip', 'En curso ●'],
+            ['--estado-ejecutada-chip', 'Ejecutada ⧖'],
+            ['--estado-cerrada-ok-chip', 'Cerrada ✓ (asist. OK)'],
+            ['--estado-cerrada-baja-chip', 'Cerrada ! (asist. baja)'],
+            ['--estado-cancelada-chip', 'Cancelada ✕'],
+          ].map(([v, l]) => (
+            <span key={v} className="flex items-center gap-1.5">
+              <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: `rgb(var(${v}))` }} />{l}
+            </span>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1.5 items-center">
+          <span className="font-semibold text-fg">Tipo (ícono):</span>
+          {[
+            ['CE_JORNADA', 'Jornada'], ['SIPRESALUD_JORNADA', 'Jornada SIPRE'], ['INAUGURACION', 'Inauguración'],
+            ['TALLER', 'Taller'], ['WEBINAR', 'Webinar'], ['VISITA_SEGUIMIENTO', 'Visita'], ['INFORME_OFICINA', 'Informe'],
+          ].map(([t, l]) => (
+            <span key={t} className="flex items-center gap-1 text-fg"><TipoIcon tipo={t} /> {l}</span>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1.5 items-center">
+          <span className="font-semibold text-fg">Sección:</span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-4 h-3 rounded-r bg-neutral/40 border-l-4" style={{ borderColor: 'rgb(var(--seccion-ce))' }} /> CE = borde sólido (Clínicas de Empresa)
           </span>
-        ))}
-        <span className="flex items-center gap-1.5 font-bold w-full"
-              style={{ color: 'rgb(168 85 247)' }}>
-          <span className="inline-block w-4 h-4 rounded ring-2 jornada-alerta-pulse"
-                style={{ background: 'rgb(147 51 234)', boxShadow: '0 0 0 2px rgb(168 85 247 / 0.6)' }} />
-          ⚠️ INAUGURACIÓN SIN JORNADA (crítico — coordinar con SIPRESALUD)
-        </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-4 h-3 rounded-r bg-neutral/40 border-l-4 border-dashed" style={{ borderColor: 'rgb(var(--seccion-sip))' }} /> SP = borde a guiones (SIPRESALUD)
+          </span>
+          <span className="flex items-center gap-1.5 font-semibold" style={{ color: 'rgb(var(--alert-inaug-chip))' }}>
+            <span className="inline-block w-3.5 h-3.5 rounded jornada-alerta-pulse-inaug" style={{ backgroundColor: 'rgb(var(--alert-inaug-chip))' }} />
+            ⚠️ Inauguración SIN jornada (crítico — coordinar con SIPRESALUD)
+          </span>
+        </div>
       </div>
 
       {selected && (

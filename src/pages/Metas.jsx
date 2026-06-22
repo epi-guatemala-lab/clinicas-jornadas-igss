@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiListMetas, apiCreateMeta, apiMetasPorEmpresa } from '../api/endpoints';
+import { useAuth } from '../hooks/useAuth';
 import { fmtN, fmtPct, fmtQ, SEMAFORO_DOT } from '../utils/format';
 import Modal from '../components/forms/Modal';
 import Field from '../components/forms/Field';
@@ -36,6 +37,7 @@ function Pill({ active, onClick, children }) {
 }
 
 export default function Metas() {
+  const { canWrite } = useAuth();
   const [list, setList] = useState([]);
   const [empresas, setEmpresas] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -66,7 +68,9 @@ export default function Metas() {
               <Pill key={a} active={year === a} onClick={() => setYear(a)}>{a}</Pill>
             ))}
           </div>
-          <button className="btn-primary" onClick={() => setCreating(true)}>+ Nueva meta</button>
+          {canWrite && (
+            <button className="btn-primary" onClick={() => setCreating(true)}>+ Nueva meta</button>
+          )}
         </div>
       </div>
 

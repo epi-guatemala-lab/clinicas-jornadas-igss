@@ -22,7 +22,7 @@ const TIPOS = [
 const ROLES_JOR = ['LIDER', 'MEDICO', 'ADMIN', 'ENFERMERIA', 'LABORATORISTA', 'DIGITADOR', 'ENCUESTADOR'];
 
 export default function Jornadas() {
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
   const [list, setList] = useState([]);
   const [selected, setSelected] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -41,7 +41,9 @@ export default function Jornadas() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Jornadas</h1>
-        <button className="btn-primary" onClick={() => setCreating(true)}>+ Nueva jornada</button>
+        {canWrite && (
+          <button className="btn-primary" onClick={() => setCreating(true)}>+ Nueva jornada</button>
+        )}
       </div>
 
       <div className="card p-3 flex flex-wrap gap-2 items-end">
@@ -187,6 +189,8 @@ function NuevaJornadaModal({ onClose, onCreated }) {
       await apiCreateJornada({
         ...form,
         inaugura_clinica: form.tipo === 'INAUGURACION',
+        charla_tema: form.charla_tema?.trim() || null,
+        charla_responsable: form.charla_responsable?.trim() || null,
         programados: Number(form.programados) || 0,
         viaticos_presupuesto: Number(form.viaticos_presupuesto) || 0,
         empresa_id: form.empresa_id || null,
@@ -269,6 +273,24 @@ function NuevaJornadaModal({ onClose, onCreated }) {
                   ))}
                 </select></div>
             </div>
+
+            {/* Charla de educación en salud (OPCIONAL — no todas las jornadas llevan) */}
+            <div className="rounded-lg border border-line-subtle bg-surface-elev p-3">
+              <div className="text-sm font-semibold text-fg mb-2">
+                Charla de educación en salud <span className="text-fg-subtle font-normal">(opcional)</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="label">Tema(s) de la charla</label>
+                  <input className="input" value={form.charla_tema || ''}
+                    placeholder="Ej: Prevención de dengue, lavado de manos"
+                    onChange={(e) => setField('charla_tema', e.target.value)} /></div>
+                <div><label className="label">Responsable de impartirla</label>
+                  <input className="input" value={form.charla_responsable || ''}
+                    placeholder="Nombre de quien da la charla"
+                    onChange={(e) => setField('charla_responsable', e.target.value)} /></div>
+              </div>
+            </div>
+
             <div className="flex gap-4 text-sm">
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={form.aplica_kit_lab}
