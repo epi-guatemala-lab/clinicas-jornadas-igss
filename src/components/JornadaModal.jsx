@@ -5,6 +5,7 @@ import {
 } from '../api/endpoints';
 import { SEMAFORO_BG, TIPO_LABEL, ESTADO_LABEL, fmtN, fmtQ, fmtPct } from '../utils/format';
 import { useAuth } from '../hooks/useAuth';
+import JornadaFormModal from './JornadaFormModal';
 
 // E1/F1: Berkin (coordinador) — única identidad que edita cerradas y material.
 function esBerkin(user) {
@@ -30,6 +31,7 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
   const [roster, setRoster] = useState([]);
   const [charlasEdit, setCharlasEdit] = useState([]);
   const [savingMat, setSavingMat] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     apiGetJornada(jornadaId).then(setJ);
@@ -288,13 +290,27 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
       {mode === 'view' && (
         <div className="border-t border-line-subtle p-4 flex justify-between bg-surface-elev">
           <button className="btn-secondary" onClick={onClose}>Cerrar</button>
-          {puedeEditar && canWrite && (
-            <div className="flex gap-2">
-              <button className="btn-danger" onClick={() => { setForm({}); setMode('cancel'); }}>Cancelar</button>
-              <button className="btn-primary" onClick={() => { setForm({}); setMode('close'); }}>Cerrar con métricas</button>
-            </div>
-          )}
+          <div className="flex gap-2">
+            {/* Editar: campos centrales. CERRADA → solo Berkin (E1). CANCELADA → nadie. */}
+            {canWrite && (puedeEditar || (j.estado === 'CERRADA' && berkin)) && (
+              <button className="btn-secondary" onClick={() => setEditing(true)}>Editar</button>
+            )}
+            {puedeEditar && canWrite && (
+              <>
+                <button className="btn-danger" onClick={() => { setForm({}); setMode('cancel'); }}>Cancelar</button>
+                <button className="btn-primary" onClick={() => { setForm({}); setMode('close'); }}>Cerrar con métricas</button>
+              </>
+            )}
+          </div>
         </div>
+      )}
+
+      {editing && (
+        <JornadaFormModal
+          jornada={j}
+          onClose={() => setEditing(false)}
+          onSaved={() => { setEditing(false); apiGetJornada(jornadaId).then(setJ); onChanged?.(); }}
+        />
       )}
     </Modal>
   );
