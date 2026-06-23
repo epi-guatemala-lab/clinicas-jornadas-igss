@@ -45,6 +45,18 @@ export const apiCerrarJornada = (id, body) =>
 export const apiCancelarJornada = (id, body) =>
   api.post(`/api/jornadas/${id}/cancelar`, body).then((r) => r.data);
 
+// F1: material entregado (solo Berkin en backend)
+export const apiSetMaterial = (id, entregado) =>
+  api.patch(`/api/jornadas/${id}/material`, { entregado }).then((r) => r.data);
+
+// D4: reemplazar las charlas de una jornada
+export const apiSetCharlas = (id, charlas) =>
+  api.put(`/api/jornadas/${id}/charlas`, { charlas }).then((r) => r.data);
+
+// D2: catálogo fijo de charlas (15)
+export const apiCatalogoCharlas = () =>
+  api.get('/api/catalogos/charlas').then((r) => r.data);
+
 export const apiCalendario = (desde, hasta, seccion) =>
   api.get('/api/jornadas/calendario', {
     params: { desde, hasta, seccion },

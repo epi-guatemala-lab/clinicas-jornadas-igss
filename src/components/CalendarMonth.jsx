@@ -88,6 +88,15 @@ export default function CalendarMonth({ month, eventos, onEventClick }) {
                       <span className="flex items-center gap-1 pl-1 max-w-full">
                         <span className={`text-[8px] font-bold leading-none px-1 py-0.5 rounded ${d.darkText ? 'bg-black/15' : 'bg-white/25'}`}>{d.seccionPrefijo}</span>
                         <TipoIcon tipo={e.tipo} inaugura={d.esInaug} />
+                        {d.esDepartamental && (
+                          /* F2.2: jornada departamental (interior) — pin de ubicación */
+                          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
+                               strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+                               className="inline-block flex-shrink-0" aria-label="Departamental">
+                            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                            <circle cx="12" cy="10" r="3" />
+                          </svg>
+                        )}
                         {d.esAlertaInaug && <span aria-hidden>⚠️</span>}
                         {d.leadGlifo && <span aria-hidden className="leading-none">{d.leadGlifo}</span>}
                         {e.hora_inicio && <span className="opacity-80">{e.hora_inicio.slice(0, 5)}</span>}

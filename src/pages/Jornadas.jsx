@@ -142,6 +142,7 @@ function NuevaJornadaModal({ onClose, onCreated }) {
     inaugura_clinica: false,
     viaticos_presupuesto: 0,
     personal: [],
+    charlas: [],
   });
   const [err, setErr] = useState('');
 
@@ -159,6 +160,19 @@ function NuevaJornadaModal({ onClose, onCreated }) {
   );
 
   function setField(k, v) { setForm((f) => ({ ...f, [k]: v })); }
+
+  // Catálogo de charlas (D2) para el dropdown del alta
+  const { data: catCharlas } = useApi('/api/catalogos/charlas');
+
+  function addCharla() {
+    setField('charlas', [...form.charlas, { charla_codigo: '', responsable_personal_id: '' }]);
+  }
+  function updCharla(i, k, v) {
+    const copy = [...form.charlas]; copy[i] = { ...copy[i], [k]: v }; setField('charlas', copy);
+  }
+  function removeCharla(i) {
+    setField('charlas', form.charlas.filter((_, idx) => idx !== i));
+  }
 
   // Catálogo GT canónico (cascada departamento → municipio)
   const { data: deptosCat } = useApi('/api/catalogos/departamentos');
@@ -187,11 +201,22 @@ function NuevaJornadaModal({ onClose, onCreated }) {
       // C1: inauguración = flag independiente del tipo. El tipo INAUGURACION
       // siempre inaugura; otros tipos (ej. tamizaje SIPRESALUD) pueden marcar
       // el checkbox para indicar que ADEMÁS inauguran una clínica.
+      const charlasPayload = (form.charlas || [])
+        .filter((c) => c.charla_codigo)
+        .map((c) => {
+          const cat = (catCharlas?.items || []).find((x) => x.codigo === c.charla_codigo);
+          return {
+            charla_codigo: c.charla_codigo,
+            charla_tema: cat ? cat.titulo : '',
+            responsable_personal_id: c.responsable_personal_id ? Number(c.responsable_personal_id) : null,
+          };
+        });
       await apiCreateJornada({
         ...form,
         inaugura_clinica: form.tipo === 'INAUGURACION' || !!form.inaugura_clinica,
-        charla_tema: form.charla_tema?.trim() || null,
-        charla_responsable: form.charla_responsable?.trim() || null,
+        charlas: charlasPayload,
+        charla_tema: null,
+        charla_responsable: null,
         programados: Number(form.programados) || 0,
         viaticos_presupuesto: Number(form.viaticos_presupuesto) || 0,
         empresa_id: form.empresa_id || null,
@@ -275,20 +300,38 @@ function NuevaJornadaModal({ onClose, onCreated }) {
                 </select></div>
             </div>
 
-            {/* Charla de educación en salud (OPCIONAL — no todas las jornadas llevan) */}
+            {/* Charlas de educación en salud — MÚLTIPLES, desde catálogo (opcional) */}
             <div className="rounded-lg border border-line-subtle bg-surface-elev p-3">
-              <div className="text-sm font-semibold text-fg mb-2">
-                Charla de educación en salud <span className="text-fg-subtle font-normal">(opcional)</span>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-semibold text-fg">
+                  Charlas de educación en salud <span className="text-fg-subtle font-normal">(opcional · múltiples)</span>
+                </div>
+                <button type="button" className="btn-secondary text-xs" onClick={addCharla}>+ Agregar charla</button>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="label">Tema(s) de la charla</label>
-                  <input className="input" value={form.charla_tema || ''}
-                    placeholder="Ej: Prevención de dengue, lavado de manos"
-                    onChange={(e) => setField('charla_tema', e.target.value)} /></div>
-                <div><label className="label">Responsable de impartirla</label>
-                  <input className="input" value={form.charla_responsable || ''}
-                    placeholder="Nombre de quien da la charla"
-                    onChange={(e) => setField('charla_responsable', e.target.value)} /></div>
+              {form.charlas.length === 0 && (
+                <div className="text-xs text-fg-subtle">Sin charlas. Usá “+ Agregar charla”.</div>
+              )}
+              <div className="space-y-2">
+                {form.charlas.map((c, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                    <select className="input" value={c.charla_codigo}
+                      onChange={(e) => updCharla(i, 'charla_codigo', e.target.value)}>
+                      <option value="">— Tema (catálogo) —</option>
+                      {(catCharlas?.items || []).map((o) => (
+                        <option key={o.codigo} value={o.codigo}>{o.codigo} · {o.titulo}</option>
+                      ))}
+                    </select>
+                    <select className="input" value={c.responsable_personal_id}
+                      onChange={(e) => updCharla(i, 'responsable_personal_id', e.target.value)}>
+                      <option value="">— Responsable —</option>
+                      {personalDisponible.map((p) => (
+                        <option key={p.id} value={p.id}>{p.nombre_completo}</option>
+                      ))}
+                    </select>
+                    <button type="button" className="text-danger px-2" title="Quitar"
+                      onClick={() => removeCharla(i)}>✕</button>
+                  </div>
+                ))}
               </div>
             </div>
 
