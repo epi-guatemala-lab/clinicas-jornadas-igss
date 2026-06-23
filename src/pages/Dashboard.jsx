@@ -220,7 +220,7 @@ export default function Dashboard() {
         </div>
         <div className="min-h-[132px]">
           <StatCard
-            label="ATENDIDOS"
+            label={(kpi.metricLabel || 'Atendidos').toUpperCase()}
             value={kpi.atendidos ?? 0}
             tone="accent-2"
             viz="spark"
@@ -335,21 +335,25 @@ export default function Dashboard() {
         </div>
         <div className="min-h-[220px]">
           <PromedioCard
-            label="EMPRESAS ACTIVAS"
-            value={kpi.nEmpresasActivas ?? 0}
+            label="JORNADAS PROGRAMADAS"
+            value={kpi.nJornadasProgramadas ?? 0}
             valueFmt="number"
-            subLabel="Con jornadas cerradas este mes"
+            subLabel={
+              kpi.jornadasRestantes != null
+                ? `${kpi.jornadasRestantes} próximas en el mes`
+                : 'Programadas este mes'
+            }
             tone="accent-2"
             t={t}
           />
         </div>
         <div className="min-h-[220px]">
-          <EstadoJornadasChart />
+          <EstadoJornadasChart anio={periodo?.anio} mes={periodo?.mes} />
         </div>
         <div className="min-h-[220px]">
           {data.costos
             ? <CostosCard costos={data.costos} t={t} />
-            : <DistribucionDepartamentoChart />}
+            : <DistribucionDepartamentoChart anio={periodo?.anio} mes={periodo?.mes} />}
         </div>
       </div>
 
@@ -377,7 +381,7 @@ export default function Dashboard() {
             <Serie12MesesChart />
             {/* Distribución por departamento NO se duplica: para admin
                 (sin costos) ya está en row 3 col 4. Solo gerencia la ve aquí. */}
-            {data.costos && <DistribucionDepartamentoChart />}
+            {data.costos && <DistribucionDepartamentoChart anio={periodo?.anio} mes={periodo?.mes} />}
             {data.costos && <CostosMensualesChart />}
           </div>
         )}
@@ -548,13 +552,18 @@ function derivarKpis(data, serieDiaria) {
     ? Number((pctMeta - pctMetaPrev).toFixed(1))
     : null;
 
+  // Etiqueta de la métrica que mide la meta (Afiliados para SIPRESALUD/gerencia,
+  // Atendidos para CE). El backend la devuelve en serie-diaria-mes.
+  const metricLabel = serieDiaria?.metric_label || 'Atendidos';
+
   return {
-    pctMeta, pctMetaDelta, metaMes, atendidos, faltaMeta,
+    pctMeta, pctMetaDelta, metaMes, atendidos, faltaMeta, metricLabel,
     pctAsistencia,
     diasRestantes: aux.dias_restantes_mes,
     diasConsumidos: aux.dias_consumidos_mes,
     diasTotales: aux.dias_totales_mes,
     jornadasRestantes: aux.jornadas_programadas_restantes,
+    nJornadasProgramadas: aux.n_jornadas_programadas,
     promedioPorJornada: aux.promedio_por_jornada,
     promedioPorEmpresa: aux.promedio_por_empresa,
     nEmpresasActivas: aux.n_empresas_activas,
