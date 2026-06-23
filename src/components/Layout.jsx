@@ -20,8 +20,9 @@ export default function Layout({ children }) {
     // Personal: visible para todas las secciones (roster del equipo); los salarios
     // se enmascaran salvo gerencia/admin. ce/sipresalud ven su propia sección.
     { to: '/personal', label: 'Personal', roles: ['admin', 'gerencia', 'sipresalud', 'ce'] },
-    // Metas: solo gerencia/admin (cambios estratégicos)
-    { to: '/metas', label: 'Metas', roles: ['admin', 'gerencia'] },
+    // Metas: todas las secciones VEN sus metas (incl. la de afiliados); crear/editar
+    // queda en gerencia/admin (las metas institucionales son estratégicas).
+    { to: '/metas', label: 'Metas', roles: ['admin', 'gerencia', 'sipresalud', 'ce'] },
   ];
   const visibles = navLinks.filter((l) => l.roles.includes(user.rol));
 
