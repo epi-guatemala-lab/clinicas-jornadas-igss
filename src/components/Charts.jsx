@@ -44,7 +44,7 @@ const ESTADO_KEY_COLOR = (t) => ({
   EN_CURSO: t.status.info,
   EJECUTADA: t.status.warning,
   CERRADA: t.status.success,
-  CANCELADA: t.status.danger,
+  CANCELADA: t.accent.primary, // rosado (A2) — destaca cancelaciones en el donut
   REPROGRAMADA: t.status.warning,
 });
 

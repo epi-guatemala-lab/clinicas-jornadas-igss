@@ -114,7 +114,12 @@ export function getChipDescriptor(e, now = new Date()) {
   else if (esEnCurso) bgVar = '--estado-encurso-chip';
   else if (estado === 'EJECUTADA') bgVar = '--estado-ejecutada-chip';
   else if (estado === 'CERRADA') bgVar = e.semaforo === 'verde' ? '--estado-cerrada-ok-chip' : '--estado-cerrada-baja-chip';
-  else bgVar = '--estado-programada-chip'; // PROGRAMADA + REPROGRAMADA (gris)
+  else bgVar = '--estado-programada-chip'; // PROGRAMADA + REPROGRAMADA (azul)
+
+  // Texto OSCURO sobre los fondos claros (amarillo en-curso B3, verde menta
+  // realizada B2); el resto usa texto blanco. Evita el bajo contraste de
+  // blanco-sobre-amarillo/menta.
+  const darkText = (bgVar === '--estado-encurso-chip' || bgVar === '--estado-ejecutada-chip');
 
   // Glifo de estado (forma, tras el texto) — refuerzo colorblind.
   let estadoGlifo = null;
@@ -126,7 +131,7 @@ export function getChipDescriptor(e, now = new Date()) {
     : esEnCurso ? 'jornada-encurso-pulse' : '';
 
   return {
-    bgVar, seccionPrefijo, seccionVar, seccionDashed,
+    bgVar, darkText, seccionPrefijo, seccionVar, seccionDashed,
     esEnCurso, esCancelada, esAlertaInaug, esReprogramada,
     leadGlifo: esEnCurso ? '●' : null,
     estadoGlifo, saludGlifo, pctChip,

@@ -60,16 +60,16 @@ export const lightTokens = {
   // en index.css. Texto BLANCO sobre cada fondo (verificado WCAG AA).
   calendar: {
     estado: {
-      programada:  '#475569',  // gris — futura
-      enCurso:     '#1D4ED8',  // azul — en curso ahora
-      ejecutada:   '#92510E',  // ámbar oscuro — falta cierre
-      cerradaOk:   '#15803D',  // verde — cerrada, asistencia OK
-      cerradaBaja: '#C2410C',  // naranja — cerrada, asistencia baja
-      cancelada:   '#DC2626',  // rojo — cancelada
-      reprogramada:'#475569',  // gris (se distingue por borde dashed + ↻)
+      programada:  '#2563EB',  // azul — futura (B1)
+      enCurso:     '#EAB308',  // amarillo — en curso ahora (B3, texto oscuro)
+      ejecutada:   '#34D399',  // verde menta — realizada/pendiente cierre (B2, texto oscuro)
+      cerradaOk:   '#7C3AED',  // morado — cerrada, asistencia ≥90% (B4)
+      cerradaBaja: '#DB2777',  // rosado — cerrada, asistencia <90% (B5)
+      cancelada:   '#6B7280',  // gris — cancelada (B6)
+      reprogramada:'#2563EB',  // azul (se distingue por borde dashed + ↻)
     },
     seccion: { ce: '#0066B3', sip: '#0F766E' },  // borde + cápsula CE/SP
-    alertInaug: '#7E22CE',     // morado — inauguración sin jornada
+    alertInaug: '#6F4E37',     // café — inauguración (B7)
   },
 };
 
@@ -129,16 +129,16 @@ export const darkTokens = {
   // ── Calendario dark (mismos significados, ajustados para AA con texto blanco) ──
   calendar: {
     estado: {
-      programada:  '#5B6B82',
-      enCurso:     '#1E6FB0',
-      ejecutada:   '#A8620F',
-      cerradaOk:   '#1B8A4A',
-      cerradaBaja: '#B45309',
-      cancelada:   '#C23434',
-      reprogramada:'#5B6B82',
+      programada:  '#3B82F6',  // azul (B1)
+      enCurso:     '#FACC15',  // amarillo (B3, texto oscuro)
+      ejecutada:   '#6EE7B7',  // verde menta (B2, texto oscuro)
+      cerradaOk:   '#8B5CF6',  // morado (B4)
+      cerradaBaja: '#EC4899',  // rosado (B5)
+      cancelada:   '#71717A',  // gris (B6)
+      reprogramada:'#3B82F6',  // azul
     },
     seccion: { ce: '#3B9EE0', sip: '#2DD4BF' },
-    alertInaug: '#8B3FD0',     // morado dark AA (5.65:1 con blanco)
+    alertInaug: '#A0764B',     // café (B7)
   },
 };
 

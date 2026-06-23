@@ -343,7 +343,7 @@ export default function Dashboard() {
                 ? `${kpi.jornadasRestantes} próximas en el mes`
                 : 'Programadas este mes'
             }
-            tone="accent-2"
+            tone="accent-3"
             t={t}
           />
         </div>
