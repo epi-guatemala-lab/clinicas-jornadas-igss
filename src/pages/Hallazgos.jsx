@@ -10,9 +10,12 @@ import {
 import { fmtN } from '../utils/format';
 
 const PERIODOS = [
-  { key: 'todo', label: 'Todo', desde: null, hasta: null },
-  { key: '2026', label: '2026', desde: '2026-01-01', hasta: '2026-12-31' },
+  // '2026' es el DEFAULT y es ABIERTO hacia el futuro (hasta:null = "2026 en
+  // adelante") para que el dashboard cuadre con la base operativa 2026. 2025 y
+  // Todo quedan como toggles históricos (la BD conserva 2025 — dato real).
+  { key: '2026', label: '2026 +', desde: '2026-01-01', hasta: null },
   { key: '2025', label: '2025', desde: '2025-01-01', hasta: '2025-12-31' },
+  { key: 'todo', label: 'Todo (histórico)', desde: null, hasta: null },
 ];
 const MESES = [
   ['', 'Todo el año'], ['01', 'Enero'], ['02', 'Febrero'], ['03', 'Marzo'],
@@ -82,7 +85,7 @@ function FilterChip({ label, value, onRemove }) {
 }
 
 export default function Hallazgos() {
-  const [periodo, setPeriodo] = useState('todo');
+  const [periodo, setPeriodo] = useState('2026');
   const [mes, setMes] = useState('');  // '' = todo el año; '01'..'12' = mes específico
   const [sexo, setSexo] = useState('');
   // Drill-down state

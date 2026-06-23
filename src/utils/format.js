@@ -40,7 +40,7 @@ export const TIPO_LABEL = {
 export const ESTADO_LABEL = {
   PROGRAMADA: 'Programada',
   EN_CURSO: 'En curso',
-  EJECUTADA: 'Ejecutada (pendiente cierre)',
+  EJECUTADA: 'Realizada (pendiente cierre)',
   CERRADA: 'Cerrada',
   CANCELADA: 'Cancelada',
   REPROGRAMADA: 'Reprogramada',

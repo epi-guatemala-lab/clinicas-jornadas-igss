@@ -77,13 +77,13 @@ export default function CalendarMonth({ month, eventos, onEventClick }) {
                   return (
                     <button key={e.id} onClick={() => onEventClick?.(e)}
                       title={title}
-                      className={`relative block w-full text-left text-[11px] rounded-r py-1 pr-1 truncate text-white transition hover:opacity-90 ${d.pulseClass} ${d.esEnCurso ? 'ring-1 ring-white/90' : ''}`}
+                      className={`relative block w-full text-left text-[11px] rounded-r py-1 pr-1 truncate transition hover:opacity-90 ${d.darkText ? 'text-zinc-900' : 'text-white'} ${d.pulseClass} ${d.esEnCurso ? 'ring-1 ring-zinc-900/40' : ''}`}
                       style={{
                         backgroundColor: `rgb(var(${d.bgVar}))`,
                         borderLeft: `4px ${d.seccionDashed ? 'dashed' : 'solid'} rgb(var(${d.seccionVar}))`,
                       }}>
                       <span className="flex items-center gap-1 pl-1 max-w-full">
-                        <span className="text-[8px] font-bold leading-none px-1 py-0.5 rounded bg-white/25">{d.seccionPrefijo}</span>
+                        <span className={`text-[8px] font-bold leading-none px-1 py-0.5 rounded ${d.darkText ? 'bg-black/15' : 'bg-white/25'}`}>{d.seccionPrefijo}</span>
                         <TipoIcon tipo={e.tipo} />
                         {d.esAlertaInaug && <span aria-hidden>⚠️</span>}
                         {d.leadGlifo && <span aria-hidden className="leading-none">{d.leadGlifo}</span>}
