@@ -129,8 +129,8 @@ export default function Calendario() {
             ['--estado-programada-chip', 'Programada'],
             ['--estado-encurso-chip', 'En curso ●'],
             ['--estado-ejecutada-chip', 'Ejecutada ⧖'],
-            ['--estado-cerrada-ok-chip', 'Cerrada ✓ (asist. OK)'],
-            ['--estado-cerrada-baja-chip', 'Cerrada ! (asist. baja)'],
+            ['--estado-cerrada-ok-chip', 'Cerrada ✓ 95% (asist. OK ≥90%)'],
+            ['--estado-cerrada-baja-chip', 'Cerrada ! 65% (asist. baja <90%)'],
             ['--estado-cancelada-chip', 'Cancelada ✕'],
           ].map(([v, l]) => (
             <span key={v} className="flex items-center gap-1.5">

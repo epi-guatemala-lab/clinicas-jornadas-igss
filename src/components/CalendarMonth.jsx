@@ -88,10 +88,18 @@ export default function CalendarMonth({ month, eventos, onEventClick }) {
                         {d.esAlertaInaug && <span aria-hidden>⚠️</span>}
                         {d.leadGlifo && <span aria-hidden className="leading-none">{d.leadGlifo}</span>}
                         {e.hora_inicio && <span className="opacity-80">{e.hora_inicio.slice(0, 5)}</span>}
-                        <span className={`truncate ${d.tachado ? 'line-through opacity-90' : 'font-medium'} ${d.esAlertaInaug ? 'uppercase tracking-wide font-bold' : ''}`}>
+                        <span className={`truncate min-w-0 ${d.tachado ? 'line-through opacity-90' : 'font-medium'} ${d.esAlertaInaug ? 'uppercase tracking-wide font-bold' : ''}`}>
                           {label}
                         </span>
-                        {trailGlifo && <span aria-hidden className="ml-auto font-bold pl-0.5">{trailGlifo}</span>}
+                        {d.pctChip != null ? (
+                          /* CERRADA con métricas: glifo de forma (cue colorblind) + % real */
+                          <span className="ml-auto flex items-center gap-1 pl-0.5 flex-shrink-0">
+                            {d.saludGlifo && <span aria-hidden className="font-bold leading-none">{d.saludGlifo}</span>}
+                            <span className="text-[9px] font-bold leading-none px-1 py-0.5 rounded bg-white/25 tabular-nums">{d.pctChip}%</span>
+                          </span>
+                        ) : (
+                          trailGlifo && <span aria-hidden className="ml-auto font-bold pl-0.5 flex-shrink-0">{trailGlifo}</span>
+                        )}
                       </span>
                     </button>
                   );
