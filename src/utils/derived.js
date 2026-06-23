@@ -99,9 +99,13 @@ export function getChipDescriptor(e, now = new Date()) {
   const seccionVar = esCE ? '--seccion-ce' : '--seccion-sip';
   const seccionDashed = !esCE; // SIPRESALUD = guiones
 
-  // Salud (solo CERRADA): verde = OK, resto = baja.
+  // Salud (solo CERRADA): verde = OK, resto = baja. + % real de asistencia
+  // (entero) para ver si la baja es por mucho o poco — pedido de la jefatura.
   let saludGlifo = null;
   if (estado === 'CERRADA') saludGlifo = e.semaforo === 'verde' ? '✓' : '!';
+  const pctChip = (estado === 'CERRADA' && e.pct_asistencia != null
+    && !Number.isNaN(Number(e.pct_asistencia)))
+    ? Math.round(Number(e.pct_asistencia)) : null;
 
   // Fondo de chip = ESTADO/salud, con overrides de alerta (orden de prioridad).
   let bgVar;
@@ -125,7 +129,7 @@ export function getChipDescriptor(e, now = new Date()) {
     bgVar, seccionPrefijo, seccionVar, seccionDashed,
     esEnCurso, esCancelada, esAlertaInaug, esReprogramada,
     leadGlifo: esEnCurso ? '●' : null,
-    estadoGlifo, saludGlifo,
+    estadoGlifo, saludGlifo, pctChip,
     tachado: esCancelada,
     pulseClass,
   };
