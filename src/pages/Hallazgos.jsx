@@ -14,6 +14,11 @@ const PERIODOS = [
   { key: '2026', label: '2026', desde: '2026-01-01', hasta: '2026-12-31' },
   { key: '2025', label: '2025', desde: '2025-01-01', hasta: '2025-12-31' },
 ];
+const MESES = [
+  ['', 'Todo el año'], ['01', 'Enero'], ['02', 'Febrero'], ['03', 'Marzo'],
+  ['04', 'Abril'], ['05', 'Mayo'], ['06', 'Junio'], ['07', 'Julio'],
+  ['08', 'Agosto'], ['09', 'Septiembre'], ['10', 'Octubre'], ['11', 'Noviembre'], ['12', 'Diciembre'],
+];
 const SEXOS = [
   { key: '', label: 'Ambos' },
   { key: 'M', label: 'Hombres' },
@@ -78,6 +83,7 @@ function FilterChip({ label, value, onRemove }) {
 
 export default function Hallazgos() {
   const [periodo, setPeriodo] = useState('todo');
+  const [mes, setMes] = useState('');  // '' = todo el año; '01'..'12' = mes específico
   const [sexo, setSexo] = useState('');
   // Drill-down state
   // departamento = nombre normalizado (MAYÚSC sin tildes) → resalta el mapa y el chip.
@@ -94,14 +100,22 @@ export default function Hallazgos() {
 
   const p = PERIODOS.find((x) => x.key === periodo) || PERIODOS[0];
 
-  // Params base (período + sexo): los comparten el mapa y los charts no-drill.
+  // Params base (período + mes + sexo): los comparten el mapa y los charts no-drill.
   const baseParams = useMemo(() => {
     const o = {};
-    if (p.desde) o.desde = p.desde;
-    if (p.hasta) o.hasta = p.hasta;
+    if (p.desde) {
+      if (mes && p.key !== 'todo') {
+        // mes específico dentro del año seleccionado
+        const ld = new Date(Number(p.key), Number(mes), 0).getDate();
+        o.desde = `${p.key}-${mes}-01`;
+        o.hasta = `${p.key}-${mes}-${String(ld).padStart(2, '0')}`;
+      } else {
+        o.desde = p.desde; o.hasta = p.hasta;
+      }
+    }
     if (sexo) o.sexo = sexo;
     return o;
-  }, [p.desde, p.hasta, sexo]);
+  }, [p.desde, p.hasta, p.key, mes, sexo]);
 
   // Params completos (incluye drill-down): los consumen resumen + charts que aceptan filtros.
   // OJO: se envía departamentoRaw (valor de BD), no el normalizado del mapa.
@@ -179,15 +193,25 @@ export default function Hallazgos() {
 
           {/* Filtros período + sexo */}
           <div className="flex flex-col gap-2 items-end">
-            <div className="flex items-center gap-1.5 bg-white/15 backdrop-blur rounded-full p-1">
-              {PERIODOS.map((x) => (
-                <button key={x.key} onClick={() => setPeriodo(x.key)}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
-                    periodo === x.key ? 'bg-white text-igss-primary shadow' : 'text-white/85 hover:text-white'
-                  }`}>
-                  {x.label}
-                </button>
-              ))}
+            <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 bg-white/15 backdrop-blur rounded-full p-1">
+                {PERIODOS.map((x) => (
+                  <button key={x.key} onClick={() => { setPeriodo(x.key); if (x.key === 'todo') setMes(''); }}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
+                      periodo === x.key ? 'bg-white text-igss-primary shadow' : 'text-white/85 hover:text-white'
+                    }`}>
+                    {x.label}
+                  </button>
+                ))}
+              </div>
+              {/* Filtro por mes (dentro del año seleccionado) */}
+              <select value={mes} onChange={(e) => setMes(e.target.value)}
+                disabled={periodo === 'todo'}
+                title={periodo === 'todo' ? 'Elegí un año para filtrar por mes' : 'Filtrar por mes'}
+                className="bg-white/15 backdrop-blur rounded-full px-3 py-1.5 text-xs font-semibold text-white
+                           outline-none disabled:opacity-40 [&>option]:text-fg">
+                {MESES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
             </div>
             <div className="flex items-center gap-1.5 bg-white/15 backdrop-blur rounded-full p-1">
               {SEXOS.map((x) => (
