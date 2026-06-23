@@ -16,6 +16,16 @@ function useChartData(path, params = {}) {
   return { data: r.data, err: r.error, loading: r.loading };
 }
 
+const MES_NOMBRES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+// Etiqueta de período para subtítulos: "Mayo 2026" si hay mes, "Año 2026" si solo año.
+function periodoLabel(anio, mes) {
+  if (anio && mes) return `${MES_NOMBRES[mes]} ${anio}`;
+  if (anio) return `Año ${anio}`;
+  return 'Año en curso';
+}
+
 function tipoDisplay(t) {
   return {
     CE_JORNADA: { label: 'Jornada CE', tone: t.accent.tertiary },
@@ -212,8 +222,11 @@ function DeptoTooltip(props) {
   );
 }
 
-export function DistribucionDepartamentoChart() {
-  const { data, err, loading } = useChartData('distribucion-departamento');
+export function DistribucionDepartamentoChart({ anio, mes }) {
+  // Sigue el período (mes/año) seleccionado en el Dashboard. Si no se pasa
+  // mes, el backend cae al año en curso (comportamiento histórico).
+  const params = (anio != null && mes != null) ? { anio, mes } : (anio != null ? { anio } : {});
+  const { data, err, loading } = useChartData('distribucion-departamento', params);
   const t = useThemedColors();
   const ct = useChartTheme();
   if (err === '403') return null;
@@ -229,7 +242,7 @@ export function DistribucionDepartamentoChart() {
   return (
     <MiniChartCard
       title="Atendidos por departamento"
-      subtitle="Año en curso · verde ≥90 · naranja <80"
+      subtitle={`${periodoLabel(anio, mes)} · verde ≥90 · naranja <80`}
       className="h-full"
       density="compact"
       loading={loading}
@@ -319,7 +332,7 @@ export function ProgresoDiarioMesChart({ compact = false, anio, mes }) {
               <ReferenceLine x={hoyData.dia} stroke={accentColor} strokeDasharray="3 3"
                              label={{ value: 'HOY', position: 'top', fill: accentColor, fontSize: 10, fontWeight: 700 }} />
             )}
-            <Bar dataKey="atendidos" name="Atendidos del día"
+            <Bar dataKey="atendidos" name={`${data.metric_label || 'Atendidos'} del día`}
                  fill="url(#barGrad)" radius={[3, 3, 0, 0]} />
             <Line type="monotone" dataKey="acumulado" name="Acumulado"
                   stroke={accentColor} strokeWidth={2.5} dot={false} />
@@ -343,8 +356,9 @@ export function AlertaInauguracionesSinJornada() {
 }
 
 // ───────────────────────────── estado jornadas ──────────────────────
-export function EstadoJornadasChart() {
-  const { data, err, loading } = useChartData('estado-jornadas');
+export function EstadoJornadasChart({ anio, mes }) {
+  const params = (anio != null && mes != null) ? { anio, mes } : (anio != null ? { anio } : {});
+  const { data, err, loading } = useChartData('estado-jornadas', params);
   const t = useThemedColors();
   const ct = useChartTheme();
   if (err === '403') return null;
@@ -358,8 +372,8 @@ export function EstadoJornadasChart() {
   const totalAlertas = fmt.filter((f) => f.esAlerta).reduce((s, f) => s + f.value, 0);
   return (
     <MiniChartCard
-      title={`Estado de jornadas${totalAlertas > 0 ? ` · ${totalAlertas} ⚠` : ''}`}
-      subtitle="Mes en curso"
+      title={`Jornadas Realizadas${totalAlertas > 0 ? ` · ${totalAlertas} ⚠` : ''}`}
+      subtitle={periodoLabel(anio, mes)}
       className="h-full"
       density="compact"
       loading={loading}
