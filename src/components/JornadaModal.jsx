@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react';
-import { apiGetJornada, apiCancelarJornada, apiCerrarJornada } from '../api/endpoints';
+import {
+  apiGetJornada, apiCancelarJornada, apiCerrarJornada,
+  apiSetMaterial, apiSetCharlas, apiCatalogoCharlas, apiListPersonal,
+} from '../api/endpoints';
 import { SEMAFORO_BG, TIPO_LABEL, ESTADO_LABEL, fmtN, fmtQ, fmtPct } from '../utils/format';
 import { useAuth } from '../hooks/useAuth';
+
+// E1/F1: Berkin (coordinador) — única identidad que edita cerradas y material.
+function esBerkin(user) {
+  return user?.personal_id === 10 || user?.username === 'Berkin.Santos';
+}
 
 const CATEGORIAS = [
   ['CLIMA', 'Clima'],
@@ -16,18 +24,67 @@ const CATEGORIAS = [
 export default function JornadaModal({ jornadaId, onClose, onChanged }) {
   const { user, canWrite } = useAuth();
   const [j, setJ] = useState(null);
-  const [mode, setMode] = useState('view');  // view | cancel | close
+  const [mode, setMode] = useState('view');  // view | cancel | close | charlas
   const [form, setForm] = useState({});
+  const [catalogo, setCatalogo] = useState([]);
+  const [roster, setRoster] = useState([]);
+  const [charlasEdit, setCharlasEdit] = useState([]);
+  const [savingMat, setSavingMat] = useState(false);
 
   useEffect(() => {
     apiGetJornada(jornadaId).then(setJ);
   }, [jornadaId]);
 
+  // Catálogo de charlas (D2) + roster de responsables (D3) — para el editor.
+  useEffect(() => {
+    apiCatalogoCharlas().then((d) => setCatalogo(d.items || [])).catch(() => {});
+    apiListPersonal({ activo: 1 }).then((d) => setRoster(d || [])).catch(() => {});
+  }, []);
+
   if (!j) return (
     <Modal onClose={onClose}><div className="p-6 text-fg-muted">Cargando…</div></Modal>
   );
 
+  const berkin = esBerkin(user);
   const puedeEditar = !['CERRADA', 'CANCELADA'].includes(j.estado);
+  // Charlas: editables por cualquier editor de la sección (tras E2 = Marlon/Isabel
+  // + admin), incl. en jornadas CERRADAS (revisión a detalle). Backend re-valida.
+  const puedeEditarCharlas = canWrite && j.estado !== 'CANCELADA';
+
+  async function toggleMaterial() {
+    setSavingMat(true);
+    try {
+      const upd = await apiSetMaterial(j.id, !j.material_entregado);
+      setJ(upd); onChanged?.();
+    } catch (e) {
+      alert(e.response?.data?.detail || 'No se pudo actualizar el material');
+    } finally { setSavingMat(false); }
+  }
+  function startCharlas() {
+    setCharlasEdit((j.charlas || []).map((c) => ({
+      charla_codigo: c.charla_codigo || '', charla_tema: c.charla_tema || '',
+      responsable_personal_id: c.responsable_personal_id || '',
+    })));
+    setMode('charlas');
+  }
+  async function saveCharlas() {
+    const payload = charlasEdit
+      .filter((c) => c.charla_codigo || c.charla_tema)
+      .map((c) => {
+        const cat = catalogo.find((x) => x.codigo === c.charla_codigo);
+        return {
+          charla_codigo: c.charla_codigo || null,
+          charla_tema: cat ? cat.titulo : (c.charla_tema || ''),
+          responsable_personal_id: c.responsable_personal_id ? Number(c.responsable_personal_id) : null,
+        };
+      });
+    try {
+      const upd = await apiSetCharlas(j.id, payload);
+      setJ(upd); setMode('view'); onChanged?.();
+    } catch (e) {
+      alert(e.response?.data?.detail || 'No se pudieron guardar las charlas');
+    }
+  }
 
   async function doCancel() {
     if (!form.justificacion_categoria || !form.justificacion_texto || form.justificacion_texto.length < 5) {
@@ -78,12 +135,44 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
           {j.afiliados_atendidos != null && <Field label="Afiliados atendidos">{fmtN(j.afiliados_atendidos)}</Field>}
           {j.kits_consumidos != null && <Field label="Kits consumidos">{fmtN(j.kits_consumidos)}</Field>}
           {j.viaticos_real != null && <Field label="Viáticos reales">{fmtQ(j.viaticos_real)}</Field>}
-          {j.inaugura_clinica && <Field label="Inaugura clínica" className="col-span-2 text-accent font-medium">✓ Esta jornada inaugura una clínica permanente</Field>}
-          {(j.charla_tema || j.charla_responsable) && (
-            <Field label="Charla de educación en salud" className="col-span-2">
-              {j.charla_tema || '—'}
-              {j.charla_responsable ? <span className="text-fg-muted"> · Responsable: {j.charla_responsable}</span> : null}
-            </Field>
+          {j.inaugura_clinica && <Field label="Inaugura clínica" className="col-span-2 text-accent font-medium">✂️ Esta jornada inaugura una clínica permanente</Field>}
+          <Field label="Material entregado" className="col-span-2">
+            <span className={j.material_entregado ? 'text-success font-semibold' : 'text-fg-muted'}>
+              {j.material_entregado ? '✓ Entregado' : '○ Pendiente'}
+            </span>
+            {j.material_entregado_at && <span className="text-fg-muted text-xs"> · {j.material_entregado_at.replace('T', ' ')}</span>}
+            {berkin && (
+              <button className="ml-3 text-xs underline text-igss-primary disabled:opacity-50"
+                onClick={toggleMaterial} disabled={savingMat}>
+                {j.material_entregado ? 'Desmarcar' : 'Marcar entregado'}
+              </button>
+            )}
+          </Field>
+        </div>
+
+        {/* Charlas de educación en salud — MÚLTIPLES (D1/D4) */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-sm font-semibold text-fg">
+              Charlas de educación en salud ({j.charlas?.length || 0})
+            </h3>
+            {mode === 'view' && puedeEditarCharlas && (
+              <button className="text-xs underline text-igss-primary" onClick={startCharlas}>
+                Editar charlas
+              </button>
+            )}
+          </div>
+          {j.charlas?.length > 0 ? (
+            <ul className="text-sm space-y-1">
+              {j.charlas.map((c) => (
+                <li key={c.id} className="flex justify-between border-b border-line-subtle py-1">
+                  <span>{c.charla_codigo ? <span className="text-fg-muted">{c.charla_codigo} </span> : null}{c.charla_tema}</span>
+                  <span className="text-fg-muted">{c.responsable_nombre || '—'}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="text-sm text-fg-muted">Sin charlas registradas.</div>
           )}
         </div>
 
@@ -160,6 +249,37 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
             <div className="flex gap-2 justify-end">
               <button className="btn-secondary" onClick={() => setMode('view')}>Volver</button>
               <button className="btn-primary" onClick={doClose}>Cerrar jornada</button>
+            </div>
+          </div>
+        )}
+
+        {mode === 'charlas' && (
+          <div className="bg-surface-elev border border-line rounded p-3 space-y-2">
+            <h4 className="font-semibold text-fg">Editar charlas de educación en salud</h4>
+            {charlasEdit.map((c, i) => (
+              <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                <select className="input" value={c.charla_codigo}
+                  onChange={(e) => setCharlasEdit((arr) => arr.map((x, ix) => ix === i ? { ...x, charla_codigo: e.target.value } : x))}>
+                  <option value="">— Tema (catálogo) —</option>
+                  {catalogo.map((o) => <option key={o.codigo} value={o.codigo}>{o.codigo} · {o.titulo}</option>)}
+                </select>
+                <select className="input" value={c.responsable_personal_id}
+                  onChange={(e) => setCharlasEdit((arr) => arr.map((x, ix) => ix === i ? { ...x, responsable_personal_id: e.target.value } : x))}>
+                  <option value="">— Responsable —</option>
+                  {roster.filter((p) => !j.seccion_responsable || p.seccion === j.seccion_responsable)
+                    .map((p) => <option key={p.id} value={p.id}>{p.nombre_completo}</option>)}
+                </select>
+                <button className="text-danger px-2" title="Quitar"
+                  onClick={() => setCharlasEdit((arr) => arr.filter((_, ix) => ix !== i))}>✕</button>
+              </div>
+            ))}
+            <button className="btn-secondary text-sm"
+              onClick={() => setCharlasEdit((arr) => [...arr, { charla_codigo: '', charla_tema: '', responsable_personal_id: '' }])}>
+              + Agregar charla
+            </button>
+            <div className="flex gap-2 justify-end pt-1">
+              <button className="btn-secondary" onClick={() => setMode('view')}>Volver</button>
+              <button className="btn-primary" onClick={saveCharlas}>Guardar charlas</button>
             </div>
           </div>
         )}

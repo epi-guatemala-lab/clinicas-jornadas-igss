@@ -94,6 +94,10 @@ export function getChipDescriptor(e, now = new Date()) {
   const esInaug = e.inaugura_clinica === true || e.tipo === 'INAUGURACION';
   // Empresa con clínica amarrada (C2) → borde naranja; sin empresa → sin borde.
   const clinicaAmarrada = e.empresa_clinica_amarrada === true;
+  // F2.2: jornada DEPARTAMENTAL (en el interior, fuera de la capital) → ícono de
+  // ubicación. Requiere viaje/viáticos; se distingue de las de Guatemala capital.
+  const dep = (e.departamento || '').trim().toUpperCase();
+  const esDepartamental = dep !== '' && dep !== 'GUATEMALA';
 
   // Sección (prefijo + borde) con fallback por tipo.
   const sec = e.seccion
@@ -138,7 +142,7 @@ export function getChipDescriptor(e, now = new Date()) {
 
   return {
     bgVar, darkText, seccionPrefijo, seccionVar, seccionDashed,
-    esEnCurso, esCancelada, esAlertaInaug, esReprogramada, esInaug, clinicaAmarrada,
+    esEnCurso, esCancelada, esAlertaInaug, esReprogramada, esInaug, clinicaAmarrada, esDepartamental,
     leadGlifo: esEnCurso ? '●' : null,
     estadoGlifo, saludGlifo, pctChip,
     tachado: esCancelada,

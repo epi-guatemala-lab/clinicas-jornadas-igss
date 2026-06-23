@@ -161,6 +161,10 @@ export default function Calendario() {
           <span className="flex items-center gap-1">
             <span style={{ color: 'rgb(var(--alert-inaug-chip))' }}>✂</span> Inauguración (tijera) → fondo café
           </span>
+          <span className="flex items-center gap-1">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>
+            Jornada departamental (interior)
+          </span>
           <span className="flex items-center gap-1.5 font-semibold" style={{ color: 'rgb(var(--alert-inaug-chip))' }}>
             <span className="inline-block w-3.5 h-3.5 rounded jornada-alerta-pulse-inaug" style={{ backgroundColor: 'rgb(var(--alert-inaug-chip))' }} />
             ⚠️ Inauguración SIN jornada (crítico — coordinar con SIPRESALUD)
