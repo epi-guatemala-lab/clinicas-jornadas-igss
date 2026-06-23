@@ -52,8 +52,11 @@ const PATHS = {
   ),
 };
 
-export default function TipoIcon({ tipo, size = 13, className = '' }) {
-  const path = PATHS[tipo] || PATHS.INFORME_OFICINA;
+export default function TipoIcon({ tipo, inaugura = false, size = 13, className = '' }) {
+  // C1: una jornada que inaugura una clínica muestra la tijera de inauguración,
+  // aunque su tipo sea SIPRESALUD_JORNADA (el flag manda sobre el tipo).
+  const key = inaugura ? 'INAUGURACION' : tipo;
+  const path = PATHS[key] || PATHS.INFORME_OFICINA;
   return (
     <svg
       width={size} height={size} viewBox="0 0 24 24" fill="none"

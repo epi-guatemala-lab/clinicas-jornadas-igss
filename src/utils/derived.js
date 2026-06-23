@@ -89,6 +89,11 @@ export function getChipDescriptor(e, now = new Date()) {
   const esCancelada = estado === 'CANCELADA';
   const esReprogramada = estado === 'REPROGRAMADA';
   const esEnCurso = !esCancelada && isEnCurso(e, now);
+  // Inauguración por FLAG (C1): el tipo dedicado INAUGURACION o cualquier jornada
+  // con inaugura_clinica=true (ej. tamizaje SIPRESALUD que además inaugura clínica).
+  const esInaug = e.inaugura_clinica === true || e.tipo === 'INAUGURACION';
+  // Empresa con clínica amarrada (C2) → borde naranja; sin empresa → sin borde.
+  const clinicaAmarrada = e.empresa_clinica_amarrada === true;
 
   // Sección (prefijo + borde) con fallback por tipo.
   const sec = e.seccion
@@ -109,9 +114,10 @@ export function getChipDescriptor(e, now = new Date()) {
 
   // Fondo de chip = ESTADO/salud, con overrides de alerta (orden de prioridad).
   let bgVar;
-  if (esAlertaInaug) bgVar = '--alert-inaug-chip';
-  else if (esCancelada) bgVar = '--estado-cancelada-chip';
-  else if (esEnCurso) bgVar = '--estado-encurso-chip';
+  if (esAlertaInaug) bgVar = '--alert-inaug-chip';          // inaug SIN jornada (alerta, café)
+  else if (esCancelada) bgVar = '--estado-cancelada-chip';  // cancelada gana (gris)
+  else if (esEnCurso) bgVar = '--estado-encurso-chip';      // en curso ahora (amarillo)
+  else if (esInaug) bgVar = '--alert-inaug-chip';           // B7: inauguración (incl. cerradas con inaug) → café
   else if (estado === 'EJECUTADA') bgVar = '--estado-ejecutada-chip';
   else if (estado === 'CERRADA') bgVar = e.semaforo === 'verde' ? '--estado-cerrada-ok-chip' : '--estado-cerrada-baja-chip';
   else bgVar = '--estado-programada-chip'; // PROGRAMADA + REPROGRAMADA (azul)
@@ -132,7 +138,7 @@ export function getChipDescriptor(e, now = new Date()) {
 
   return {
     bgVar, darkText, seccionPrefijo, seccionVar, seccionDashed,
-    esEnCurso, esCancelada, esAlertaInaug, esReprogramada,
+    esEnCurso, esCancelada, esAlertaInaug, esReprogramada, esInaug, clinicaAmarrada,
     leadGlifo: esEnCurso ? '●' : null,
     estadoGlifo, saludGlifo, pctChip,
     tachado: esCancelada,

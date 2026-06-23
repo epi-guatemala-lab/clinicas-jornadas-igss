@@ -60,6 +60,7 @@
     --seccion-ce:   0 102 179;     /* #0066B3 */
     --seccion-sip:  15 118 110;    /* #0F766E */
     --alert-inaug-chip: 111 78 55; /* #6F4E37 café — inauguración (B7) */
+    --clinica-amarrada: 234 88 12; /* #EA580C naranja — empresa con clínica amarrada (C2) */
   }
 
   /* ── DARK THEME (fondo negro + colores brillantes) ───────── */
@@ -113,6 +114,7 @@
     --seccion-ce:   59 158 224;    /* #3B9EE0 */
     --seccion-sip:  45 212 191;    /* #2DD4BF */
     --alert-inaug-chip: 160 118 75; /* #A0764B café (B7) */
+    --clinica-amarrada: 251 146 60; /* #FB923C naranja (C2) */
   }
 
   body {

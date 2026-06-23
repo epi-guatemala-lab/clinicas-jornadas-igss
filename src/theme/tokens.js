@@ -70,6 +70,7 @@ export const lightTokens = {
     },
     seccion: { ce: '#0066B3', sip: '#0F766E' },  // borde + cápsula CE/SP
     alertInaug: '#6F4E37',     // café — inauguración (B7)
+    clinicaAmarrada: '#EA580C', // naranja — borde empresa con clínica amarrada (C2)
   },
 };
 
@@ -139,6 +140,7 @@ export const darkTokens = {
     },
     seccion: { ce: '#3B9EE0', sip: '#2DD4BF' },
     alertInaug: '#A0764B',     // café (B7)
+    clinicaAmarrada: '#FB923C', // naranja (C2)
   },
 };
 
