@@ -38,7 +38,10 @@ function Pill({ active, onClick, children }) {
 }
 
 export default function Metas() {
-  const { canWrite } = useAuth();
+  const { user, canWrite } = useAuth();
+  // Crear/editar metas institucionales = gerencia/admin (estratégico). El resto
+  // (sipresalud/ce) VE sus metas y el progreso, pero no las modifica. Espeja require_gerencia_write.
+  const canCreateMeta = canWrite && (user.rol === 'admin' || user.rol === 'gerencia');
   const [list, setList] = useState([]);
   const [empresas, setEmpresas] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -69,7 +72,7 @@ export default function Metas() {
               <Pill key={a} active={year === a} onClick={() => setYear(a)}>{a}</Pill>
             ))}
           </div>
-          {canWrite && (
+          {canCreateMeta && (
             <button className="btn-primary" onClick={() => setCreating(true)}>+ Nueva meta</button>
           )}
         </div>
