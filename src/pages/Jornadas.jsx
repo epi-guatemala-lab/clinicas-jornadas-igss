@@ -184,11 +184,12 @@ function NuevaJornadaModal({ onClose, onCreated }) {
     e.preventDefault();
     setErr('');
     try {
-      // El backend hace la coherencia tipo↔inaugura_clinica automáticamente
-      // (no enviamos inaugura_clinica desde el form — se determina por tipo)
+      // C1: inauguración = flag independiente del tipo. El tipo INAUGURACION
+      // siempre inaugura; otros tipos (ej. tamizaje SIPRESALUD) pueden marcar
+      // el checkbox para indicar que ADEMÁS inauguran una clínica.
       await apiCreateJornada({
         ...form,
-        inaugura_clinica: form.tipo === 'INAUGURACION',
+        inaugura_clinica: form.tipo === 'INAUGURACION' || !!form.inaugura_clinica,
         charla_tema: form.charla_tema?.trim() || null,
         charla_responsable: form.charla_responsable?.trim() || null,
         programados: Number(form.programados) || 0,
@@ -297,10 +298,16 @@ function NuevaJornadaModal({ onClose, onCreated }) {
                   onChange={(e) => setField('aplica_kit_lab', e.target.checked)} />
                 Aplica kit de laboratorio
               </label>
-              {form.tipo === 'INAUGURACION' && (
+              {form.tipo === 'INAUGURACION' ? (
                 <span className="text-success font-medium flex items-center gap-1">
                   🎉 Inaugura clínica permanente (automático por tipo)
                 </span>
+              ) : (
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={!!form.inaugura_clinica}
+                    onChange={(e) => setField('inaugura_clinica', e.target.checked)} />
+                  ✂️ Esta jornada también inaugura una clínica
+                </label>
               )}
             </div>
 

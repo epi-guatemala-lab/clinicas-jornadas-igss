@@ -155,6 +155,12 @@ export default function Calendario() {
           <span className="flex items-center gap-1">
             <span className="inline-block w-4 h-3 rounded-r bg-neutral/40 border-l-4 border-dashed" style={{ borderColor: 'rgb(var(--seccion-sip))' }} /> SP = borde a guiones (SIPRESALUD)
           </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-4 h-3 rounded bg-neutral/40 border-r-4" style={{ borderColor: 'rgb(var(--clinica-amarrada))' }} /> Borde derecho naranja = empresa con clínica amarrada
+          </span>
+          <span className="flex items-center gap-1">
+            <span style={{ color: 'rgb(var(--alert-inaug-chip))' }}>✂</span> Inauguración (tijera) → fondo café
+          </span>
           <span className="flex items-center gap-1.5 font-semibold" style={{ color: 'rgb(var(--alert-inaug-chip))' }}>
             <span className="inline-block w-3.5 h-3.5 rounded jornada-alerta-pulse-inaug" style={{ backgroundColor: 'rgb(var(--alert-inaug-chip))' }} />
             ⚠️ Inauguración SIN jornada (crítico — coordinar con SIPRESALUD)

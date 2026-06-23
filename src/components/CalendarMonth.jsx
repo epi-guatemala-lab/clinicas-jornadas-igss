@@ -81,10 +81,13 @@ export default function CalendarMonth({ month, eventos, onEventClick }) {
                       style={{
                         backgroundColor: `rgb(var(${d.bgVar}))`,
                         borderLeft: `4px ${d.seccionDashed ? 'dashed' : 'solid'} rgb(var(${d.seccionVar}))`,
+                        // C2: borde derecho naranja si la empresa tiene clínica amarrada
+                        // (sin empresa → sin borde). El izquierdo sigue marcando sección.
+                        borderRight: d.clinicaAmarrada ? '3px solid rgb(var(--clinica-amarrada))' : undefined,
                       }}>
                       <span className="flex items-center gap-1 pl-1 max-w-full">
                         <span className={`text-[8px] font-bold leading-none px-1 py-0.5 rounded ${d.darkText ? 'bg-black/15' : 'bg-white/25'}`}>{d.seccionPrefijo}</span>
-                        <TipoIcon tipo={e.tipo} />
+                        <TipoIcon tipo={e.tipo} inaugura={d.esInaug} />
                         {d.esAlertaInaug && <span aria-hidden>⚠️</span>}
                         {d.leadGlifo && <span aria-hidden className="leading-none">{d.leadGlifo}</span>}
                         {e.hora_inicio && <span className="opacity-80">{e.hora_inicio.slice(0, 5)}</span>}
