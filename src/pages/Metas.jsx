@@ -11,6 +11,7 @@ import EmptyState from '../components/feedback/EmptyState';
 // Tipos de meta (con rename: "Clínicas amarradas" → "Clínica + Jornada")
 const TIPOS = [
   ['PERSONAS_TAMIZADAS', 'Personas tamizadas'],
+  ['AFILIADOS_ATENDIDOS', 'Afiliados atendidos'],
   ['PACIENTES_ATENDIDOS', 'Pacientes atendidos'],
   ['JORNADAS_EJECUTADAS', 'Jornadas ejecutadas'],
   ['CLINICAS_AMARRADAS', 'Clínica + Jornada'],

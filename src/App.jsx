@@ -31,7 +31,7 @@ export default function App() {
             <Route path="/jornadas" element={<Protected><Jornadas /></Protected>} />
             <Route path="/empresas" element={<Protected><Empresas /></Protected>} />
             <Route path="/viaticos" element={<Protected><Viaticos /></Protected>} />
-            <Route path="/personal" element={<Protected roles={['admin','gerencia']}><Personal /></Protected>} />
+            <Route path="/personal" element={<Protected roles={['admin','gerencia','sipresalud','ce']}><Personal /></Protected>} />
             <Route path="/metas" element={<Protected roles={['admin','gerencia']}><Metas /></Protected>} />
             <Route path="/hallazgos" element={<Protected roles={['admin','gerencia','sipresalud']}><Hallazgos /></Protected>} />
           </Routes>
