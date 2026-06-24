@@ -175,19 +175,3 @@ export function diasRestantesDelMes(now = new Date()) {
   const ultimoDia = new Date(y, m + 1, 0).getDate();
   return Math.max(0, ultimoDia - now.getDate());
 }
-
-/**
- * Calcula costo personal con factor "anual + 20% prestaciones / 365":
- * (mensual × 12 × 1.20) / 365 × dias_asignados
- * vs el modelo legacy: mensual / 30 × dias_asignados.
- *
- * El toggle de Metas decide cuál usar.
- *
- * @param {number} compensacionMensual - Q mensuales (renglón 011/022)
- * @param {number} diasAsignados - días de jornada
- * @returns {number}
- */
-export function costoPersonalDiarioConPrestaciones(compensacionMensual, diasAsignados = 1) {
-  if (!compensacionMensual) return 0;
-  return ((compensacionMensual * 12 * 1.20) / 365) * (diasAsignados || 1);
-}
