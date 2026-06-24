@@ -40,11 +40,7 @@ export default function Jornadas() {
       </div>
 
       <div className="card p-3 flex flex-wrap gap-2 items-end">
-        {user.rol !== 'ce' && (
-          <Select label="Sección" value={filter.seccion}
-            onChange={(v) => setFilter({ ...filter, seccion: v })}
-            options={[['', 'Todas'], ['CE', 'CE'], ['SIPRESALUD', 'SIPRESALUD']]} />
-        )}
+        {/* Sin filtro de sección: todas las jornadas son SIPRESALUD (no CE). */}
         <Select label="Tipo" value={filter.tipo}
           onChange={(v) => setFilter({ ...filter, tipo: v })}
           options={[['', 'Todos'], ...TIPOS]} />
