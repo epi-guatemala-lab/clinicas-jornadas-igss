@@ -23,6 +23,8 @@ export default function Layout({ children }) {
     // Metas: todas las secciones VEN sus metas (incl. la de afiliados); crear/editar
     // queda en gerencia/admin (las metas institucionales son estratégicas).
     { to: '/metas', label: 'Metas', roles: ['admin', 'gerencia', 'sipresalud', 'ce'] },
+    // Admin: gestión de usuarios + visor de auditoría (solo rol admin).
+    { to: '/admin', label: 'Admin', roles: ['admin'] },
   ];
   const visibles = navLinks.filter((l) => l.roles.includes(user.rol));
 
