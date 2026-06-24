@@ -18,18 +18,20 @@ import { fmtQ } from '../utils/format';
 function CostoDiarioPreview({ salarioInput, renglon }) {
   const v = Number(salarioInput) || 0;
   if (!v) return null;
+  // Fórmula unificada con el backend (config.COSTO_*): diario = (mensual/30) ×
+  // factor; 011/022 → ×1.20 (prestaciones), 029 → ×1.00.
   const conPrestaciones = renglon === '011' || renglon === '022';
   let anual, mensual, diario;
   if (conPrestaciones) {
-    // 011/022: el input ES el salario anual
-    anual = v * 1.20;        // anual + 20% prestaciones
-    mensual = v / 12;        // mensual equivalente (sin prestaciones, base)
-    diario = anual / 365;
+    // 011/022: el input ES el salario anual → base mensual = anual/12.
+    anual = v;
+    mensual = v / 12;
+    diario = (mensual / 30) * 1.20;   // /30 + 20% prestaciones
   } else {
-    // 029: el input ES el salario mensual
+    // 029: el input ES el salario mensual; sin prestaciones.
     mensual = v;
     anual = v * 12;
-    diario = v / 30;
+    diario = mensual / 30;            // /30 sin prestaciones
   }
   return (
     <div className="mt-2 text-xs bg-surface-elev rounded-lg p-2.5 border border-line-subtle">
@@ -46,13 +48,13 @@ function CostoDiarioPreview({ salarioInput, renglon }) {
           <div className="font-semibold tabular-nums">{fmtQ(mensual)}</div>
         </div>
         <div>
-          <div className="text-fg-muted">Anual{conPrestaciones && ' +20%'}</div>
+          <div className="text-fg-muted">Anual base</div>
           <div className="font-semibold tabular-nums">{fmtQ(anual)}</div>
         </div>
       </div>
       <div className="mt-1.5 text-[10px] text-fg-muted leading-tight">
         {conPrestaciones
-          ? 'Fórmula: (salario anual × 1.20) / 365 — incluye aguinaldo, bono 14 e indemnización (20%).'
+          ? 'Fórmula: (salario mensual / 30) × 1.20 — incluye aguinaldo, bono 14 e indemnización (20%).'
           : 'Fórmula: salario mensual / 30 — honorarios sin prestaciones.'}
       </div>
     </div>
