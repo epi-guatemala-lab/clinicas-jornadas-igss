@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { apiListMetas, apiCreateMeta, apiMetasPorEmpresa } from '../api/endpoints';
+import { apiListMetas, apiCreateMeta, apiMetasPorEmpresa, apiGetConfig, apiSetMetaAfiliados } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
 import { fmtN, fmtPct, fmtQ, SEMAFORO_DOT } from '../utils/format';
 import Modal from '../components/forms/Modal';
@@ -47,6 +47,29 @@ export default function Metas() {
   const [creating, setCreating] = useState(false);
   const [seccionEmp, setSeccionEmp] = useState('');
   const [year, setYear] = useState(ANIO_DEFAULT);
+  // Módulo admin: meta mensual de afiliados SIPRESALUD (editable, default 5000).
+  const [metaAfi, setMetaAfi] = useState(null);
+  const [metaAfiDraft, setMetaAfiDraft] = useState('');
+  const [savingMeta, setSavingMeta] = useState(false);
+
+  useEffect(() => {
+    apiGetConfig().then((d) => {
+      setMetaAfi(d.meta_afiliados_mensual);
+      setMetaAfiDraft(String(d.meta_afiliados_mensual ?? ''));
+    }).catch(() => {});
+  }, []);
+
+  async function saveMetaAfi() {
+    const v = Number(metaAfiDraft);
+    if (!v || v <= 0) { alert('Ingresá un valor válido (> 0)'); return; }
+    setSavingMeta(true);
+    try {
+      const d = await apiSetMetaAfiliados(v);
+      setMetaAfi(d.meta_afiliados_mensual);
+    } catch (e) {
+      alert(e.response?.data?.detail || 'No se pudo guardar la meta');
+    } finally { setSavingMeta(false); }
+  }
 
   function reload() {
     apiListMetas({ anio: year }).then(setList);
@@ -76,6 +99,29 @@ export default function Metas() {
             <button className="btn-primary" onClick={() => setCreating(true)}>+ Nueva meta</button>
           )}
         </div>
+      </div>
+
+      {/* Módulo admin: meta mensual de afiliados (SIPRESALUD) editable */}
+      <div className="rounded-2xl border border-line bg-surface-elev p-4 flex flex-wrap items-center gap-3">
+        <div className="flex-1 min-w-[220px]">
+          <div className="text-sm font-semibold text-fg">Meta mensual de afiliados (SIPRESALUD)</div>
+          <div className="text-xs text-fg-muted">
+            Es la meta del dashboard. Afiliados = atendidos que son cotizantes IGSS
+            (puede ser menor que el total de pacientes atendidos).
+          </div>
+        </div>
+        {canCreateMeta ? (
+          <div className="flex items-center gap-2">
+            <input type="number" min="1" className="input w-32" value={metaAfiDraft}
+              onChange={(e) => setMetaAfiDraft(e.target.value)} />
+            <button className="btn-primary" onClick={saveMetaAfi}
+              disabled={savingMeta || String(metaAfi) === metaAfiDraft}>
+              {savingMeta ? 'Guardando…' : 'Guardar'}
+            </button>
+          </div>
+        ) : (
+          <div className="text-2xl font-extrabold tabular-nums text-accent">{fmtN(metaAfi ?? 0)}</div>
+        )}
       </div>
 
       {/* KPIs agregados — promedio general */}

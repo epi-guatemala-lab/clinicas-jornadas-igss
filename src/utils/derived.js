@@ -1,3 +1,4 @@
+import { isoLocalDate } from './format';
 // Funciones puras derivadas — sin estado, fáciles de testear.
 // Centralizan la lógica "naranja vs rojo", "EN_CURSO local", severidad de alertas.
 
@@ -46,7 +47,7 @@ export function isEnCurso(jornada, now = new Date()) {
   if (!['PROGRAMADA', 'REPROGRAMADA', 'EN_CURSO'].includes(jornada.estado)) return false;
 
   // Comparación de fechas en zona local (yyyy-mm-dd vs date local)
-  const hoyStr = now.toISOString().slice(0, 10);
+  const hoyStr = isoLocalDate(now);
   const inicio = jornada.fecha_inicio;
   const fin = jornada.fecha_fin || jornada.fecha_inicio;
   if (inicio > hoyStr) return false; // todavía no empezó

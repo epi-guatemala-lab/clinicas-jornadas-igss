@@ -5,6 +5,7 @@ import {
 } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
 import { useApi } from '../hooks/useApi';
+import { isoLocalDate } from '../utils/format';
 
 const TIPOS = [
   ['CE_JORNADA', '🏢 Jornada CE'],
@@ -62,7 +63,7 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
     tipo: 'SIPRESALUD_JORNADA',
     seccion_responsable: user.seccion || 'SIPRESALUD',
     modalidad: 'PRESENCIAL',
-    fecha_inicio: new Date().toISOString().slice(0, 10),
+    fecha_inicio: isoLocalDate(),
     programados: 0,
     aplica_kit_lab: true,
     inaugura_clinica: false,

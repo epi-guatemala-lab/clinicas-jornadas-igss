@@ -9,7 +9,7 @@ import { useChartTheme } from './charts/useChartTheme';
 import ThemedTooltip from './charts/ThemedTooltip';
 import MiniChartCard from './cards/MiniChartCard';
 import AlertBanner from './cards/AlertBanner';
-import { fmtQ, fmtN } from '../utils/format';
+import { fmtQ, fmtN, isoLocalDate } from '../utils/format';
 
 function useChartData(path, params = {}) {
   const r = useApi(`/api/charts/${path}`, params);
@@ -284,7 +284,7 @@ export function ProgresoDiarioMesChart({ compact = false, anio, mes }) {
   const barColor = t.accent.tertiary;
   const accentColor = t.accent.primary;
   const metaColor = t.accent.secondary;
-  const hoyStr = new Date().toISOString().slice(0, 10);
+  const hoyStr = isoLocalDate();
   const hoyData = data?.serie?.find((d) => d.fecha === hoyStr);
   const MES_NOM = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio',
     'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
