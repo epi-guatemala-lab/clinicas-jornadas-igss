@@ -137,7 +137,7 @@ export default function Metas() {
           label="ATENDIDOS EN EL AÑO"
           value={pg.atendidos || 0}
           tone="accent-2"
-          subLabel={`${fmtN(pg.programados)} programados`}
+          subLabel={`${fmtN(pg.programados)} afiliados proyectados`}
         />
         <StatCard
           label="% ASISTENCIA GLOBAL"

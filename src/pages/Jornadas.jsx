@@ -11,10 +11,8 @@ const TIPOS = [
   ['CE_JORNADA', '🏢 Jornada CE'],
   ['SIPRESALUD_JORNADA', '💉 Jornada SIPRESALUD'],
   ['INAUGURACION', '🎉 Inauguración (deja clínica permanente)'],
-  ['TALLER', '📚 Taller'],
+  ['TALLER', '🎤 Conferencia'],
   ['WEBINAR', '💻 Webinar'],
-  ['VISITA_SEGUIMIENTO', '🔍 Visita de seguimiento'],
-  ['INFORME_OFICINA', '📝 Informe / Oficina'],
 ];
 
 export default function Jornadas() {

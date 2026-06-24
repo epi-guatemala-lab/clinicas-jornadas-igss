@@ -5,7 +5,7 @@ const TIPO_LABEL_SHORT = {
   CE_JORNADA: 'CE',
   SIPRESALUD_JORNADA: 'SIPRES',
   INAUGURACION: 'Inaug',
-  TALLER: 'Taller',
+  TALLER: 'Conferencia',
   WEBINAR: 'Web',
   VISITA_SEGUIMIENTO: 'Visita',
   INFORME_OFICINA: 'Of',
@@ -63,7 +63,7 @@ export default function JornadaRow({ jornada, onClick, dense = false }) {
           )}
           {jornada.programados != null && (
             <div className="text-[10px] text-fg-muted tabular-nums mt-0.5">
-              {jornada.programados} programados
+              {jornada.programados} afiliados proyectados
               {jornada.atendidos != null && ` · ${jornada.atendidos} atendidos`}
             </div>
           )}

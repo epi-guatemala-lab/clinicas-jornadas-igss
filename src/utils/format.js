@@ -41,7 +41,7 @@ export const TIPO_LABEL = {
   CE_JORNADA: 'Jornada CE',
   SIPRESALUD_JORNADA: 'Jornada SIPRESALUD',
   INAUGURACION: 'Inauguración',
-  TALLER: 'Taller',
+  TALLER: 'Conferencia',
   WEBINAR: 'Webinar',
   VISITA_SEGUIMIENTO: 'Visita de seguimiento',
   INFORME_OFICINA: 'Informe / Oficina',
