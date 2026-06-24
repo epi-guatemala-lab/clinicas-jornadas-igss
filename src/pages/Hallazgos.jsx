@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useApi } from '../hooks/useApi';
+import { useAuth } from '../hooks/useAuth';
 import StatCard from '../components/cards/StatCard';
+import EpiUploader from '../components/EpiUploader';
 import EpiMapChart from '../components/EpiMapChart';
 import {
   PrevalenciaPatologiaChart, PrevalenciaGrupoChart, DistribucionHallazgosChart,
@@ -148,6 +150,7 @@ export default function Hallazgos() {
   }, [baseParams, grupoEtario, patologiaId]);
 
   const { data: resumen, loading } = useApi('/api/epi/resumen', resumenParams);
+  const { user } = useAuth();
 
   const tamizados = resumen?.total_tamizados ?? 0;
   const pctHallazgo = resumen?.pct_con_hallazgo ?? 0;
@@ -230,6 +233,11 @@ export default function Hallazgos() {
           </div>
         </div>
       </div>
+
+      {/* ── Cargador de base epidemiológica (solo admin) ─────────────── */}
+      {user?.rol === 'admin' && (
+        <EpiUploader onApplied={() => window.location.reload()} />
+      )}
 
       {/* ── Chips de filtros activos (drill-down) ────────────────────── */}
       {hasDrill && (

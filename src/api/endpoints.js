@@ -125,3 +125,15 @@ export const apiAlertasUnificadas = (params = {}) =>
 
 export const apiSerieDiariaMes = (params = {}) =>
   api.get('/api/charts/serie-diaria-mes', { params }).then((r) => r.data);
+
+// ── Cargador epidemiológico (solo admin) ────────────────────────────
+// apply=false → PREVIEW (dry-run, no escribe); apply=true → aplica.
+// Idempotente (mismo archivo = NO-OP) + agregatorio (solo suma).
+export const apiUploadEpi = (fileObj, apply = false) => {
+  const fd = new FormData();
+  fd.append('file', fileObj);
+  return api.post(`/api/epi/upload?apply=${apply ? 'true' : 'false'}`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 180000,
+  }).then((r) => r.data);
+};
