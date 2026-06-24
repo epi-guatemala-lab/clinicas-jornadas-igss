@@ -104,10 +104,11 @@ export default function Metas() {
       {/* Módulo admin: meta mensual de afiliados (SIPRESALUD) editable */}
       <div className="rounded-2xl border border-line bg-surface-elev p-4 flex flex-wrap items-center gap-3">
         <div className="flex-1 min-w-[220px]">
-          <div className="text-sm font-semibold text-fg">Meta mensual de afiliados (SIPRESALUD)</div>
+          <div className="text-sm font-semibold text-fg">Meta mensual de pacientes atendidos (SIPRESALUD)</div>
           <div className="text-xs text-fg-muted">
-            Es la meta del dashboard. Afiliados = atendidos que son cotizantes IGSS
-            (puede ser menor que el total de pacientes atendidos).
+            Es la meta del dashboard (pacientes atendidos por mes). Se unificó con
+            "afiliados" porque todos los atendidos son afiliados IGSS — atendidos es
+            el número completo.
           </div>
         </div>
         {canCreateMeta ? (
