@@ -32,7 +32,7 @@ function tipoDisplay(t) {
     SIPRESALUD_JORNADA: { label: 'Jornada SIPRESALUD', tone: t.accent.secondary },
     INAUGURACION_CON_JORNADA: { label: 'Inauguración (coordinada)', tone: t.status.success },
     INAUGURACION_SIN_JORNADA: { label: '⚠️ Inauguración SIN jornada', tone: t.status.danger },
-    TALLER: { label: 'Taller', tone: t.accent.primary },
+    TALLER: { label: 'Conferencia', tone: t.accent.primary },
     WEBINAR: { label: 'Webinar', tone: t.chart.series[6] },
     VISITA_SEGUIMIENTO: { label: 'Visita seguimiento', tone: t.status.info },
     INFORME_OFICINA: { label: 'Informe/Oficina', tone: t.status.neutral },
@@ -65,7 +65,7 @@ export function Serie12MesesChart() {
   return (
     <MiniChartCard
       title="Tendencia últimos 12 meses"
-      subtitle="Pacientes atendidos vs programados"
+      subtitle="Pacientes atendidos vs afiliados proyectados"
       height={260}
       loading={loading}
       error={err && err !== '403' ? err : null}
@@ -79,7 +79,7 @@ export function Serie12MesesChart() {
             <YAxis {...ct.axisProps} />
             <Tooltip content={<ThemedTooltip formatter={(v) => fmtN(v)} />} />
             <Legend {...ct.legendProps} />
-            <Area type="monotone" dataKey="programados" name="Programados"
+            <Area type="monotone" dataKey="programados" name="Afiliados proyectados"
                   stroke={t.status.neutral} fill={t.status.neutral} fillOpacity={0.18} />
             <Area type="monotone" dataKey="atendidos" name="Atendidos"
                   stroke={t.accent.tertiary} fill={t.accent.tertiary} fillOpacity={0.5} />

@@ -566,7 +566,6 @@ function derivarKpis(data, serieDiaria) {
     nJornadasProgramadas: aux.n_jornadas_programadas,
     promedioPorJornada: aux.promedio_por_jornada,
     promedioPorEmpresa: aux.promedio_por_empresa,
-    nEmpresasActivas: aux.n_empresas_activas,
   };
 }
 

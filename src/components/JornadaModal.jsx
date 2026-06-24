@@ -150,7 +150,7 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
           <Field label="Modalidad">{j.modalidad}</Field>
           <Field label="Ubicación">{[j.departamento, j.municipio, j.zona && `z. ${j.zona}`].filter(Boolean).join(' · ') || '—'}</Field>
           <Field label="Líder">{j.lider_nombre || '—'}</Field>
-          <Field label="Programados">{fmtN(j.programados)}</Field>
+          <Field label="Afiliados proyectados">{fmtN(j.programados)}</Field>
           <Field label="Atendidos">{j.atendidos != null ? `${fmtN(j.atendidos)} (${fmtPct(j.pct_asistencia)})` : '—'}</Field>
           {j.afiliados_atendidos != null && <Field label="Afiliados atendidos">{fmtN(j.afiliados_atendidos)}</Field>}
           {j.kits_consumidos != null && <Field label="Kits consumidos">{fmtN(j.kits_consumidos)}</Field>}
