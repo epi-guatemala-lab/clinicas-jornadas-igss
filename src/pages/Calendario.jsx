@@ -4,7 +4,6 @@ import { apiCalendario } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
 import CalendarMonth from '../components/CalendarMonth';
 import JornadaModal from '../components/JornadaModal';
-import SeccionSwitch from '../components/filters/SeccionSwitch';
 import FilterChip from '../components/filters/FilterChip';
 import TipoIcon from '../components/TipoIcon';
 
@@ -73,13 +72,7 @@ export default function Calendario() {
       </div>
 
       <div className="flex flex-wrap gap-2 items-center">
-        {user.rol !== 'ce' && (
-          <SeccionSwitch
-            value={seccion === 'TODAS' ? '' : seccion}
-            onChange={(v) => setSeccion(v || 'TODAS')}
-            includeAll
-          />
-        )}
+        {/* Sin switch de sección: todas las jornadas son SIPRESALUD (no se hacen CE). */}
         <FilterChip
           active={soloAlertas}
           onClick={() => setSoloAlertas(!soloAlertas)}
@@ -141,7 +134,7 @@ export default function Calendario() {
         <div className="flex flex-wrap gap-x-3 gap-y-1.5 items-center">
           <span className="font-semibold text-fg">Tipo (ícono):</span>
           {[
-            ['CE_JORNADA', 'Jornada'], ['SIPRESALUD_JORNADA', 'Jornada SIPRE'], ['INAUGURACION', 'Inauguración'],
+            ['SIPRESALUD_JORNADA', 'Jornada SIPRE'], ['INAUGURACION', 'Inauguración'],
             ['TALLER', 'Conferencia'], ['WEBINAR', 'Webinar'],
           ].map(([t, l]) => (
             <span key={t} className="flex items-center gap-1 text-fg"><TipoIcon tipo={t} /> {l}</span>
@@ -150,10 +143,7 @@ export default function Calendario() {
         <div className="flex flex-wrap gap-x-3 gap-y-1.5 items-center">
           <span className="font-semibold text-fg">Sección:</span>
           <span className="flex items-center gap-1">
-            <span className="inline-block w-4 h-3 rounded-r bg-neutral/40 border-l-4" style={{ borderColor: 'rgb(var(--seccion-ce))' }} /> CE = borde sólido (Clínicas de Empresa)
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-4 h-3 rounded-r bg-neutral/40 border-l-4 border-dashed" style={{ borderColor: 'rgb(var(--seccion-sip))' }} /> SP = borde a guiones (SIPRESALUD)
+            <span className="inline-block w-4 h-3 rounded-r bg-neutral/40 border-l-4 border-dashed" style={{ borderColor: 'rgb(var(--seccion-sip))' }} /> SIPRESALUD (borde a guiones)
           </span>
           <span className="flex items-center gap-1">
             <span className="inline-block w-4 h-3 rounded bg-neutral/40 border-r-4" style={{ borderColor: 'rgb(var(--clinica-amarrada))' }} /> Borde derecho naranja = empresa con clínica amarrada

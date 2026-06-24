@@ -38,13 +38,10 @@ export const SEMAFORO_DOT = {
 };
 
 export const TIPO_LABEL = {
-  CE_JORNADA: 'Jornada CE',
   SIPRESALUD_JORNADA: 'Jornada SIPRESALUD',
   INAUGURACION: 'Inauguración',
   TALLER: 'Conferencia',
   WEBINAR: 'Webinar',
-  VISITA_SEGUIMIENTO: 'Visita de seguimiento',
-  INFORME_OFICINA: 'Informe / Oficina',
 };
 
 export const ESTADO_LABEL = {

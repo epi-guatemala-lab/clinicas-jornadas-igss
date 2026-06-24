@@ -8,7 +8,6 @@ import {
 } from '../utils/format';
 
 const TIPOS = [
-  ['CE_JORNADA', '🏢 Jornada CE'],
   ['SIPRESALUD_JORNADA', '💉 Jornada SIPRESALUD'],
   ['INAUGURACION', '🎉 Inauguración (deja clínica permanente)'],
   ['TALLER', '🎤 Conferencia'],

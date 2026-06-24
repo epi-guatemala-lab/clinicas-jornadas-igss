@@ -3,13 +3,6 @@
 // El ícono es el portador colorblind-safe del TIPO (el color de fondo = estado).
 
 const PATHS = {
-  // Jornada CE — maletín
-  CE_JORNADA: (
-    <>
-      <rect x="3" y="7" width="18" height="13" rx="2" />
-      <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-    </>
-  ),
   // Jornada SIPRESALUD — pulso/actividad (tamizaje en salud)
   SIPRESALUD_JORNADA: <path d="M3 12h4l2-6 4 12 2-6h6" />,
   // Inauguración — tijera (corte de cinta)
@@ -37,27 +30,13 @@ const PATHS = {
       <path d="M8 21h8M12 17v4" />
     </>
   ),
-  // Visita de seguimiento — lupa
-  VISITA_SEGUIMIENTO: (
-    <>
-      <circle cx="11" cy="11" r="7" />
-      <path d="m21 21-4.3-4.3" />
-    </>
-  ),
-  // Informe / oficina — documento
-  INFORME_OFICINA: (
-    <>
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
-      <path d="M14 2v6h6" />
-    </>
-  ),
 };
 
 export default function TipoIcon({ tipo, inaugura = false, size = 13, className = '' }) {
   // C1: una jornada que inaugura una clínica muestra la tijera de inauguración,
   // aunque su tipo sea SIPRESALUD_JORNADA (el flag manda sobre el tipo).
   const key = inaugura ? 'INAUGURACION' : tipo;
-  const path = PATHS[key] || PATHS.INFORME_OFICINA;
+  const path = PATHS[key] || PATHS.SIPRESALUD_JORNADA;
   return (
     <svg
       width={size} height={size} viewBox="0 0 24 24" fill="none"

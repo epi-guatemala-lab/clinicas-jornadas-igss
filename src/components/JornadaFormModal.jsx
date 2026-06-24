@@ -7,8 +7,10 @@ import { useAuth } from '../hooks/useAuth';
 import { useApi } from '../hooks/useApi';
 import { isoLocalDate } from '../utils/format';
 
+// SIPRESALUD nunca hace Clínicas de Empresa (CE) → tipo sin "Jornada CE"
+// (fuente: requerimiento Berkin "seria Jornada SIPRE, Inauguracion, conferencia,
+// webinar" + "nunca clínicas de empresa, siempre sipresalud").
 const TIPOS = [
-  ['CE_JORNADA', '🏢 Jornada CE'],
   ['SIPRESALUD_JORNADA', '💉 Jornada SIPRESALUD'],
   ['INAUGURACION', '🎉 Inauguración (deja clínica permanente)'],
   ['TALLER', '🎤 Conferencia'],
@@ -62,7 +64,7 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
     })),
   } : {
     tipo: 'SIPRESALUD_JORNADA',
-    seccion_responsable: user.seccion || 'SIPRESALUD',
+    seccion_responsable: 'SIPRESALUD',   // siempre SIPRESALUD (no se hacen jornadas CE)
     modalidad: 'PRESENCIAL',
     fecha_inicio: isoLocalDate(),
     programados: 0,
@@ -154,10 +156,10 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
                   {TIPOS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
                 </select></div>
               <div><label className="label">Sección responsable *</label>
-                <select className="input" value={form.seccion_responsable}
-                  disabled={isEdit || user.rol === 'ce' || user.rol === 'sipresalud'}
+                {/* Siempre SIPRESALUD (no se hacen jornadas CE) — fuente Berkin. */}
+                <select className="input" value="SIPRESALUD" disabled
                   onChange={(e) => setField('seccion_responsable', e.target.value)}>
-                  <option value="CE">CE</option><option value="SIPRESALUD">SIPRESALUD</option>
+                  <option value="SIPRESALUD">SIPRESALUD</option>
                 </select></div>
               <div><label className="label">Empresa</label>
                 <select className="input" value={form.empresa_id || ''}
