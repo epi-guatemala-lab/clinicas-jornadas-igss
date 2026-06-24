@@ -186,15 +186,18 @@ export function PrevalenciaGrupoChart({ params = {} }) {
   if (err === '403') return null;
   const COL = GRUPO_COLOR(t);
   const items = (data?.items || []).map((d) => ({
-    nombre: d.grupo, casos: d.casos, tasa: d.tasa_por_100,
+    nombre: d.grupo, casos: d.casos, hallazgos: d.hallazgos ?? d.casos, tasa: d.tasa_por_100,
     ci_low: d.ci_low, ci_high: d.ci_high,
     tamizados: data?.tamizados, color: COL[d.grupo] || t.accent.tertiary,
   }));
-  const total = items.reduce((s, d) => s + (d.casos || 0), 0);
+  // Total = conteo CRUDO de hallazgos (cuadra con el dashboard oficial). Antes se
+  // sumaban los `casos` por grupo (personas), que double-cuenta a quien tiene
+  // hallazgos en varios grupos → daba MENOS que el total real.
+  const total = data?.total_hallazgos ?? items.reduce((s, d) => s + (d.hallazgos || 0), 0);
   return (
     <MiniChartCard
-      title="Prevalencia por grupo clínico"
-      subtitle="Personas con ≥1 hallazgo en el grupo · tasa por 100"
+      title="Hallazgos por grupo clínico"
+      subtitle="Distribución de hallazgos · % = prevalencia (personas con ≥1)"
       className="h-full"
       loading={loading}
       error={softErr(err)}
@@ -202,11 +205,11 @@ export function PrevalenciaGrupoChart({ params = {} }) {
     >
       {items.length > 0 && (
         <div className="flex h-full items-center gap-3">
-          {/* Donut con el total de hallazgos rotulado en el centro */}
+          {/* Donut: segmentos = hallazgos CRUDOS (suman al total del centro) */}
           <div className="relative flex-1 min-w-0 h-full">
             <ResponsiveContainer>
               <PieChart>
-                <Pie data={items} dataKey="casos" nameKey="nombre"
+                <Pie data={items} dataKey="hallazgos" nameKey="nombre"
                      innerRadius="58%" outerRadius="84%" paddingAngle={2}
                      stroke={t.bg.surface} strokeWidth={2}>
                   {items.map((e, i) => <Cell key={i} fill={e.color} />)}

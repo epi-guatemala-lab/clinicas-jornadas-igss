@@ -163,8 +163,9 @@
   animation: jornada-alerta-pulse-inaug 2s ease-in-out infinite;
 }
 
-/* Pulse 'en curso ahora' (B3): halo amarillo + escala — se mueve como la
-   alerta de inauguración sin jornada (pedido de la jefatura). */
+/* Pulse 'en curso ahora' (B3): MISMO latido/alerta que la inauguración sin
+   jornada (pedido de la jefatura) — idéntica geometría, escala y ritmo (2s),
+   solo cambia el color (amarillo en curso vs café inaug). */
 @keyframes jornada-encurso-pulse {
   0%, 100% {
     box-shadow: 0 0 0 0 rgb(var(--estado-encurso-chip) / 0.7), 0 4px 6px -1px rgb(var(--estado-encurso-chip) / 0.3);
@@ -172,11 +173,11 @@
   }
   50% {
     box-shadow: 0 0 0 6px rgb(var(--estado-encurso-chip) / 0), 0 4px 6px -1px rgb(var(--estado-encurso-chip) / 0.5);
-    transform: scale(1.03);
+    transform: scale(1.02);
   }
 }
 .jornada-encurso-pulse {
-  animation: jornada-encurso-pulse 1.8s ease-in-out infinite;
+  animation: jornada-encurso-pulse 2s ease-in-out infinite;
 }
 
 @layer components {
