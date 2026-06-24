@@ -2,13 +2,10 @@ import { useThemedColors } from '../../theme/useThemedColors';
 import { mapSemaforoLegacy } from '../../utils/derived';
 
 const TIPO_LABEL_SHORT = {
-  CE_JORNADA: 'CE',
   SIPRESALUD_JORNADA: 'SIPRES',
   INAUGURACION: 'Inaug',
   TALLER: 'Conferencia',
   WEBINAR: 'Web',
-  VISITA_SEGUIMIENTO: 'Visita',
-  INFORME_OFICINA: 'Of',
 };
 
 /**

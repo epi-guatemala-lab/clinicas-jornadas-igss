@@ -28,14 +28,11 @@ function periodoLabel(anio, mes) {
 
 function tipoDisplay(t) {
   return {
-    CE_JORNADA: { label: 'Jornada CE', tone: t.accent.tertiary },
     SIPRESALUD_JORNADA: { label: 'Jornada SIPRESALUD', tone: t.accent.secondary },
     INAUGURACION_CON_JORNADA: { label: 'Inauguración (coordinada)', tone: t.status.success },
     INAUGURACION_SIN_JORNADA: { label: '⚠️ Inauguración SIN jornada', tone: t.status.danger },
     TALLER: { label: 'Conferencia', tone: t.accent.primary },
     WEBINAR: { label: 'Webinar', tone: t.chart.series[6] },
-    VISITA_SEGUIMIENTO: { label: 'Visita seguimiento', tone: t.status.info },
-    INFORME_OFICINA: { label: 'Informe/Oficina', tone: t.status.neutral },
   };
 }
 
