@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import {
-  apiGetJornada, apiCancelarJornada, apiCerrarJornada,
+  apiGetJornada, apiCancelarJornada, apiCerrarJornada, apiReprogramarJornada,
   apiSetMaterial, apiSetCharlas, apiCatalogoCharlas, apiListPersonal,
 } from '../api/endpoints';
 import { SEMAFORO_BG, TIPO_LABEL, ESTADO_LABEL, fmtN, fmtQ, fmtPct } from '../utils/format';
 import { useAuth } from '../hooks/useAuth';
 import JornadaFormModal from './JornadaFormModal';
 
-// E1/F1: Berkin (coordinador) — única identidad que edita cerradas y material.
+// E1/F1: coordinador (Berkin) — única identidad que edita cerradas y material.
+// Usa el flag es_coordinador computado en el backend (is_berkin); fallback por
+// compat con sesiones viejas que aún no traen el campo.
 function esBerkin(user) {
-  return user?.personal_id === 10 || user?.username === 'Berkin.Santos';
+  return user?.es_coordinador === true || user?.personal_id === 10 || user?.username === 'Berkin.Santos';
 }
 
 const CATEGORIAS = [
@@ -94,6 +96,22 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
     }
     const upd = await apiCancelarJornada(j.id, form);
     setJ(upd); setMode('view'); onChanged?.();
+  }
+  async function doReprogramar() {
+    if (!form.nueva_fecha_inicio || !form.motivo || form.motivo.length < 5) {
+      alert('Nueva fecha y motivo (mín 5 caracteres) requeridos'); return;
+    }
+    try {
+      const upd = await apiReprogramarJornada(j.id, {
+        nueva_fecha_inicio: form.nueva_fecha_inicio,
+        nueva_fecha_fin: form.nueva_fecha_fin || null,
+        nueva_hora_inicio: form.nueva_hora_inicio || null,
+        motivo: form.motivo,
+      });
+      setJ(upd); setMode('view'); onChanged?.();
+    } catch (e) {
+      alert(e.response?.data?.detail || 'No se pudo reprogramar');
+    }
   }
   async function doClose() {
     if (form.atendidos == null || form.atendidos === '') {
@@ -217,6 +235,29 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
           </div>
         )}
 
+        {mode === 'reprogramar' && (
+          <div className="bg-warning-soft border border-warning/30 rounded p-3 space-y-2">
+            <h4 className="font-semibold text-warning">Reprogramar jornada</h4>
+            <div className="grid grid-cols-3 gap-2">
+              <div><label className="label">Nueva fecha *</label>
+                <input type="date" className="input" value={form.nueva_fecha_inicio || ''}
+                  onChange={(e) => setForm({ ...form, nueva_fecha_inicio: e.target.value })} /></div>
+              <div><label className="label">Nueva fecha fin</label>
+                <input type="date" className="input" value={form.nueva_fecha_fin || ''}
+                  onChange={(e) => setForm({ ...form, nueva_fecha_fin: e.target.value })} /></div>
+              <div><label className="label">Nueva hora</label>
+                <input type="time" className="input" value={form.nueva_hora_inicio || ''}
+                  onChange={(e) => setForm({ ...form, nueva_hora_inicio: e.target.value })} /></div>
+            </div>
+            <textarea className="input" rows="2" placeholder="Motivo de la reprogramación (obligatorio)"
+              value={form.motivo || ''} onChange={(e) => setForm({ ...form, motivo: e.target.value })} />
+            <div className="flex gap-2 justify-end">
+              <button className="btn-secondary" onClick={() => setMode('view')}>Volver</button>
+              <button className="btn-primary" onClick={doReprogramar}>Confirmar reprogramación</button>
+            </div>
+          </div>
+        )}
+
         {mode === 'close' && (
           <div className="bg-success-soft border border-success/30 rounded p-3 space-y-2">
             <h4 className="font-semibold text-success">Cerrar jornada con métricas</h4>
@@ -297,6 +338,7 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
             )}
             {puedeEditar && canWrite && (
               <>
+                <button className="btn-secondary" onClick={() => { setForm({}); setMode('reprogramar'); }}>Reprogramar</button>
                 <button className="btn-danger" onClick={() => { setForm({}); setMode('cancel'); }}>Cancelar</button>
                 <button className="btn-primary" onClick={() => { setForm({}); setMode('close'); }}>Cerrar con métricas</button>
               </>

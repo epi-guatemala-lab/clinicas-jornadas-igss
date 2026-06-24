@@ -45,6 +45,9 @@ export const apiCerrarJornada = (id, body) =>
 export const apiCancelarJornada = (id, body) =>
   api.post(`/api/jornadas/${id}/cancelar`, body).then((r) => r.data);
 
+export const apiReprogramarJornada = (id, body) =>
+  api.post(`/api/jornadas/${id}/reprogramar`, body).then((r) => r.data);
+
 // F1: material entregado (solo Berkin en backend)
 export const apiSetMaterial = (id, entregado) =>
   api.patch(`/api/jornadas/${id}/material`, { entregado }).then((r) => r.data);
@@ -56,6 +59,20 @@ export const apiSetCharlas = (id, charlas) =>
 // D2: catálogo fijo de charlas (15)
 export const apiCatalogoCharlas = () =>
   api.get('/api/catalogos/charlas').then((r) => r.data);
+
+// ── Admin (usuarios + auditoría) ────────────────────────────────────
+export const apiAdminUsers = (params = {}) =>
+  api.get('/api/admin/users', { params }).then((r) => r.data);
+export const apiAdminActivateUser = (id) =>
+  api.post(`/api/admin/users/${id}/activar`).then((r) => r.data);
+export const apiAdminDeactivateUser = (id) =>
+  api.post(`/api/admin/users/${id}/desactivar`).then((r) => r.data);
+export const apiAdminResetPassword = (id) =>
+  api.post(`/api/admin/users/${id}/reset-password`).then((r) => r.data);
+export const apiAdminAuditJornadas = (params = {}) =>
+  api.get('/api/admin/audit/jornadas', { params }).then((r) => r.data);
+export const apiAdminAuditAuth = (params = {}) =>
+  api.get('/api/admin/audit/auth', { params }).then((r) => r.data);
 
 // Config editable (módulo admin): meta mensual de afiliados
 export const apiGetConfig = () =>
