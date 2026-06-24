@@ -151,7 +151,8 @@ export default function Hallazgos() {
 
   const tamizados = resumen?.total_tamizados ?? 0;
   const pctHallazgo = resumen?.pct_con_hallazgo ?? 0;
-  const hxPersona = resumen?.hallazgos_por_persona ?? 0;
+  const hxPersona = resumen?.hallazgos_por_persona ?? 0;                      // / tamizados
+  const hxPersonaAlt = resumen?.hallazgos_por_persona_con_hallazgo ?? 0;      // / con-alteraciones (dashboard oficial)
   const lider = resumen?.patologia_lider;
 
   const hasDrill = departamento || grupoEtario || patologiaId != null;
@@ -261,19 +262,22 @@ export default function Hallazgos() {
                   tone="warning" viz="donut" icon={Icon.pulse}
                   vizData={{ value: pctHallazgo, max: 100, centerLabel: `${pctHallazgo}%` }}
                   subLabel="prevalencia global" />
-        <StatCard label="Hallazgos por persona" value={hxPersona} decimals={2} tone="accent-2" icon={Icon.stack}
-                  subLabel="promedio entre tamizados" />
+        <StatCard label="Hallazgos por persona con alteraciones" value={hxPersonaAlt} decimals={2} tone="accent-2" icon={Icon.stack}
+                  subLabel={`${hxPersona.toFixed(2)} entre todos los tamizados`} />
         <StatCard label="Patología líder" value={lider?.tasa ?? 0} format="percent" decimals={1}
                   tone="danger" icon={Icon.fire} subLabel={lider?.nombre || '—'} />
       </div>
 
       {/* ── HÉROES: Mapa + Prevalencia por patología ─────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3" style={{ minHeight: 460 }}>
-        <div className="lg:col-span-7 min-h-[440px]">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3" style={{ minHeight: 480 }}>
+        {/* El mapa de GT es casi cuadrado (1000×1015): en una columna ancha quedaba
+            "letterboxed" con mucho espacio muerto. Va en la columna más angosta
+            (5/12) para llenarla; la gráfica de barras de patología usa la ancha. */}
+        <div className="lg:col-span-5 min-h-[460px]">
           <EpiMapChart params={mapParams} selected={departamento}
                        onPick={pickDepto} ajustada={ajustada} />
         </div>
-        <div className="lg:col-span-5 min-h-[440px]">
+        <div className="lg:col-span-7 min-h-[460px]">
           <PrevalenciaPatologiaChart params={params}
             selectedPatologia={patologiaId}
             onPickPatologia={(id, nombre) => { setPatologiaId(id); setPatologiaNombre(id == null ? null : nombre); }} />

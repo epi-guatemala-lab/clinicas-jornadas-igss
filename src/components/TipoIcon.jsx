@@ -22,11 +22,12 @@ const PATHS = {
       <path d="M8.12 8.12 12 12" />
     </>
   ),
-  // Taller — birrete de graduación
+  // Conferencia (antes Taller) — micrófono
   TALLER: (
     <>
-      <path d="M22 10 12 5 2 10l10 5 10-5Z" />
-      <path d="M6 12v5c0 1 2.7 3 6 3s6-2 6-3v-5" />
+      <rect x="9" y="2" width="6" height="11" rx="3" />
+      <path d="M5 10a7 7 0 0 0 14 0" />
+      <path d="M12 17v4M8 21h8" />
     </>
   ),
   // Webinar — monitor

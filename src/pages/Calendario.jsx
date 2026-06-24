@@ -142,7 +142,7 @@ export default function Calendario() {
           <span className="font-semibold text-fg">Tipo (ícono):</span>
           {[
             ['CE_JORNADA', 'Jornada'], ['SIPRESALUD_JORNADA', 'Jornada SIPRE'], ['INAUGURACION', 'Inauguración'],
-            ['TALLER', 'Taller'], ['WEBINAR', 'Webinar'], ['VISITA_SEGUIMIENTO', 'Visita'], ['INFORME_OFICINA', 'Informe'],
+            ['TALLER', 'Conferencia'], ['WEBINAR', 'Webinar'],
           ].map(([t, l]) => (
             <span key={t} className="flex items-center gap-1 text-fg"><TipoIcon tipo={t} /> {l}</span>
           ))}

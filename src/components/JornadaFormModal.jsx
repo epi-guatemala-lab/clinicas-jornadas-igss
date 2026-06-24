@@ -11,10 +11,8 @@ const TIPOS = [
   ['CE_JORNADA', '🏢 Jornada CE'],
   ['SIPRESALUD_JORNADA', '💉 Jornada SIPRESALUD'],
   ['INAUGURACION', '🎉 Inauguración (deja clínica permanente)'],
-  ['TALLER', '📚 Taller'],
+  ['TALLER', '🎤 Conferencia'],
   ['WEBINAR', '💻 Webinar'],
-  ['VISITA_SEGUIMIENTO', '🔍 Visita de seguimiento'],
-  ['INFORME_OFICINA', '📝 Informe / Oficina'],
 ];
 const ROLES_JOR = ['LIDER', 'MEDICO', 'ADMIN', 'ENFERMERIA', 'LABORATORISTA', 'DIGITADOR', 'ENCUESTADOR'];
 
@@ -46,6 +44,9 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
     zona: jornada.zona || '',
     programados: jornada.programados ?? 0,
     aplica_kit_lab: !!jornada.aplica_kit_lab,
+    tamizaje_vih: !!jornada.tamizaje_vih,
+    vacunacion: !!jornada.vacunacion,
+    qr_link: jornada.qr_link || '',
     inaugura_clinica: !!jornada.inaugura_clinica,
     inauguracion_jornada_id: jornada.inauguracion_jornada_id || null,
     lider_personal_id: jornada.lider_personal_id || null,
@@ -66,6 +67,9 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
     fecha_inicio: isoLocalDate(),
     programados: 0,
     aplica_kit_lab: true,
+    tamizaje_vih: false,
+    vacunacion: false,
+    qr_link: '',
     inaugura_clinica: false,
     viaticos_presupuesto: 0,
     personal: [],
@@ -178,7 +182,7 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
                   <option value="VIRTUAL">Virtual</option>
                   <option value="MIXTA">Mixta</option>
                 </select></div>
-              <div><label className="label">Programados</label>
+              <div><label className="label">Afiliados proyectados</label>
                 <input className="input" type="number" min="0" value={form.programados}
                   onChange={(e) => setField('programados', e.target.value)} /></div>
               <div><label className="label">Departamento</label>
@@ -238,11 +242,21 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
               </div>
             </div>
 
-            <div className="flex gap-4 text-sm">
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={form.aplica_kit_lab}
                   onChange={(e) => setField('aplica_kit_lab', e.target.checked)} />
                 Aplica kit de laboratorio
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={!!form.tamizaje_vih}
+                  onChange={(e) => setField('tamizaje_vih', e.target.checked)} />
+                🩸 Tamizaje VIH
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={!!form.vacunacion}
+                  onChange={(e) => setField('vacunacion', e.target.checked)} />
+                💉 Vacunación
               </label>
               {form.tipo === 'INAUGURACION' ? (
                 <span className="text-success font-medium flex items-center gap-1">🎉 Inaugura clínica permanente (automático por tipo)</span>
@@ -254,6 +268,10 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
                 </label>
               )}
             </div>
+
+            <div><label className="label">QR Link (encuesta)</label>
+              <input className="input" type="url" inputMode="url" placeholder="https://… (link de la encuesta)"
+                value={form.qr_link || ''} onChange={(e) => setField('qr_link', e.target.value)} /></div>
 
             {form.tipo === 'INAUGURACION' && (
               <div className="bg-warning-soft border-l-4 border-warning p-3 rounded">
