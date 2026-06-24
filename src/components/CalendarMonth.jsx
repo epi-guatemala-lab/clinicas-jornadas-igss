@@ -3,7 +3,7 @@ import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   addDays, format, isSameMonth, isSameDay,
 } from 'date-fns';
-import { TIPO_LABEL, ESTADO_LABEL } from '../utils/format';
+import { TIPO_LABEL, ESTADO_LABEL, isoLocalDate } from '../utils/format';
 import { getChipDescriptor } from '../utils/derived';
 import TipoIcon from './TipoIcon';
 
@@ -19,7 +19,7 @@ const DAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
  */
 export default function CalendarMonth({ month, eventos, onEventClick }) {
   const now = new Date();
-  const hoyStr = now.toISOString().slice(0, 10);
+  const hoyStr = isoLocalDate(now);
 
   const cells = useMemo(() => {
     const start = startOfWeek(startOfMonth(month), { weekStartsOn: 0 });

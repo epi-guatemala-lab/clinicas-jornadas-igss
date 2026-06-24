@@ -57,6 +57,12 @@ export const apiSetCharlas = (id, charlas) =>
 export const apiCatalogoCharlas = () =>
   api.get('/api/catalogos/charlas').then((r) => r.data);
 
+// Config editable (módulo admin): meta mensual de afiliados
+export const apiGetConfig = () =>
+  api.get('/api/config').then((r) => r.data);
+export const apiSetMetaAfiliados = (valor) =>
+  api.put('/api/config/meta-afiliados', { valor }).then((r) => r.data);
+
 export const apiCalendario = (desde, hasta, seccion) =>
   api.get('/api/jornadas/calendario', {
     params: { desde, hasta, seccion },

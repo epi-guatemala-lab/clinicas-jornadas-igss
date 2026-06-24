@@ -9,7 +9,7 @@ import {
   Serie12MesesChart, DistribucionDepartamentoChart, CostosMensualesChart,
   ProgresoDiarioMesChart, EstadoJornadasChart,
 } from '../components/Charts';
-import { fmtQ, fmtN } from '../utils/format';
+import { fmtQ, fmtN, isoLocalDate } from '../utils/format';
 import ErrorState from '../components/feedback/ErrorState';
 import { useThemedColors } from '../theme/useThemedColors';
 import { severityOf } from '../utils/derived';
@@ -86,9 +86,9 @@ export default function Dashboard() {
     const all = data?.proximas_jornadas || [];
     if (!all.length) return { items: [], showingFallback: false, nextDate: null };
     const now = new Date();
-    const hoy = now.toISOString().slice(0, 10);
+    const hoy = isoLocalDate(now);
     const tmp = new Date(now); tmp.setDate(tmp.getDate() + 1);
-    const manana = tmp.toISOString().slice(0, 10);
+    const manana = isoLocalDate(tmp);
     const hoyManana = all.filter((j) => j.fecha_inicio === hoy || j.fecha_inicio === manana);
     if (hoyManana.length > 0) {
       return { items: hoyManana, showingFallback: false, nextDate: null };

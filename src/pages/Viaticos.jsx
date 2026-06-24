@@ -3,7 +3,7 @@ import {
   apiListViaticos, apiCreateViatico, apiNextCorrelativo, apiListPersonal, apiListJornadas,
 } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
-import { fmtQ } from '../utils/format';
+import { fmtQ, isoLocalDate } from '../utils/format';
 
 const STATUS = ['PENDIENTE', 'UTILIZADO', 'ANULADO', 'EXTRAVIADO'];
 const STATUS_BG = {
@@ -83,7 +83,7 @@ function NuevoViatico({ onClose, onSaved }) {
     monto: '',
     status: 'PENDIENTE',
     nombramiento: '',
-    fecha_nombramiento: new Date().toISOString().slice(0, 10),
+    fecha_nombramiento: isoLocalDate(),
   });
   const [next, setNext] = useState(null);
   const [personal, setPersonal] = useState([]);

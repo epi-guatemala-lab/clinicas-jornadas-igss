@@ -1,3 +1,13 @@
+// Fecha ISO en zona LOCAL del navegador (no UTC). toISOString() convierte a UTC
+// y para un usuario en Guatemala (UTC-6) entre 18:00-23:59 devolvía la fecha de
+// mañana → "HOY", en-curso y defaults se adelantaban un día.
+export const isoLocalDate = (d = new Date()) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+};
+
 export const fmtQ = (n) =>
   n == null ? '—' : `Q${Number(n).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
