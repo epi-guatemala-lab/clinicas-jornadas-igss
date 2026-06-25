@@ -84,7 +84,7 @@ export default function Calendario() {
       <CalendarMonth
         month={month}
         eventos={filteredEventos}
-        onEventClick={(e) => setSelected(e.id)} />
+        onEventClick={(e) => { if (!e.es_inauguracion_empresa) setSelected(e.id); }} />
 
       {/* Mes sin eventos: hint accionable hacia el último mes con jornadas */}
       {!soloAlertas && eventos.length === 0 && (

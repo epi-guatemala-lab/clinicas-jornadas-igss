@@ -47,6 +47,24 @@ export default function Field({
       );
     }
 
+    if (type === 'combobox') {
+      // input libre + <datalist> de sugerencias (valores previos) — permite agregar nuevos.
+      const listId = `${id}-list`;
+      return (
+        <>
+          <input id={id} name={name} type="text" value={value ?? ''} onChange={onChange}
+                 placeholder={placeholder} disabled={disabled} list={listId}
+                 className={baseInput} aria-invalid={!!error} aria-describedby={errId} />
+          <datalist id={listId}>
+            {(options || []).map((o) => {
+              const val = Array.isArray(o) ? o[0] : (o && typeof o === 'object' ? o.value : o);
+              return <option key={val} value={val} />;
+            })}
+          </datalist>
+        </>
+      );
+    }
+
     if (type === 'textarea') {
       return (
         <textarea id={id} name={name} value={value ?? ''} onChange={onChange}
