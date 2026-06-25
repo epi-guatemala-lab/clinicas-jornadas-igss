@@ -16,6 +16,20 @@ export const apiCreateEmpresa = (body) =>
 export const apiUpdateEmpresa = (id, body) =>
   api.put(`/api/empresas/${id}`, body).then((r) => r.data);
 
+// CE: inauguración de la clínica (fecha/lugar/horario) → alimenta el calendario
+export const apiSetInauguracion = (id, body) =>
+  api.patch(`/api/empresas/${id}/inauguracion`, body).then((r) => r.data);
+
+// A5: valores de 'grupo' para el combobox abierto
+export const apiEmpresaGrupos = () =>
+  api.get('/api/empresas/grupos').then((r) => r.data);
+
+// Catálogos CE
+export const apiCatalogoSectores = () =>
+  api.get('/api/catalogos/sectores').then((r) => r.data);
+export const apiCatalogoUnidadesAdscripcion = () =>
+  api.get('/api/catalogos/unidades-adscripcion').then((r) => r.data);
+
 // ── Personal ────────────────────────────────────────────────────────
 export const apiListPersonal = (params = {}) =>
   api.get('/api/personal', { params }).then((r) => r.data);
