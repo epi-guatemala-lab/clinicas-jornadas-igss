@@ -146,6 +146,13 @@ function EmpresaForm({ initial, onClose, onSave }) {
     } catch (e) { setErr(e.response?.data?.detail || 'Error'); }
   }
 
+  // Preservar el valor actual aunque no esté en el catálogo (empresas legacy con
+  // sector 'privado' en minúscula, o catálogo placeholder) → no se blanquea/pierde.
+  const sectorOptions = [['', '— Seleccione —'], ...sectores.map((s) => [s.codigo, s.titulo])];
+  if (form.sector && !sectores.some((s) => s.codigo === form.sector)) sectorOptions.push([form.sector, `${form.sector} (actual)`]);
+  const unidadOptions = [['', '— Seleccione —'], ...unidades.map((u) => [u.codigo, u.titulo])];
+  if (form.unidad_adscripcion && !unidades.some((u) => u.codigo === form.unidad_adscripcion)) unidadOptions.push([form.unidad_adscripcion, `${form.unidad_adscripcion} (actual)`]);
+
   return (
     <Modal open onClose={onClose} title={initial ? 'Editar empresa' : 'Nueva empresa'} size="lg"
       footer={<>
@@ -159,9 +166,9 @@ function EmpresaForm({ initial, onClose, onSave }) {
         <Field label="NIT" value={form.nit || ''} onChange={set('nit')} />
         <Field label="Número patronal IGSS" value={form.numero_patronal || ''} onChange={set('numero_patronal')} />
         <Field label="Sector / Gremio" type="select" value={form.sector || ''} onChange={set('sector')}
-               options={[['', '— Seleccione —'], ...sectores.map((s) => [s.codigo, s.titulo])]} />
+               options={sectorOptions} />
         <Field label="Unidad médica de adscripción" type="select" value={form.unidad_adscripcion || ''} onChange={set('unidad_adscripcion')}
-               options={[['', '— Seleccione —'], ...unidades.map((u) => [u.codigo, u.titulo])]} />
+               options={unidadOptions} />
         <Field label="# Empleados en planilla" type="number" min="0"
                value={form.n_empleados_planilla || ''} onChange={set('n_empleados_planilla')} />
         <Field label="Grupo" type="combobox" placeholder="Escribí o elegí…" hint="Campo abierto: podés agregar nuevos."
