@@ -16,14 +16,23 @@ export default function Empresas() {
   const canEdit = canWrite && (user?.rol === 'ce' || user?.rol === 'admin');
   const [tab, setTab] = useState('pendientes');      // 'pendientes' | 'historico'
   const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
   const [inaugurando, setInaugurando] = useState(null);
 
-  function reload() {
-    apiListEmpresas({ activa: true, tiene_clinica_amarrada: tab === 'historico' }).then(setList);
-  }
-  useEffect(reload, [tab]);
+  const reload = () => setReloadKey((k) => k + 1);
+  useEffect(() => {
+    // race-guard: si el usuario alterna de tab rápido, descartar la respuesta vieja.
+    let cancelled = false;
+    setLoading(true); setLoadErr('');
+    apiListEmpresas({ activa: true, tiene_clinica_amarrada: tab === 'historico' })
+      .then((d) => { if (!cancelled) { setList(d); setLoading(false); } })
+      .catch(() => { if (!cancelled) { setLoadErr('No se pudieron cargar las empresas.'); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [tab, reloadKey]);
 
   const esHistorico = tab === 'historico';
 
@@ -58,7 +67,7 @@ export default function Empresas() {
               </tr>
             </thead>
             <tbody>
-              {list.map((e) => (
+              {!loading && !loadErr && list.map((e) => (
                 <tr key={e.id} className="border-t border-line-subtle hover:bg-surface-elev">
                   <td className="p-2 font-medium text-fg">
                     {e.nombre_legal}
@@ -88,7 +97,15 @@ export default function Empresas() {
                   )}
                 </tr>
               ))}
-              {list.length === 0 && (
+              {loadErr && (
+                <tr><td colSpan={canEdit ? 8 : 7} className="text-center py-4 text-danger">
+                  {loadErr} <button className="underline ml-2" onClick={reload}>Reintentar</button>
+                </td></tr>
+              )}
+              {loading && !loadErr && (
+                <tr><td colSpan={canEdit ? 8 : 7} className="text-center py-4 text-fg-muted">Cargando…</td></tr>
+              )}
+              {!loading && !loadErr && list.length === 0 && (
                 <tr><td colSpan={canEdit ? 8 : 7} className="text-center py-4 text-fg-muted">
                   {esHistorico ? 'Sin empresas con clínica' : 'Sin empresas pendientes'}
                 </td></tr>
@@ -172,7 +189,7 @@ function EmpresaForm({ initial, onClose, onSave }) {
         <Field label="Unidad médica de adscripción" type="select" value={form.unidad_adscripcion || ''} onChange={set('unidad_adscripcion')}
                options={unidadOptions} />
         <Field label="# Empleados en planilla" type="number" min="0"
-               value={form.n_empleados_planilla || ''} onChange={set('n_empleados_planilla')} />
+               value={form.n_empleados_planilla ?? ''} onChange={set('n_empleados_planilla')} />
         <Field label="Grupo" type="combobox" placeholder="Escribí o elegí…" hint="Campo abierto: podés agregar nuevos."
                value={form.grupo || ''} onChange={set('grupo')} options={grupos} />
         <GeoSelects departamento={form.departamento} municipio={form.municipio}
