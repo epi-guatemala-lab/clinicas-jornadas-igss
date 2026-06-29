@@ -135,9 +135,11 @@ function EmpresaForm({ initial, onClose, onSave }) {
 
   async function submit(e) {
     e.preventDefault(); setErr('');
+    const _planilla = form.n_empleados_planilla;
     const body = {
       ...form,
-      n_empleados_planilla: form.n_empleados_planilla ? Number(form.n_empleados_planilla) : null,
+      // '' o null → null; cualquier número (incluido 0) se preserva (no usar truthiness: 0 es válido).
+      n_empleados_planilla: _planilla === '' || _planilla == null ? null : Number(_planilla),
     };
     try {
       if (initial) await apiUpdateEmpresa(initial.id, body);
@@ -207,9 +209,13 @@ function InauguracionForm({ empresa, onClose, onSave }) {
   async function submit(e) {
     e.preventDefault(); setErr('');
     try {
+      // Normalizar opcionales vacíos a null (no guardar '' en la BD).
       await apiSetInauguracion(empresa.id, {
-        ...form,
+        fecha_inauguracion: form.fecha_inauguracion,
         inauguracion_fecha_fin: form.inauguracion_fecha_fin || null,
+        inauguracion_hora_inicio: form.inauguracion_hora_inicio || null,
+        inauguracion_hora_fin: form.inauguracion_hora_fin || null,
+        inauguracion_lugar: form.inauguracion_lugar || null,
       });
       onSave();
     } catch (e) { setErr(e.response?.data?.detail || 'Error'); }
