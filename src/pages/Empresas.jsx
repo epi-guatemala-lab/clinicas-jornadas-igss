@@ -12,8 +12,8 @@ import MiniChartCard from '../components/cards/MiniChartCard';
 
 export default function Empresas() {
   const { canWrite, user } = useAuth();
-  // Empresas + inauguración solo las gestiona CE (+admin); SIPRESALUD/gerencia read-only.
-  const canEdit = canWrite && (user?.rol === 'ce' || user?.rol === 'admin');
+  // Empresas + inauguración las gestionan CE, SIPRESALUD y admin (editores); gerencia read-only.
+  const canEdit = canWrite && (user?.rol === 'ce' || user?.rol === 'admin' || user?.rol === 'sipresalud');
   const [tab, setTab] = useState('pendientes');      // 'pendientes' | 'historico'
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -253,7 +253,7 @@ function InauguracionForm({ empresa, onClose, onSave }) {
         <Field label="Hora fin" type="time" value={form.inauguracion_hora_fin} onChange={set('inauguracion_hora_fin')} />
         <Field className="col-span-2" label="Lugar (dirección completa)" type="textarea" rows={2}
                value={form.inauguracion_lugar} onChange={set('inauguracion_lugar')} />
-        <p className="col-span-2 text-[11px] text-fg-subtle">Aparece en el calendario. SIPRESALUD la ve pero no la edita.</p>
+        <p className="col-span-2 text-[11px] text-fg-subtle">Aparece en el calendario para todos.</p>
         {err && <div className="col-span-2 bg-danger-soft text-danger text-sm p-2 rounded">{err}</div>}
       </form>
     </Modal>
