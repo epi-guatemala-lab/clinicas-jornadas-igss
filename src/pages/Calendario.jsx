@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { addMonths, format, startOfMonth, endOfMonth } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { apiCalendario } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
 import CalendarMonth from '../components/CalendarMonth';
 import JornadaModal from '../components/JornadaModal';
 import FilterChip from '../components/filters/FilterChip';
 import TipoIcon from '../components/TipoIcon';
+
+// date-fns sin locale rotula los meses en inglés ("July 2026"). Todo el texto visible
+// va en español: un solo helper para no volver a olvidarlo en algún format() suelto.
+const mesAnio = (d) =>
+  format(d, 'MMMM yyyy', { locale: es }).replace(/^\w/, (c) => c.toUpperCase());
 
 export default function Calendario() {
   const { user } = useAuth();
@@ -57,7 +63,7 @@ export default function Calendario() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-fg">
-            {format(month, 'MMMM yyyy').replace(/^\w/, c => c.toUpperCase())}
+            {mesAnio(month)}
           </h1>
           <p className="text-xs text-fg-muted">{eventos.length} eventos en el mes</p>
         </div>
@@ -93,14 +99,14 @@ export default function Calendario() {
             <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="3" y1="10" x2="21" y2="10" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="16" y1="2" x2="16" y2="6" />
           </svg>
           <span>
-            Sin eventos en <span className="font-semibold text-fg">{format(month, 'MMMM yyyy').replace(/^\w/, c => c.toUpperCase())}</span>.
+            Sin eventos en <span className="font-semibold text-fg">{mesAnio(month)}</span>.
           </span>
           {ultimoMes ? (
             <button
               onClick={() => setMonth(ultimoMes.date)}
               className="font-semibold text-igss-primary hover:underline"
             >
-              Ir al último mes con jornadas: {format(ultimoMes.date, 'MMMM yyyy').replace(/^\w/, c => c.toUpperCase())} →
+              Ir al último mes con jornadas: {mesAnio(ultimoMes.date)} →
             </button>
           ) : (
             <span className="text-fg-subtle">No hay jornadas en los 12 meses previos.</span>
@@ -110,7 +116,7 @@ export default function Calendario() {
 
       {soloAlertas && filteredEventos.length === 0 && (
         <div className="rounded-2xl border border-success/40 bg-success-soft/40 px-4 py-2.5 text-sm text-success font-medium">
-          ✓ Sin alertas en {format(month, 'MMMM yyyy')}.
+          ✓ Sin alertas en {mesAnio(month)}.
         </div>
       )}
 
