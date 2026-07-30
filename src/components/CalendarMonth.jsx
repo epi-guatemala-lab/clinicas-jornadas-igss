@@ -52,7 +52,7 @@ export default function CalendarMonth({ month, eventos, onEventClick }) {
           const inMonth = isSameMonth(d, month);
           const isToday = isSameDay(d, now);
           return (
-            <div key={i} className={`min-h-[110px] p-1.5 border-b border-r border-line-subtle ${
+            <div key={i} className={`min-h-[150px] p-1.5 border-b border-r border-line-subtle ${
                 inMonth ? 'bg-surface' : 'bg-canvas/60'
             }`}>
               <div className={`text-xs font-medium mb-1 ${
@@ -77,41 +77,47 @@ export default function CalendarMonth({ month, eventos, onEventClick }) {
                   return (
                     <button key={e.id} onClick={() => onEventClick?.(e)}
                       title={title}
-                      className={`relative block w-full text-left text-[11px] rounded-r py-1 pr-1 truncate transition hover:opacity-90 ${d.darkText ? 'text-zinc-900' : 'text-white'} ${d.pulseClass} ${d.esEnCurso ? 'ring-1 ring-zinc-900/40' : ''}`}
+                      className={`relative block w-full text-left text-[11px] rounded-r py-1.5 pr-1 overflow-hidden transition hover:opacity-90 ${d.darkText ? 'text-zinc-900' : 'text-white'} ${d.pulseClass} ${d.esEnCurso ? 'ring-1 ring-zinc-900/40' : ''}`}
                       style={{
                         backgroundColor: `rgb(var(${d.bgVar}))`,
-                        borderLeft: `4px ${d.seccionDashed ? 'dashed' : 'solid'} rgb(var(${d.seccionVar}))`,
+                        borderLeft: `6px ${d.seccionDashed ? 'dashed' : 'solid'} rgb(var(${d.seccionVar}))`,
                         // C2: borde derecho naranja si la empresa tiene clínica amarrada
                         // (sin empresa → sin borde). El izquierdo sigue marcando sección.
                         borderRight: d.clinicaAmarrada ? '3px solid rgb(var(--clinica-amarrada))' : undefined,
                       }}>
-                      <span className="flex items-center gap-1 pl-1 max-w-full">
-                        <span className={`text-[8px] font-bold leading-none px-1 py-0.5 rounded ${d.darkText ? 'bg-black/15' : 'bg-white/25'}`}>{d.seccionPrefijo}</span>
-                        <TipoIcon tipo={e.tipo} inaugura={d.esInaug} />
-                        {d.esDepartamental && (
-                          /* F2.2: jornada departamental (interior) — pin de ubicación */
-                          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
-                               strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
-                               className="inline-block flex-shrink-0" aria-label="Departamental">
-                            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-                            <circle cx="12" cy="10" r="3" />
-                          </svg>
-                        )}
-                        {d.esAlertaInaug && <span aria-hidden>⚠️</span>}
-                        {d.leadGlifo && <span aria-hidden className="leading-none">{d.leadGlifo}</span>}
-                        {e.hora_inicio && <span className="opacity-80">{e.hora_inicio.slice(0, 5)}</span>}
-                        <span className={`truncate min-w-0 ${d.tachado ? 'line-through opacity-90' : 'font-medium'} ${d.esAlertaInaug ? 'uppercase tracking-wide font-bold' : ''}`}>
+                      {/* Chip en 2 filas: metadatos arriba, nombre completo abajo (hasta 2
+                          líneas). Antes todo iba en una fila con `truncate` y el nombre de
+                          la empresa se cortaba — pedido de la Dra: barras más anchas para
+                          ver los datos completos. */}
+                      <span className="flex flex-col gap-0.5 pl-1.5 max-w-full">
+                        <span className="flex items-center gap-1 max-w-full">
+                          <span className={`text-[9px] font-bold leading-none px-1 py-0.5 rounded ${d.darkText ? 'bg-black/15' : 'bg-white/25'}`}>{d.seccionPrefijo}</span>
+                          <TipoIcon tipo={e.tipo} inaugura={d.esInaug} />
+                          {d.esDepartamental && (
+                            /* F2.2: jornada departamental (interior) — pin de ubicación */
+                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
+                                 strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+                                 className="inline-block flex-shrink-0" aria-label="Departamental">
+                              <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                              <circle cx="12" cy="10" r="3" />
+                            </svg>
+                          )}
+                          {d.esAlertaInaug && <span aria-hidden>⚠️</span>}
+                          {d.leadGlifo && <span aria-hidden className="leading-none">{d.leadGlifo}</span>}
+                          {e.hora_inicio && <span className="opacity-90 tabular-nums">{e.hora_inicio.slice(0, 5)}</span>}
+                          {d.pctChip != null ? (
+                            /* CERRADA con métricas: glifo de forma (cue colorblind) + % real */
+                            <span className="ml-auto flex items-center gap-1 pl-0.5 flex-shrink-0">
+                              {d.saludGlifo && <span aria-hidden className="font-bold leading-none">{d.saludGlifo}</span>}
+                              <span className="text-[10px] font-bold leading-none px-1 py-0.5 rounded bg-white/25 tabular-nums">{d.pctChip}%</span>
+                            </span>
+                          ) : (
+                            trailGlifo && <span aria-hidden className="ml-auto font-bold pl-0.5 flex-shrink-0">{trailGlifo}</span>
+                          )}
+                        </span>
+                        <span className={`block text-[12px] leading-tight line-clamp-2 break-words ${d.tachado ? 'line-through opacity-90' : 'font-semibold'} ${d.esAlertaInaug ? 'uppercase tracking-wide font-bold' : ''}`}>
                           {label}
                         </span>
-                        {d.pctChip != null ? (
-                          /* CERRADA con métricas: glifo de forma (cue colorblind) + % real */
-                          <span className="ml-auto flex items-center gap-1 pl-0.5 flex-shrink-0">
-                            {d.saludGlifo && <span aria-hidden className="font-bold leading-none">{d.saludGlifo}</span>}
-                            <span className="text-[9px] font-bold leading-none px-1 py-0.5 rounded bg-white/25 tabular-nums">{d.pctChip}%</span>
-                          </span>
-                        ) : (
-                          trailGlifo && <span aria-hidden className="ml-auto font-bold pl-0.5 flex-shrink-0">{trailGlifo}</span>
-                        )}
                       </span>
                     </button>
                   );
