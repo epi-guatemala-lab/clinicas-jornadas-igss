@@ -115,7 +115,10 @@ export default function CalendarMonth({ month, eventos, onEventClick }) {
                             trailGlifo && <span aria-hidden className="ml-auto font-bold pl-0.5 flex-shrink-0">{trailGlifo}</span>
                           )}
                         </span>
-                        <span className={`block text-[12px] leading-tight line-clamp-2 break-words ${d.tachado ? 'line-through opacity-90' : 'font-semibold'} ${d.esAlertaInaug ? 'uppercase tracking-wide font-bold' : ''}`}>
+                        {/* Sin recorte a propósito: el nombre de la empresa se lee COMPLETO
+                            (envuelve en las líneas que necesite). `break-words` evita que un
+                            token largo se desborde de la celda. */}
+                        <span className={`block text-[12px] leading-tight break-words ${d.tachado ? 'line-through opacity-90' : 'font-semibold'} ${d.esAlertaInaug ? 'uppercase tracking-wide font-bold' : ''}`}>
                           {label}
                         </span>
                       </span>
