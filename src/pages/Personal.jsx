@@ -9,7 +9,7 @@ import { fmtQ } from '../utils/format';
  * Para 011/022 (personal permanente/contrato): el usuario ingresa SALARIO ANUAL.
  *   diario = (anual × 1.20) / 365  — incluye 20% prestaciones (aguinaldo, bono14, indemnización)
  *
- * Para 029 (honorarios): el usuario ingresa SALARIO MENSUAL.
+ * Para 029 / 182 (honorarios): el usuario ingresa SALARIO MENSUAL.
  *   diario = mensual / 30
  *
  * Recibe `salarioInput` (lo que el usuario tipea) y `renglon`. Internamente
@@ -28,7 +28,7 @@ function CostoDiarioPreview({ salarioInput, renglon }) {
     mensual = v / 12;
     diario = (mensual / 30) * 1.20;   // /30 + 20% prestaciones
   } else {
-    // 029: el input ES el salario mensual; sin prestaciones.
+    // 029 / 182: el input ES el salario mensual; sin prestaciones.
     mensual = v;
     anual = v * 12;
     diario = mensual / 30;            // /30 sin prestaciones
@@ -61,7 +61,7 @@ function CostoDiarioPreview({ salarioInput, renglon }) {
   );
 }
 
-const ROLES = ['LIDER', 'MEDICO', 'ADMIN', 'ENFERMERIA', 'LABORATORISTA', 'DIGITADOR', 'ENCUESTADOR'];
+const ROLES = ['LIDER', 'MEDICO', 'ADMIN', 'ENFERMERIA', 'ENFERMERA', 'NUTRICIONISTA', 'LABORATORISTA', 'DIGITADOR', 'ENCUESTADOR'];
 
 export default function Personal() {
   const { user, canWrite } = useAuth();
@@ -133,7 +133,7 @@ function PersonalForm({ initial, onClose, onSave }) {
   // La BD guarda `compensacion` SIEMPRE en mensual (Q/mes), independiente del renglón.
   // En la UI:
   //   - 011/022 (planilla): el usuario ingresa SALARIO ANUAL — al guardar dividimos /12.
-  //   - 029 (honorarios): el usuario ingresa SALARIO MENSUAL — se guarda directo.
+  //   - 029/182 (honorarios): el usuario ingresa SALARIO MENSUAL — se guarda directo.
   // Al cargar para edición, multiplicamos la compensacion mensual × 12 si es 011/022
   // para que el input muestre el valor anual que el usuario espera ver.
   const initialRenglon = initial?.renglon || '029';
@@ -161,7 +161,7 @@ function PersonalForm({ initial, onClose, onSave }) {
   const esPlanilla = form.renglon === '011' || form.renglon === '022';
   const labelSalario = esPlanilla
     ? 'Salario ANUAL en Quetzales · 011 / 022'
-    : 'Salario MENSUAL en Quetzales · 029 honorarios';
+    : 'Salario MENSUAL en Quetzales · honorarios (029 / 182)';
   const placeholderSalario = esPlanilla ? 'ej. 180000.00 (anual)' : 'ej. 15000.00 (mensual)';
 
   async function submit(e) {
@@ -202,6 +202,7 @@ function PersonalForm({ initial, onClose, onSave }) {
               <option value="011">011 — Personal permanente</option>
               <option value="022">022 — Personal por contrato</option>
               <option value="029">029 — Honorarios</option>
+              <option value="182">182 — Programa jornadas (SIPRESALUD)</option>
             </select></div>
           <div><label className="label">Código interno IGSS</label>
             <input className="input" value={form.ibm || ''} onChange={(e)=>set('ibm', e.target.value)} placeholder="ej. IBM o código de planilla" /></div>
@@ -221,7 +222,7 @@ function PersonalForm({ initial, onClose, onSave }) {
             <p className="text-[10px] text-fg-subtle mt-1">
               {esPlanilla
                 ? 'Las partidas 011 y 022 se ingresan como salario anual. El sistema lo convierte automáticamente al guardar.'
-                : 'Los honorarios (029) se ingresan como salario mensual.'}
+                : 'Los honorarios (029 / 182) se ingresan como salario mensual.'}
               {' '}Se guarda cifrado en la BD. Solo gerencia y admin pueden ver el valor.
             </p>
             <CostoDiarioPreview salarioInput={form.salarioInput} renglon={form.renglon} />
