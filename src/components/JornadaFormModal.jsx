@@ -16,7 +16,7 @@ const TIPOS = [
   ['TALLER', '🎤 Conferencia'],
   ['WEBINAR', '💻 Webinar'],
 ];
-const ROLES_JOR = ['LIDER', 'MEDICO', 'ADMIN', 'ENFERMERIA', 'LABORATORISTA', 'DIGITADOR', 'ENCUESTADOR'];
+const ROLES_JOR = ['LIDER', 'MEDICO', 'ADMIN', 'ENFERMERIA', 'NUTRICIONISTA', 'LABORATORISTA', 'DIGITADOR', 'ENCUESTADOR'];
 
 /**
  * Formulario de jornada — CREA (jornada=null) o EDITA (jornada=objeto hidratado).
