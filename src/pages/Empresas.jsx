@@ -9,6 +9,8 @@ import Modal from '../components/forms/Modal';
 import Field from '../components/forms/Field';
 import GeoSelects from '../components/forms/GeoSelects';
 import MiniChartCard from '../components/cards/MiniChartCard';
+import SearchInput from '../components/filters/SearchInput';
+import { useDebounce } from '../hooks/useDebounce';
 
 export default function Empresas() {
   const { canWrite, user } = useAuth();
@@ -22,17 +24,19 @@ export default function Empresas() {
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
   const [inaugurando, setInaugurando] = useState(null);
+  const [q, setQ] = useState('');
+  const dq = useDebounce(q, 300);
 
   const reload = () => setReloadKey((k) => k + 1);
   useEffect(() => {
     // race-guard: si el usuario alterna de tab rápido, descartar la respuesta vieja.
     let cancelled = false;
     setLoading(true); setLoadErr('');
-    apiListEmpresas({ activa: true, tiene_clinica_amarrada: tab === 'historico' })
+    apiListEmpresas({ activa: true, tiene_clinica_amarrada: tab === 'historico', ...(dq ? { q: dq } : {}) })
       .then((d) => { if (!cancelled) { setList(d); setLoading(false); } })
       .catch(() => { if (!cancelled) { setLoadErr('No se pudieron cargar las empresas.'); setLoading(false); } });
     return () => { cancelled = true; };
-  }, [tab, reloadKey]);
+  }, [tab, reloadKey, dq]);
 
   const esHistorico = tab === 'historico';
 
@@ -46,9 +50,11 @@ export default function Empresas() {
       </div>
 
       {/* Tabs: pendientes de inauguración vs histórico (ya con clínica) */}
-      <div className="flex gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         <Pill active={tab === 'pendientes'} onClick={() => setTab('pendientes')}>Pendientes de inauguración</Pill>
         <Pill active={tab === 'historico'} onClick={() => setTab('historico')}>Histórico (con clínica)</Pill>
+        <SearchInput value={q} onChange={setQ} placeholder="Buscar por nombre, NIT, patronal…"
+          className="ml-auto min-w-[16rem]" />
       </div>
 
       <MiniChartCard title={`${list.length} empresas · ${esHistorico ? 'con clínica de empresa' : 'pendientes'}`} density="compact">

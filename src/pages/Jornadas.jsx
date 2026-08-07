@@ -6,6 +6,8 @@ import JornadaFormModal from '../components/JornadaFormModal';
 import {
   SEMAFORO_DOT, TIPO_LABEL, ESTADO_LABEL, fmtN, fmtPct,
 } from '../utils/format';
+import { useDebounce } from '../hooks/useDebounce';
+import SearchInput from '../components/filters/SearchInput';
 
 const TIPOS = [
   ['SIPRESALUD_JORNADA', '💉 Jornada SIPRESALUD'],
@@ -20,15 +22,18 @@ export default function Jornadas() {
   const [selected, setSelected] = useState(null);
   const [creating, setCreating] = useState(false);
   const [filter, setFilter] = useState({ seccion: '', tipo: '', estado: '' });
+  const [q, setQ] = useState('');
+  const dq = useDebounce(q, 300);
 
   function reload() {
     const params = {};
     if (filter.seccion) params.seccion = filter.seccion;
     if (filter.tipo) params.tipo = filter.tipo;
     if (filter.estado) params.estado = filter.estado;
+    if (dq) params.q = dq;
     apiListJornadas(params).then(setList);
   }
-  useEffect(reload, [filter]);  // eslint-disable-line
+  useEffect(reload, [filter, dq]);  // eslint-disable-line
 
   return (
     <div className="space-y-4">
@@ -47,6 +52,8 @@ export default function Jornadas() {
         <Select label="Estado" value={filter.estado}
           onChange={(v) => setFilter({ ...filter, estado: v })}
           options={[['', 'Todos'], ['PROGRAMADA', 'Programada'], ['CERRADA', 'Cerrada'], ['CANCELADA', 'Cancelada']]} />
+        <SearchInput value={q} onChange={setQ} placeholder="Buscar por código, tema…"
+          className="ml-auto min-w-[16rem]" />
       </div>
 
       <div className="card overflow-x-auto">

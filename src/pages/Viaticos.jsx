@@ -4,6 +4,9 @@ import {
 } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
 import { fmtQ, isoLocalDate } from '../utils/format';
+import SearchableSelect from '../components/filters/SearchableSelect';
+import SearchInput from '../components/filters/SearchInput';
+import { useDebounce } from '../hooks/useDebounce';
 
 const STATUS = ['PENDIENTE', 'UTILIZADO', 'ANULADO', 'EXTRAVIADO'];
 const STATUS_BG = {
@@ -18,12 +21,15 @@ export default function Viaticos() {
   const [list, setList] = useState([]);
   const [creating, setCreating] = useState(false);
   const [filter, setFilter] = useState({ status: '' });
+  const [q, setQ] = useState('');
+  const dq = useDebounce(q, 300);
 
   function reload() {
     const p = {}; if (filter.status) p.status = filter.status;
+    if (dq) p.q = dq;
     apiListViaticos(p).then(setList);
   }
-  useEffect(reload, [filter]); // eslint-disable-line
+  useEffect(reload, [filter, dq]); // eslint-disable-line
 
   return (
     <div className="space-y-4">
@@ -33,7 +39,7 @@ export default function Viaticos() {
           <button className="btn-primary" onClick={()=>setCreating(true)}>+ Nuevo viático</button>
         )}
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {['', ...STATUS].map((s) => (
           <button key={s||'all'} onClick={()=>setFilter({ status: s })}
             className={`px-3 py-1.5 rounded border text-sm ${filter.status === s
@@ -41,6 +47,8 @@ export default function Viaticos() {
             {s || 'Todos'}
           </button>
         ))}
+        <SearchInput value={q} onChange={setQ} placeholder="Buscar por correlativo, nombramiento, servidor…"
+          className="ml-auto min-w-[16rem]" />
       </div>
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
@@ -124,15 +132,17 @@ function NuevoViatico({ onClose, onSaved }) {
           <div><label className="label">Mes</label>
             <input className="input" value={form.mes_anio} onChange={(e)=>set('mes_anio', e.target.value)} /></div>
           <div><label className="label">Servidor público</label>
-            <select className="input" value={form.personal_id || ''} onChange={(e)=>set('personal_id', e.target.value ? Number(e.target.value) : null)}>
-              <option value="">—</option>
-              {personal.map((p)=><option key={p.id} value={p.id}>{p.nombre_completo}</option>)}
-            </select></div>
+            <SearchableSelect value={form.personal_id || ''}
+              onChange={(v) => set('personal_id', v ? Number(v) : null)}
+              placeholder="—"
+              options={personal.map((p) => ({ value: p.id, label: p.nombre_completo }))} />
+          </div>
           <div><label className="label">Jornada (opcional)</label>
-            <select className="input" value={form.jornada_id || ''} onChange={(e)=>set('jornada_id', e.target.value ? Number(e.target.value) : null)}>
-              <option value="">—</option>
-              {jornadas.slice(0, 50).map((j)=><option key={j.id} value={j.id}>{j.codigo} · {j.fecha_inicio}</option>)}
-            </select></div>
+            <SearchableSelect value={form.jornada_id || ''}
+              onChange={(v) => set('jornada_id', v ? Number(v) : null)}
+              placeholder="—"
+              options={jornadas.map((j) => ({ value: j.id, label: `${j.codigo} · ${j.fecha_inicio}` }))} />
+          </div>
           <div><label className="label">Nombramiento</label>
             <input className="input" placeholder="ej 223/2026" value={form.nombramiento} onChange={(e)=>set('nombramiento', e.target.value)} /></div>
           <div><label className="label">Fecha nombramiento</label>

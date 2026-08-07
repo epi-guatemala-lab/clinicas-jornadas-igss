@@ -6,6 +6,7 @@ import {
 import { SEMAFORO_BG, TIPO_LABEL, ESTADO_LABEL, fmtN, fmtQ, fmtPct } from '../utils/format';
 import { useAuth } from '../hooks/useAuth';
 import JornadaFormModal from './JornadaFormModal';
+import SearchableSelect from './filters/SearchableSelect';
 
 // E1/F1: coordinador (Berkin) — única identidad que edita cerradas y material.
 // Usa el flag es_coordinador computado en el backend (is_berkin); fallback por
@@ -306,12 +307,11 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
                   <option value="">— Tema (catálogo) —</option>
                   {catalogo.map((o) => <option key={o.codigo} value={o.codigo}>{o.codigo} · {o.titulo}</option>)}
                 </select>
-                <select className="input" value={c.responsable_personal_id}
-                  onChange={(e) => setCharlasEdit((arr) => arr.map((x, ix) => ix === i ? { ...x, responsable_personal_id: e.target.value } : x))}>
-                  <option value="">— Responsable —</option>
-                  {roster.filter((p) => !j.seccion_responsable || p.seccion === j.seccion_responsable)
-                    .map((p) => <option key={p.id} value={p.id}>{p.nombre_completo}</option>)}
-                </select>
+                <SearchableSelect value={c.responsable_personal_id || ''}
+                  onChange={(v) => setCharlasEdit((arr) => arr.map((x, ix) => ix === i ? { ...x, responsable_personal_id: v } : x))}
+                  placeholder="— Responsable —"
+                  options={roster.filter((p) => !j.seccion_responsable || p.seccion === j.seccion_responsable)
+                    .map((p) => ({ value: p.id, label: p.nombre_completo }))} />
                 <button className="text-danger px-2" title="Quitar"
                   onClick={() => setCharlasEdit((arr) => arr.filter((_, ix) => ix !== i))}>✕</button>
               </div>

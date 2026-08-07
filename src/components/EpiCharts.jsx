@@ -3,12 +3,15 @@ import {
   Tooltip, Legend, ResponsiveContainer, Cell, ErrorBar,
   PieChart, Pie,
 } from 'recharts';
+import { useMemo, useState } from 'react';
 import { useApi } from '../hooks/useApi';
 import { useThemedColors } from '../theme/useThemedColors';
 import { useChartTheme } from './charts/useChartTheme';
 import ThemedTooltip from './charts/ThemedTooltip';
 import MiniChartCard from './cards/MiniChartCard';
+import SearchInput from './filters/SearchInput';
 import { fmtN } from '../utils/format';
+import { normIncludes } from '../utils/norm';
 
 function useEpi(path, params = {}) {
   const r = useApi(`/api/epi/${path}`, params);
@@ -436,10 +439,11 @@ export function PrevalenciaPorChart({ dimension, titulo, params = {}, limit = 25
 export function EmpresasTabla({ params = {}, limit = 40 }) {
   const { data, err, loading } = useEpi('prevalencia-por/empresa', { ...params, limit });
   const t = useThemedColors();
+  const [q, setQ] = useState('');
   if (err === '403') return null;
-  const items = data?.items || [];
+  const items = useMemo(() => (data?.items || []).filter((d) => !q || normIncludes(d.grupo, q)), [data, q]);
   const maxTasa = Math.max(1, ...items.map((d) => d.tasa_por_100 || 0));
-  const anyIC = items.some((d) => d.ci_low != null && d.ci_high != null);
+  const anyIC = (data?.items || []).some((d) => d.ci_low != null && d.ci_high != null);
   return (
     <MiniChartCard
       title="Prevalencia por empresa"
@@ -450,6 +454,8 @@ export function EmpresasTabla({ params = {}, limit = 40 }) {
       error={softErr(err)}
       empty={!loading && items.length === 0}
     >
+      <div className="mb-2"><SearchInput value={q} onChange={setQ} placeholder="Buscar empresa…"
+        className="max-w-xs" /></div>
       {items.length > 0 && (
         <div className="overflow-auto max-h-[420px] -mx-1">
           <table className="w-full text-sm border-collapse">

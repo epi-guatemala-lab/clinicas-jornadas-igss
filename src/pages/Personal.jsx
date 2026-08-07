@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { apiListPersonal, apiCreatePersonal, apiUpdatePersonal } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
 import { fmtQ } from '../utils/format';
+import SearchInput from '../components/filters/SearchInput';
+import { normIncludes } from '../utils/norm';
 
 /**
  * Muestra costo diario derivado del salario ingresado + renglón.
@@ -70,6 +72,11 @@ export default function Personal() {
   const canEditPersonal = canWrite && user.rol === 'admin';
   const [list, setList] = useState([]);
   const [filter, setFilter] = useState({ seccion: '' });
+  const [q, setQ] = useState('');
+  const filtered = useMemo(() => list.filter((p) => {
+    if (!q) return true;
+    return ['nombre_completo', 'nit', 'ibm', 'rol_default'].some((f) => normIncludes(p[f], q));
+  }), [list, q]);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
 
@@ -87,7 +94,7 @@ export default function Personal() {
         )}
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {['', 'CE', 'SIPRESALUD'].map((s) => (
           <button key={s||'all'} onClick={()=>setFilter({ seccion: s })}
             className={`px-3 py-1.5 rounded border ${filter.seccion === s
@@ -95,6 +102,8 @@ export default function Personal() {
             {s || 'Todas'}
           </button>
         ))}
+        <SearchInput value={q} onChange={setQ} placeholder="Buscar por nombre, NIT, rol…"
+          className="max-w-xs ml-auto" />
       </div>
 
       <div className="card overflow-x-auto">
@@ -110,7 +119,7 @@ export default function Personal() {
             </tr>
           </thead>
           <tbody>
-            {list.map((p) => (
+            {filtered.map((p) => (
               <tr key={p.id} className="border-t">
                 <td className="p-2 font-medium">{p.nombre_completo}<div className="text-xs text-fg-muted">NIT: {p.nit || '—'}</div></td>
                 <td className="p-2">{p.seccion}</td>
