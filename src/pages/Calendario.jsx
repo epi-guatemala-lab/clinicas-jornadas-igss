@@ -6,6 +6,8 @@ import { useAuth } from '../hooks/useAuth';
 import CalendarMonth from '../components/CalendarMonth';
 import JornadaModal from '../components/JornadaModal';
 import FilterChip from '../components/filters/FilterChip';
+import SearchInput from '../components/filters/SearchInput';
+import { normIncludes } from '../utils/norm';
 import TipoIcon from '../components/TipoIcon';
 
 // date-fns sin locale rotula los meses en inglés ("July 2026"). Todo el texto visible
@@ -20,6 +22,7 @@ export default function Calendario() {
   const [eventos, setEventos] = useState([]);
   const [selected, setSelected] = useState(null);
   const [soloAlertas, setSoloAlertas] = useState(false);
+  const [q, setQ] = useState('');
   const [ultimoMes, setUltimoMes] = useState(null);  // último mes con jornadas (lookback)
 
   const desde = useMemo(() => format(startOfMonth(month), 'yyyy-MM-dd'), [month]);
@@ -54,9 +57,13 @@ export default function Calendario() {
     return () => { cancelled = true; };
   }, [desde, hasta, seccion, month]);
 
-  const filteredEventos = soloAlertas
-    ? eventos.filter((e) => e.sin_jornada_asociada || e.estado === 'CANCELADA')
-    : eventos;
+  const filteredEventos = useMemo(() => {
+    let out = eventos;
+    if (soloAlertas) out = out.filter((e) => e.sin_jornada_asociada || e.estado === 'CANCELADA');
+    if (q) out = out.filter((e) => normIncludes(
+      `${e.empresa || ''} ${e.tema || ''} ${e.codigo || ''} ${e.departamento || ''} ${e.tipo || ''}`, q));
+    return out;
+  }, [eventos, soloAlertas, q]);
 
   return (
     <div className="space-y-4">
@@ -85,6 +92,9 @@ export default function Calendario() {
         >
           ⚠️ Solo alertas
         </FilterChip>
+        <SearchInput value={q} onChange={setQ}
+          placeholder="Buscar en el mes por empresa, tema, código…"
+          className="ml-auto max-w-sm" />
       </div>
 
       <CalendarMonth
@@ -117,6 +127,14 @@ export default function Calendario() {
       {soloAlertas && filteredEventos.length === 0 && (
         <div className="rounded-2xl border border-success/40 bg-success-soft/40 px-4 py-2.5 text-sm text-success font-medium">
           ✓ Sin alertas en {mesAnio(month)}.
+        </div>
+      )}
+
+      {/* Búsqueda sin coincidencias en el mes (distinto de "mes vacío") */}
+      {q && !soloAlertas && filteredEventos.length === 0 && eventos.length > 0 && (
+        <div className="rounded-2xl border border-line bg-surface-elev px-4 py-3 text-sm text-fg-muted">
+          Sin coincidencias para «<span className="font-semibold text-fg">{q}</span>» en {mesAnio(month)}.
+          Probá con otro término o <button onClick={() => setQ('')} className="font-semibold text-igss-primary hover:underline">limpiá la búsqueda</button>.
         </div>
       )}
 
