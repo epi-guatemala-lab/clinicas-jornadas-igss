@@ -6,6 +6,7 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { useApi } from '../hooks/useApi';
 import { isoLocalDate } from '../utils/format';
+import SearchableSelect from './filters/SearchableSelect';
 
 // SIPRESALUD nunca hace Clínicas de Empresa (CE) → tipo sin "Jornada CE"
 // (fuente: requerimiento Berkin "seria Jornada SIPRE, Inauguracion, conferencia,
@@ -162,11 +163,11 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
                   <option value="SIPRESALUD">SIPRESALUD</option>
                 </select></div>
               <div><label className="label">Empresa</label>
-                <select className="input" value={form.empresa_id || ''}
-                  onChange={(e) => setField('empresa_id', e.target.value ? Number(e.target.value) : null)}>
-                  <option value="">— Sin empresa (webinar/oficina) —</option>
-                  {empresas.map((e) => <option key={e.id} value={e.id}>{e.nombre_legal}</option>)}
-                </select></div>
+                <SearchableSelect value={form.empresa_id || ''}
+                  onChange={(v) => setField('empresa_id', v ? Number(v) : null)}
+                  placeholder="— Sin empresa (webinar/oficina) —"
+                  options={empresas.map((e) => ({ value: e.id, label: e.nombre_legal }))} />
+              </div>
               <div><label className="label">Tema</label>
                 <input className="input" value={form.tema || ''} onChange={(e) => setField('tema', e.target.value)} /></div>
               <div><label className="label">Fecha inicio *</label>
@@ -205,13 +206,11 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
                 <input className="input" type="number" step="0.01" min="0" value={form.viaticos_presupuesto}
                   onChange={(e) => setField('viaticos_presupuesto', e.target.value)} /></div>
               <div className="col-span-2"><label className="label">Líder de jornada</label>
-                <select className="input" value={form.lider_personal_id || ''}
-                  onChange={(e) => setField('lider_personal_id', e.target.value ? Number(e.target.value) : null)}>
-                  <option value="">— Sin líder asignado —</option>
-                  {personalDisponible.map((p) => (
-                    <option key={p.id} value={p.id}>{p.nombre_completo} ({p.rol_default || 'sin rol'})</option>
-                  ))}
-                </select></div>
+                <SearchableSelect value={form.lider_personal_id || ''}
+                  onChange={(v) => setField('lider_personal_id', v ? Number(v) : null)}
+                  placeholder="— Sin líder asignado —"
+                  options={personalDisponible.map((p) => ({ value: p.id, label: `${p.nombre_completo} (${p.rol_default || 'sin rol'})` }))} />
+              </div>
             </div>
 
             {/* Charlas de educación en salud — MÚLTIPLES, desde catálogo */}
@@ -233,11 +232,10 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
                         <option key={o.codigo} value={o.codigo}>{o.codigo} · {o.titulo}</option>
                       ))}
                     </select>
-                    <select className="input" value={c.responsable_personal_id}
-                      onChange={(e) => updCharla(i, 'responsable_personal_id', e.target.value)}>
-                      <option value="">— Responsable —</option>
-                      {personalDisponible.map((p) => <option key={p.id} value={p.id}>{p.nombre_completo}</option>)}
-                    </select>
+                    <SearchableSelect value={c.responsable_personal_id || ''}
+                      onChange={(v) => updCharla(i, 'responsable_personal_id', v)}
+                      placeholder="— Responsable —"
+                      options={personalDisponible.map((p) => ({ value: p.id, label: p.nombre_completo }))} />
                     <button type="button" className="text-danger px-2" title="Quitar" onClick={() => removeCharla(i)}>✕</button>
                   </div>
                 ))}
@@ -278,13 +276,10 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
             {form.tipo === 'INAUGURACION' && (
               <div className="bg-warning-soft border-l-4 border-warning p-3 rounded">
                 <label className="label">Jornada SIPRESALUD asociada</label>
-                <select className="input" value={form.inauguracion_jornada_id || ''}
-                  onChange={(e) => setField('inauguracion_jornada_id', e.target.value ? Number(e.target.value) : null)}>
-                  <option value="">— Sin asociar (generará alerta roja) —</option>
-                  {jornadasSipre.map((j) => (
-                    <option key={j.id} value={j.id}>{j.codigo} · {j.fecha_inicio} · {(j.empresa_nombre || j.tema || '').slice(0, 35)}</option>
-                  ))}
-                </select>
+                <SearchableSelect value={form.inauguracion_jornada_id || ''}
+                  onChange={(v) => setField('inauguracion_jornada_id', v ? Number(v) : null)}
+                  placeholder="— Sin asociar (generará alerta roja) —"
+                  options={jornadasSipre.map((j) => ({ value: j.id, label: `${j.codigo} · ${j.fecha_inicio} · ${(j.empresa_nombre || j.tema || '').slice(0, 35)}` }))} />
               </div>
             )}
 
@@ -296,10 +291,10 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
               <div className="space-y-2">
                 {form.personal.map((p, i) => (
                   <div key={i} className="flex gap-2 items-center bg-surface-elev p-2 rounded">
-                    <select className="input flex-1" value={p.personal_id}
-                      onChange={(e) => updPersona(i, 'personal_id', Number(e.target.value))}>
-                      {personalDisponible.map((x) => <option key={x.id} value={x.id}>{x.nombre_completo} ({x.seccion})</option>)}
-                    </select>
+                    <SearchableSelect className="flex-1" value={p.personal_id}
+                      onChange={(v) => updPersona(i, 'personal_id', Number(v))}
+                      allowEmpty={false}
+                      options={personalDisponible.map((x) => ({ value: x.id, label: `${x.nombre_completo} (${x.seccion})` }))} />
                     <select className="input w-32" value={p.rol_jornada}
                       onChange={(e) => updPersona(i, 'rol_jornada', e.target.value)}>
                       {ROLES_JOR.map((r) => <option key={r} value={r}>{r}</option>)}

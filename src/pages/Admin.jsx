@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   apiAdminUsers, apiAdminActivateUser, apiAdminDeactivateUser,
   apiAdminResetPassword, apiAdminAuditJornadas, apiAdminAuditAuth,
 } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
+import SearchInput from '../components/filters/SearchInput';
+import { normIncludes } from '../utils/norm';
+import { useDebounce } from '../hooks/useDebounce';
 
 function Pill({ active, onClick, children }) {
   return (
@@ -38,6 +41,9 @@ function Usuarios({ canWrite }) {
   const [busy, setBusy] = useState(null);
   function reload() { apiAdminUsers().then(setList).catch(() => setList([])); }
   useEffect(reload, []);
+  const [q, setQ] = useState('');
+  const filtered = useMemo(() => list.filter((u) => !q
+    || ['username', 'nombre_completo', 'email'].some((f) => normIncludes(u[f], q))), [list, q]);
 
   async function toggle(u) {
     setBusy(u.id);
@@ -64,6 +70,8 @@ function Usuarios({ canWrite }) {
           <button className="btn-secondary text-xs mt-2" onClick={() => setPw(null)}>Cerrar</button>
         </div>
       )}
+      <SearchInput value={q} onChange={setQ} placeholder="Buscar por usuario, nombre, email…"
+        className="max-w-md" />
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-surface-elev text-fg-muted uppercase text-xs">
@@ -75,7 +83,7 @@ function Usuarios({ canWrite }) {
             </tr>
           </thead>
           <tbody>
-            {list.map((u) => (
+            {filtered.map((u) => (
               <tr key={u.id} className="border-t border-line-subtle hover:bg-surface-elev">
                 <td className="p-2 font-mono text-xs">{u.username}</td>
                 <td className="p-2">{u.nombre_completo}</td>
@@ -106,18 +114,22 @@ function Usuarios({ canWrite }) {
 function Auditoria() {
   const [src, setSrc] = useState('jornadas');  // jornadas | auth
   const [rows, setRows] = useState([]);
+  const [q, setQ] = useState('');
+  const dq = useDebounce(q, 300);
   useEffect(() => {
     const fn = src === 'jornadas' ? apiAdminAuditJornadas : apiAdminAuditAuth;
-    fn({ limit: 200 }).then(setRows).catch(() => setRows([]));
-  }, [src]);
+    fn({ limit: 200, ...(dq ? { q: dq } : {}) }).then(setRows).catch(() => setRows([]));
+  }, [src, dq]);
   const cols = src === 'jornadas'
     ? ['timestamp', 'tabla', 'registro_id', 'accion', 'username', 'cambios_json']
     : ['timestamp', 'accion', 'username', 'detalle', 'ip'];
   return (
     <div className="space-y-3">
-      <div className="flex gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         <Pill active={src === 'jornadas'} onClick={() => setSrc('jornadas')}>Operaciones</Pill>
         <Pill active={src === 'auth'} onClick={() => setSrc('auth')}>Accesos / Auth</Pill>
+        <SearchInput value={q} onChange={setQ} placeholder="Buscar por usuario, acción, ip…"
+          className="ml-auto min-w-[16rem]" />
       </div>
       <div className="card overflow-x-auto">
         <table className="w-full text-xs">

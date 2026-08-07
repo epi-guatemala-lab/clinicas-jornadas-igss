@@ -7,6 +7,8 @@ import Field from '../components/forms/Field';
 import StatCard from '../components/cards/StatCard';
 import MiniChartCard from '../components/cards/MiniChartCard';
 import EmptyState from '../components/feedback/EmptyState';
+import SearchInput from '../components/filters/SearchInput';
+import { normIncludes } from '../utils/norm';
 
 // Tipos de meta (con rename: "Clínicas amarradas" → "Clínica + Jornada")
 const TIPOS = [
@@ -81,6 +83,9 @@ export default function Metas() {
   useEffect(() => { reload(); }, [seccionEmp, year]);
 
   const pg = empresas?.promedio_general || {};
+  const [qEmp, setQEmp] = useState('');
+  const empresasFiltradas = (empresas?.empresas || []).filter((e) =>
+    !qEmp || normIncludes(e.nombre_legal, qEmp));
 
   return (
     <div className="space-y-4">
@@ -247,6 +252,8 @@ export default function Metas() {
           </select>
         }
       >
+        <div className="mb-2"><SearchInput value={qEmp} onChange={setQEmp} placeholder="Buscar empresa…"
+          className="max-w-xs" /></div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-surface-elev text-xs uppercase text-fg-muted">
@@ -260,7 +267,7 @@ export default function Metas() {
               </tr>
             </thead>
             <tbody>
-              {(empresas?.empresas || []).map((e) => (
+              {empresasFiltradas.map((e) => (
                 <tr key={e.empresa_id} className="border-t border-line-subtle">
                   <td className="p-2 font-medium text-fg">{e.nombre_legal}</td>
                   <td className="p-2 text-right tabular-nums">{e.n_jornadas}</td>
