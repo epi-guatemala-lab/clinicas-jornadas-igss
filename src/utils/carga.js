@@ -412,6 +412,11 @@ export function extrasResumen(resumen) {
  * números.
  */
 const LISTAS_CONOCIDAS = {
+  empresas_nuevas_nombres: {
+    etiqueta: 'Empresas nuevas que traería este archivo',
+    ayuda: 'Revisá que sean clientes de verdad nuevos y no un cliente que ya está cargado con otro nombre (una sigla, un acrónimo, o el nombre completo en vez del comercial). Si aparece una empresa que ya conocés, avisá antes de aplicar: crearía una ficha duplicada y le partiría el historial de jornadas en dos.',
+    destacada: true,
+  },
   empresas_ejemplo_omitidas: {
     etiqueta: 'Empresas a las que se les quitó el NIT y los contactos de ejemplo',
     ayuda: 'La plantilla original traía NIT y contactos inventados sobre empresas reales. Se descartan esos seis campos y el resto de la ficha entra normal; los huecos quedan vacíos hasta que llegue el dato verdadero. El sistema nunca inventa un NIT.',
@@ -699,10 +704,15 @@ function filasDeContenedor(cont) {
     if (typeof ej !== 'object') { filas.push({ capa, detalle: String(ej) }); return; }
     const registro = ej.codigo || ej.jornada || ej.jornada_id || ej.entidad || ej.clave || null;
     const empresa = ej.empresa || null;
+    const persona = ej.persona || null;
     if (Array.isArray(ej.cambios) && ej.cambios.length) {
-      // Operativo: una jornada con varios campos que cambian.
+      // Operativo: una jornada, empresa o persona con varios campos que
+      // cambian. `empresa`/`persona` quedan null salvo que el ETL las traiga
+      // (cambios_jornadas trae empresa; cambios_empresas trae empresa=nombre;
+      // cambios_personal trae persona=nombre) — cada tabla mezclada muestra
+      // solo la columna que le corresponde a cada fila.
       ej.cambios.forEach((c) => filas.push({
-        capa, entidad: registro, empresa, campo: c.campo,
+        capa, entidad: registro, empresa, persona, campo: c.campo,
         actual: c.antes, nuevo: c.despues,
       }));
       return;
@@ -764,6 +774,7 @@ export const ETIQUETA_COLUMNA = {
   tabla: 'Tabla',
   entidad: 'Jornada',
   empresa: 'Empresa',
+  persona: 'Persona',
   hoja: 'Hoja del Excel',
   fila: 'Fila',
   clave: 'Clave',
@@ -811,11 +822,32 @@ export function fmtBytes(n) {
   return `${(b / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** Fecha y hora legibles a partir de lo que guarda SQLite ('YYYY-MM-DD HH:MM:SS'). */
+// SQLite guarda 'YYYY-MM-DD HH:MM:SS' con datetime('now'), que es SIEMPRE UTC
+// aunque la cadena no lleve 'Z'. El backend corre con TZ=America/Guatemala
+// (UTC-6), así que reordenar la cadena tal cual —sin convertir— le mostraba a
+// Berkin una hora 6 horas adelantada: cargó a la 1pm y el historial decía
+// 7pm. Guatemala no tiene horario de verano, así que la conversión es fija.
+const TZ_PORTAL = 'America/Guatemala';
+
+/** Fecha y hora legibles (zona Guatemala) a partir de lo que guarda SQLite. */
 export function fmtFechaHora(s) {
   if (!s) return '—';
   const txt = String(s).replace('T', ' ').replace('Z', '');
-  const m = txt.match(/^(\d{4})-(\d{2})-(\d{2})[ ]?(\d{2}:\d{2})?/);
+  const m = txt.match(/^(\d{4})-(\d{2})-(\d{2})[ ]?(\d{2}:\d{2})?(:\d{2})?/);
   if (!m) return txt;
-  return m[4] ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}` : `${m[3]}/${m[2]}/${m[1]}`;
+  const [, anio, mes, dia, horaMin] = m;
+  if (!horaMin) return `${dia}/${mes}/${anio}`;
+  const [hh, mm] = horaMin.split(':');
+  const utcMs = Date.UTC(+anio, +mes - 1, +dia, +hh, +mm);
+  if (Number.isNaN(utcMs)) return `${dia}/${mes}/${anio} ${horaMin}`;
+  try {
+    const partes = new Intl.DateTimeFormat('es-GT', {
+      timeZone: TZ_PORTAL, day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(new Date(utcMs));
+    const val = (t) => partes.find((p) => p.type === t)?.value;
+    return `${val('day')}/${val('month')}/${val('year')} ${val('hour')}:${val('minute')}`;
+  } catch {
+    return `${dia}/${mes}/${anio} ${horaMin}`;   // navegador sin soporte de TZ IANA
+  }
 }

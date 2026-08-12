@@ -105,7 +105,7 @@ export default function BloqueosCarga({ bloqueos, canWrite = true, onReintentar 
                           disabled={!canWrite || f.estado === 'guardando'}
                           onChange={(e) => set(p.nombre, { grupo: e.target.value, error: '' })}
                         />
-                        <button type="button" className="btn-primary text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                        <button type="button" className="btn-primary text-xs"
                           disabled={!canWrite || f.estado === 'guardando'}
                           onClick={() => darDeAlta(p)}>
                           {f.estado === 'guardando' ? 'Guardando…' : 'Dar de alta'}
@@ -148,7 +148,7 @@ export default function BloqueosCarga({ bloqueos, canWrite = true, onReintentar 
       )}
 
       {onReintentar && (
-        <button type="button" className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+        <button type="button" className="btn-primary"
           disabled={patologias.length > 0 && !todasListas}
           title={patologias.length > 0 && !todasListas
             ? 'Primero dales de alta a todas las patologías de la lista'

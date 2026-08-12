@@ -172,9 +172,20 @@ export const apiCrearCarga = (fileObj, modo = 'PREVIEW', opts = {}) => {
  * hacerlo dos veces (previsualizar y aplicar) es minuto y medio de espera
  * evitable. El camino normal es un POST vacío a `/aplicar`.
  *
- * Si el servidor todavía no tiene esa ruta (404/405/501) se cae al contrato
- * anterior —reenviar el archivo con modo=APLICAR— y avisa por `onReenvio`
- * para que la pantalla lo diga en vez de quedarse muda 80 segundos.
+ * El servidor devuelve 410 (Gone) cuando el archivo de esa previsualización
+ * ya venció o no se puede leer —el caso FRECUENTE: el TTL son 4 horas y
+ * revisar una carga real (90+ jornadas) toma tiempo—. Ahí SÍ conviene
+ * reenviar solo: el navegador todavía tiene el archivo en memoria, así que
+ * en vez de dejar a quien aplica sin salida se reenvía automáticamente
+ * (avisando por `onReenvio`) y el servidor vuelve a exigir el SHA256 antes
+ * de escribir nada, con lo cual la garantía de "se aplica lo que se
+ * previsualizó" se mantiene igual de estricta.
+ *
+ * 404 ("esa carga no existe") es un caso genuinamente distinto —la fila se
+ * borró o el id es viejo— y NO se reintenta solo: mezclarlo con el 410 fue
+ * justamente el bug (reenviaba sobre CUALQUIER 404, incluida una ruta
+ * verdaderamente inexistente, saltándose la verificación del archivo). Ahí
+ * se muestra el error del servidor tal cual y el usuario empieza de nuevo.
  *
  * @returns {Promise<{id:number, estado:string, mensaje?:string, reenviado:boolean}>}
  */
@@ -187,8 +198,7 @@ export const apiAplicarCarga = async (cargaId, fileObj, opts = {}) => {
     return { ...(r.data || {}), reenviado: false };
   } catch (e) {
     const st = e.response?.status;
-    const rutaAusente = st === 404 || st === 405 || st === 501;
-    if (!rutaAusente || !fileObj) throw e;
+    if (st !== 410 || !fileObj) throw e;
     opts.onReenvio?.();
     const d = await apiCrearCarga(fileObj, 'APLICAR', opts);
     return { ...d, reenviado: true };

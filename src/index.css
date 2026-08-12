@@ -182,7 +182,14 @@
 
 @layer components {
   .btn {
+    /* Deshabilitado: NO se apaga con opacity (medido: texto blanco sobre
+       bg-accent al 50% da 1.75:1, muy por debajo del mínimo WCAG de 4.5:1 —
+       el botón queda casi ilegible, especialmente en "Previsualizar la
+       carga" mientras no hay archivo elegido). Se cambia a un fondo/texto
+       neutro con contraste real (~6.7:1 claro / ~7.9:1 oscuro) en vez de
+       diluir los mismos colores que ya son ilegibles diluidos. */
     @apply px-3 py-2 rounded-md font-medium text-sm transition-colors
+           disabled:bg-sunken disabled:text-fg-muted disabled:cursor-not-allowed disabled:hover:bg-sunken
            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas;
   }
   .btn-primary {

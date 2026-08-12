@@ -1,8 +1,14 @@
 import { useMemo, useState } from 'react';
 import {
-  ETIQUETA_COLUMNA, NOMBRE_CAPA, etiquetaDeCampo, separarConflictos,
+  ETIQUETA_COLUMNA, NOMBRE_CAPA, etiquetaDeCampo, separarConflictos, fmtFechaHora,
 } from '../../utils/carga';
 import { fmtN } from '../../utils/format';
+
+// Un valor de conflicto que viene como 'YYYY-MM-DD' (o con hora) es una
+// fecha, aunque llegue como texto plano desde el backend. Sin esto la tabla
+// mostraba "2026-01-09" crudo — el mismo problema de fecha en formato
+// EE.UU./ambiguo que ya se corrigió en el resto del portal, vivo de nuevo acá.
+const ES_FECHA_ISO = /^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?$/;
 
 const PAGINA = 50;
 
@@ -118,6 +124,14 @@ function TablaDiferencias({ filas, etiquetas = null }) {
 
   return (
     <div className="space-y-2">
+      {/* En pantallas angostas la tabla se desplaza horizontal (overflow-x-auto
+          ya lo permite), pero sin ningún indicador visual nadie se entera de
+          que hay más columnas — se ve simplemente cortada. Esta es justo la
+          tabla que le pide a Berkin "revisá antes de aplicar": que no sepa
+          que falta desplazar es tan grave como que la columna no exista. */}
+      <p className="sm:hidden text-[11px] text-fg-muted flex items-center gap-1">
+        <span aria-hidden>↔</span> Deslizá la tabla hacia los lados para ver todas las columnas
+      </p>
       <div className="card overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-surface-elev text-fg-muted uppercase">
@@ -174,5 +188,8 @@ function Celda({ valor }) {
     return <code className="text-[11px] break-all">{JSON.stringify(valor)}</code>;
   }
   const txt = String(valor);
+  if (ES_FECHA_ISO.test(txt)) {
+    return <span className="tabular-nums">{fmtFechaHora(txt)}</span>;
+  }
   return <span className="break-words" title={txt.length > 60 ? txt : undefined}>{txt}</span>;
 }

@@ -163,7 +163,18 @@ export default function Cargas() {
   const enProceso = carga && !esFinal(carga.estado);
   const estadoBadge = carga ? (ESTADO_CARGA[carga.estado] || { texto: carga.estado, clase: 'badge-neutral' }) : null;
   const esPreview = carga?.modo === 'PREVIEW';
-  const puedeAplicar = carga?.estado === 'OK' && esPreview && !soloLectura && canWrite && !enviando;
+  // El backend guarda el Excel de la previsualización solo unas horas (trae
+  // DPI en claro) y expone si todavía lo tiene (`archivo_disponible`). Ofrecer
+  // "Aplicar" sin fijarse en esto llevaba a un clic que solo podía fallar: si
+  // además el navegador ya no tiene el archivo en memoria (se recargó la
+  // página, o se abrió esta carga desde el historial), no hay de dónde
+  // reenviarlo. Con el archivo en memoria SIEMPRE se puede —el 410 dispara un
+  // reenvío automático— así que ese caso sí habilita el botón.
+  const archivoDisponible = Boolean(archivo) || Boolean(carga?.archivo_disponible);
+  const puedeAplicar = carga?.estado === 'OK' && esPreview && !soloLectura && canWrite
+    && !enviando && archivoDisponible;
+  const archivoVencidoSinLocal = carga?.estado === 'OK' && esPreview && !soloLectura
+    && canWrite && !archivoDisponible;
 
   return (
     <div className="space-y-5">
@@ -214,7 +225,7 @@ export default function Cargas() {
               <span className="text-sm text-fg-muted">Ningún archivo elegido</span>
             )}
             {(archivo || cargaId) && (
-              <button type="button" className="btn-secondary text-xs disabled:opacity-50"
+              <button type="button" className="btn-secondary text-xs"
                 onClick={limpiar} disabled={enviando}>
                 Empezar de nuevo
               </button>
@@ -222,7 +233,7 @@ export default function Cargas() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button type="button" className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            <button type="button" className="btn-primary"
               onClick={previsualizar}
               disabled={!archivo || enviando || enProceso}>
               {enviando && pctSubida !== null ? 'Subiendo…' : 'Previsualizar la carga'}
@@ -345,6 +356,19 @@ export default function Cargas() {
                     se aplica, el portal queda <b>en solo lectura</b> unos segundos —las demás
                     personas pueden consultar, pero no guardar—. Antes de escribir, el sistema saca
                     un respaldo de la base.
+                  </p>
+                </div>
+              )}
+
+              {archivoVencidoSinLocal && (
+                <div className="rounded-lg border border-warning/50 bg-warning-soft/40 p-3 text-sm">
+                  <p className="font-semibold text-warning">
+                    El archivo de esta previsualización ya venció
+                  </p>
+                  <p className="mt-1 text-xs text-fg-muted max-w-3xl">
+                    Por seguridad (trae datos personales) el servidor lo guarda solo unas horas y ya
+                    lo borró. Los números de arriba siguen siendo válidos como referencia, pero para
+                    aplicarlos hay que elegir el archivo otra vez y previsualizar de nuevo.
                   </p>
                 </div>
               )}
