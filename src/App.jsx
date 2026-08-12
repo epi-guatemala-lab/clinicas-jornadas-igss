@@ -10,6 +10,7 @@ import Personal from './pages/Personal';
 import Viaticos from './pages/Viaticos';
 import Metas from './pages/Metas';
 import Hallazgos from './pages/Hallazgos';
+import Cargas from './pages/Cargas';
 import Admin from './pages/Admin';
 
 function Protected({ children, roles }) {
@@ -35,6 +36,11 @@ export default function App() {
             <Route path="/personal" element={<Protected roles={['admin','gerencia','sipresalud','ce']}><Personal /></Protected>} />
             <Route path="/metas" element={<Protected roles={['admin','gerencia','sipresalud','ce']}><Metas /></Protected>} />
             <Route path="/hallazgos" element={<Protected roles={['admin','gerencia','sipresalud']}><Hallazgos /></Protected>} />
+            {/* Carga del Excel maestro: toca TODO el sistema (epidemiología,
+                jornadas, empresas, personal, viáticos, laboratorio), así que es
+                pantalla propia y no un rincón de Epidemiología. Solo admin; el
+                permiso de escritura lo exige además el backend. */}
+            <Route path="/cargas" element={<Protected roles={['admin']}><Cargas /></Protected>} />
             <Route path="/admin" element={<Protected roles={['admin']}><Admin /></Protected>} />
           </Routes>
         </Layout>

@@ -9,7 +9,7 @@ import {
   Serie12MesesChart, DistribucionDepartamentoChart, CostosMensualesChart,
   ProgresoDiarioMesChart, EstadoJornadasChart,
 } from '../components/Charts';
-import { fmtQ, fmtN, isoLocalDate } from '../utils/format';
+import { fmtQ, fmtN, isoLocalDate, fmtFechaCorta } from '../utils/format';
 import ErrorState from '../components/feedback/ErrorState';
 import { useThemedColors } from '../theme/useThemedColors';
 import { severityOf } from '../utils/derived';
@@ -291,7 +291,7 @@ export default function Dashboard() {
             title="Próximas jornadas"
             subtitle={
               proximasInfo.showingFallback
-                ? `Siguiente: ${proximasInfo.nextDate}`
+                ? `Siguiente: ${fmtFechaCorta(proximasInfo.nextDate)}`
                 : `Hoy y mañana · ${proximasInfo.items.length}`
             }
             density="compact"

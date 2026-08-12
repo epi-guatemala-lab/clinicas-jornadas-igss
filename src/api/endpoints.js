@@ -140,14 +140,94 @@ export const apiAlertasUnificadas = (params = {}) =>
 export const apiSerieDiariaMes = (params = {}) =>
   api.get('/api/charts/serie-diaria-mes', { params }).then((r) => r.data);
 
-// ── Cargador epidemiológico (solo admin) ────────────────────────────
-// apply=false → PREVIEW (dry-run, no escribe); apply=true → aplica.
-// Idempotente (mismo archivo = NO-OP) + agregatorio (solo suma).
-export const apiUploadEpi = (fileObj, apply = false) => {
+// ── Carga del Excel maestro (solo admin + editor) ───────────────────
+// El servidor procesa en segundo plano: POST devuelve 202 con el id de la
+// carga y el avance se consulta con apiGetCarga. El archivo pesa ~34 MB, así
+// que la subida lleva su tiempo: timeout amplio + progreso de subida real.
+const SUBIDA_TIMEOUT_MS = 15 * 60 * 1000;   // 15 min: red institucional lenta
+
+/**
+ * Sube el Excel y encola la carga.
+ * @param {File} fileObj archivo elegido por el usuario
+ * @param {'PREVIEW'|'APLICAR'} modo
+ * @param {{onUploadProgress?:Function, signal?:AbortSignal}} opts
+ * @returns {Promise<{id:number, estado:string, mensaje?:string}>}
+ */
+export const apiCrearCarga = (fileObj, modo = 'PREVIEW', opts = {}) => {
   const fd = new FormData();
   fd.append('file', fileObj);
-  return api.post(`/api/epi/upload?apply=${apply ? 'true' : 'false'}`, fd, {
+  return api.post(`/api/cargas?modo=${modo}`, fd, {
     headers: { 'Content-Type': 'multipart/form-data' },
-    timeout: 180000,
+    timeout: SUBIDA_TIMEOUT_MS,
+    onUploadProgress: opts.onUploadProgress,
+    signal: opts.signal,
   }).then((r) => r.data);
 };
+
+/**
+ * Aplica una carga YA previsualizada REUSANDO el archivo que el servidor
+ * guardó, sin volver a subir los 34 MB.
+ *
+ * Subir el archivo desde una máquina real toma unos 80 segundos, así que
+ * hacerlo dos veces (previsualizar y aplicar) es minuto y medio de espera
+ * evitable. El camino normal es un POST vacío a `/aplicar`.
+ *
+ * Si el servidor todavía no tiene esa ruta (404/405/501) se cae al contrato
+ * anterior —reenviar el archivo con modo=APLICAR— y avisa por `onReenvio`
+ * para que la pantalla lo diga en vez de quedarse muda 80 segundos.
+ *
+ * @returns {Promise<{id:number, estado:string, mensaje?:string, reenviado:boolean}>}
+ */
+export const apiAplicarCarga = async (cargaId, fileObj, opts = {}) => {
+  try {
+    const r = await api.post(`/api/cargas/${cargaId}/aplicar`, null, {
+      timeout: SUBIDA_TIMEOUT_MS,
+      signal: opts.signal,
+    });
+    return { ...(r.data || {}), reenviado: false };
+  } catch (e) {
+    const st = e.response?.status;
+    const rutaAusente = st === 404 || st === 405 || st === 501;
+    if (!rutaAusente || !fileObj) throw e;
+    opts.onReenvio?.();
+    const d = await apiCrearCarga(fileObj, 'APLICAR', opts);
+    return { ...d, reenviado: true };
+  }
+};
+
+// El contrato devuelve `resumen`/`conflictos`/`bloqueos` ya interpretados. Se
+// aceptan además las columnas crudas (`*_json`, texto) para que la pantalla no
+// quede en blanco si el servidor entrega la fila tal como está en la tabla.
+function _campo(carga, nombre) {
+  const v = carga[nombre] !== undefined ? carga[nombre] : carga[`${nombre}_json`];
+  if (typeof v !== 'string') return v ?? null;
+  if (!v.trim()) return null;
+  try { return JSON.parse(v); } catch { return v; }
+}
+
+function _normalizarCarga(carga) {
+  if (!carga || typeof carga !== 'object') return carga;
+  return {
+    ...carga,
+    resumen: _campo(carga, 'resumen'),
+    conflictos: _campo(carga, 'conflictos'),
+    bloqueos: _campo(carga, 'bloqueos'),
+  };
+}
+
+export const apiGetCarga = (cargaId) =>
+  api.get(`/api/cargas/${cargaId}`).then((r) => _normalizarCarga(r.data));
+
+export const apiListCargas = (limit = 20) =>
+  api.get('/api/cargas', { params: { limit } })
+    .then((r) => (Array.isArray(r.data) ? r.data : (r.data?.data || [])));
+
+// ── Catálogo de patologías (alta desde el portal, sin redespliegue) ──
+export const apiListPatologias = () =>
+  api.get('/api/admin/patologias').then((r) => r.data);
+
+export const apiCreatePatologia = (body) =>
+  api.post('/api/admin/patologias', body).then((r) => r.data);
+
+export const apiUpdatePatologia = (id, body) =>
+  api.put(`/api/admin/patologias/${id}`, body).then((r) => r.data);

@@ -1,5 +1,6 @@
 import { useThemedColors } from '../../theme/useThemedColors';
 import { mapSemaforoLegacy } from '../../utils/derived';
+import { fmtFechaCorta } from '../../utils/format';
 
 const TIPO_LABEL_SHORT = {
   SIPRESALUD_JORNADA: 'SIPRES',
@@ -23,9 +24,7 @@ export default function JornadaRow({ jornada, onClick, dense = false }) {
     : sem === 'azul' ? t.status.info
     : t.status.neutral;
 
-  const fechaFmt = jornada.fecha_inicio
-    ? jornada.fecha_inicio.slice(5).replace('-', '/')
-    : '';
+  const fechaFmt = fmtFechaCorta(jornada.fecha_inicio);
 
   return (
     <button

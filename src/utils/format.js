@@ -8,6 +8,16 @@ export const isoLocalDate = (d = new Date()) => {
   return `${y}-${m}-${dd}`;
 };
 
+// Fecha ISO ('YYYY-MM-DD') → 'DD/MM' (formato de Guatemala, día antes de mes).
+// Único lugar donde se arma este recorte: un slice()/replace() a mano en cada
+// pantalla es como apareció el bug de fecha en formato de EE.UU. (MM/DD) en el
+// panel de próximas jornadas del Dashboard.
+export const fmtFechaCorta = (iso) => {
+  if (!iso) return '';
+  const [, mm, dd] = String(iso).split('-');
+  return mm && dd ? `${dd}/${mm}` : '';
+};
+
 export const fmtQ = (n) =>
   n == null ? '—' : `Q${Number(n).toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 

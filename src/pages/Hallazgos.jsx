@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../hooks/useAuth';
 import StatCard from '../components/cards/StatCard';
-import EpiUploader from '../components/EpiUploader';
 import EpiMapChart from '../components/EpiMapChart';
 import {
   PrevalenciaPatologiaChart, PrevalenciaGrupoChart, DistribucionHallazgosChart,
@@ -234,9 +234,21 @@ export default function Hallazgos() {
         </div>
       </div>
 
-      {/* ── Cargador de base epidemiológica (solo admin) ─────────────── */}
+      {/* ── Puntero a la carga del Excel maestro (solo admin) ─────────
+          El cargador dejó de vivir acá: el Excel actualiza también jornadas,
+          empresas, personal, viáticos y laboratorio, así que tiene pantalla
+          propia. Queda el atajo para quien lo buscaba en este tablero. */}
       {user?.rol === 'admin' && (
-        <EpiUploader onApplied={() => window.location.reload()} />
+        <div className="card border border-line p-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="font-semibold text-fg">¿Vas a actualizar los datos del mes?</div>
+            <p className="text-xs text-fg-muted">
+              La carga del Excel maestro (BASE_EPIDE) se hace desde <b>Carga de datos</b>: actualiza
+              el tamizaje y también jornadas, empresas, personal, viáticos y laboratorio.
+            </p>
+          </div>
+          <Link to="/cargas" className="btn-primary text-sm whitespace-nowrap">Ir a Carga de datos</Link>
+        </div>
       )}
 
       {/* ── Chips de filtros activos (drill-down) ────────────────────── */}

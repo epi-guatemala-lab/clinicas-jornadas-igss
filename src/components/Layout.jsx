@@ -23,7 +23,11 @@ export default function Layout({ children }) {
     // Metas: todas las secciones VEN sus metas (incl. la de afiliados); crear/editar
     // queda en gerencia/admin (las metas institucionales son estratégicas).
     { to: '/metas', label: 'Metas', roles: ['admin', 'gerencia', 'sipresalud', 'ce'] },
-    // Admin: gestión de usuarios + visor de auditoría (solo rol admin).
+    // Carga de datos: el Excel maestro actualiza TODAS las capas del sistema,
+    // no solo epidemiología, así que va como sección propia y no escondida en
+    // un tablero. Solo admin (y el backend exige además permiso de edición).
+    { to: '/cargas', label: 'Carga de datos', roles: ['admin'] },
+    // Admin: gestión de usuarios + catálogo de patologías + auditoría (solo admin).
     { to: '/admin', label: 'Admin', roles: ['admin'] },
   ];
   const visibles = navLinks.filter((l) => l.roles.includes(user.rol));
