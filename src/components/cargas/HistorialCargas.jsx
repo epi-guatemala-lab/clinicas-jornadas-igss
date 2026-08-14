@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiListCargas } from '../../api/endpoints';
 import { describirError } from '../../utils/apiError';
-import { ESTADO_CARGA, MODO_CARGA, fmtBytes, fmtFechaHora } from '../../utils/carga';
+import { ESTADO_CARGA, MODO_CARGA, etiquetaTipoCarga, fmtBytes, fmtFechaHora } from '../../utils/carga';
 
 /**
  * Bitácora de cargas: quién subió qué archivo, cuándo y con qué resultado.
@@ -70,7 +70,15 @@ export default function HistorialCargas({ recargarToken = 0, onVerCarga }) {
                     </div>
                     <div className="text-[11px] text-fg-subtle">{fmtBytes(c.archivo_bytes)}</div>
                   </td>
-                  <td className="p-2 text-xs">{MODO_CARGA[c.modo] || c.modo}</td>
+                  <td className="p-2 text-xs">
+                    {MODO_CARGA[c.modo] || c.modo}
+                    {c.tipo === 'CIERRE_JORNADA' && (
+                      <div className="text-[11px] text-igss-primary">
+                        {etiquetaTipoCarga(c.tipo)}
+                        {c.jornada_id != null && ` · jornada #${c.jornada_id}`}
+                      </div>
+                    )}
+                  </td>
                   <td className="p-2"><span className={est.clase}>{est.texto}</span></td>
                   <td className="p-2 text-xs">{c.creado_por || '—'}</td>
                   <td className="p-2 text-xs text-fg-muted">

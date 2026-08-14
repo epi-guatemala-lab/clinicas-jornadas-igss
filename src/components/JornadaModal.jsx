@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   apiGetJornada, apiCancelarJornada, apiCerrarJornada, apiReprogramarJornada,
   apiSetMaterial, apiSetCharlas, apiCatalogoCharlas, apiListPersonal,
+  apiGetCierreJornada,
 } from '../api/endpoints';
 import { SEMAFORO_BG, TIPO_LABEL, ESTADO_LABEL, fmtN, fmtQ, fmtPct } from '../utils/format';
 import { useAuth } from '../hooks/useAuth';
@@ -36,8 +38,13 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
   const [savingMat, setSavingMat] = useState(false);
   const [editing, setEditing] = useState(false);
 
+  const [cierre, setCierre] = useState(null);
+
   useEffect(() => {
     apiGetJornada(jornadaId).then(setJ);
+    // Estado del análisis de cierre (sección «Análisis de datos»): si la jornada
+    // ya tiene archivo cargado muestra KPIs; si no, el botón para subirlo.
+    apiGetCierreJornada(jornadaId).then(setCierre).catch(() => setCierre(null));
   }, [jornadaId]);
 
   // Catálogo de charlas (D2) + roster de responsables (D3) — para el editor.
@@ -208,6 +215,47 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {/* Análisis de cierre (archivo «N - Análisis de Datos …»): estado en la
+            ficha, subida y listado referible en su propia página. Solo jornadas
+            de clínica; visible en CERRADA (los labs llegan días después). */}
+        {['SIPRESALUD_JORNADA', 'CE_JORNADA'].includes(j.tipo) && j.estado !== 'CANCELADA' && (
+          <div className="rounded-lg border border-line-subtle bg-sunken/30 p-3 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-fg">Análisis de datos (cierre)</h3>
+              <div className="flex items-center gap-2">
+                {cierre?.epi_jornada_codigo && (
+                  <Link to={`/hallazgos?jornada=${j.codigo}`}
+                    className="text-xs underline text-igss-primary">
+                    Ver epidemiología
+                  </Link>
+                )}
+                <Link to={`/jornadas/${j.id}/analisis`}
+                  className="btn-secondary text-xs no-underline">
+                  {cierre?.carga_id ? 'Ver análisis' : 'Cargar análisis'}
+                </Link>
+              </div>
+            </div>
+            {cierre?.carga_id ? (
+              <p className="text-xs text-fg-muted">
+                Cargado por {cierre.cargado_por} el {cierre.cargado_at} ·{' '}
+                <b className="text-fg">{fmtN(cierre.personas)} tamizados</b>
+                {cierre.con_hallazgo != null && (
+                  <> · {fmtN(cierre.con_hallazgo)} con hallazgos · {fmtN(cierre.referibles)} por referir</>
+                )}
+                {cierre.atendidos_declarado != null && cierre.personas != null
+                  && cierre.atendidos_declarado !== cierre.personas && (
+                  <span className="text-warning"> · atendidos declarados: {fmtN(cierre.atendidos_declarado)} (distinto de los {fmtN(cierre.personas)} del análisis)</span>
+                )}
+              </p>
+            ) : (
+              <p className="text-xs text-fg-muted">
+                Cuando Sipresalud genere el archivo «N - Análisis de Datos …», subilo acá: el
+                triaje, la encuesta y el laboratorio quedan asociados a esta jornada.
+              </p>
+            )}
           </div>
         )}
 

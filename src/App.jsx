@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Calendario from './pages/Calendario';
 import Jornadas from './pages/Jornadas';
+import AnalisisJornada from './pages/AnalisisJornada';
 import Empresas from './pages/Empresas';
 import Personal from './pages/Personal';
 import Viaticos from './pages/Viaticos';
@@ -31,6 +32,7 @@ export default function App() {
             <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
             <Route path="/calendario" element={<Protected><Calendario /></Protected>} />
             <Route path="/jornadas" element={<Protected><Jornadas /></Protected>} />
+          <Route path="/jornadas/:id/analisis" element={<Protected><AnalisisJornada /></Protected>} />
             <Route path="/empresas" element={<Protected><Empresas /></Protected>} />
             <Route path="/viaticos" element={<Protected><Viaticos /></Protected>} />
             <Route path="/personal" element={<Protected roles={['admin','gerencia','sipresalud','ce']}><Personal /></Protected>} />

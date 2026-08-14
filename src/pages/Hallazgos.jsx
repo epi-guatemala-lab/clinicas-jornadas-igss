@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { useAuth } from '../hooks/useAuth';
 import StatCard from '../components/cards/StatCard';
@@ -87,9 +87,14 @@ function FilterChip({ label, value, onRemove }) {
 }
 
 export default function Hallazgos() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [periodo, setPeriodo] = useState('2026');
   const [mes, setMes] = useState('');  // '' = todo el año; '01'..'12' = mes específico
   const [sexo, setSexo] = useState('');
+  // Filtro por jornada (viene del link «Ver epidemiología de esta jornada» de la
+  // ficha): código operativo JOR-2026-NNNN que el backend resuelve al código
+  // epi. Mientras esté activo, TODO el tablero muestra solo esa jornada.
+  const [jornada, setJornada] = useState(() => searchParams.get('jornada') || '');
   // Drill-down state
   // departamento = nombre normalizado (MAYÚSC sin tildes) → resalta el mapa y el chip.
   // departamentoRaw = nombre crudo de la BD ("Guatemala") → es lo que la API filtra
@@ -104,6 +109,13 @@ export default function Hallazgos() {
   const [ajustada, setAjustada] = useState(false);
 
   const p = PERIODOS.find((x) => x.key === periodo) || PERIODOS[0];
+
+  const quitarJornada = () => {
+    setJornada('');
+    const next = new URLSearchParams(searchParams);
+    next.delete('jornada');
+    setSearchParams(next, { replace: true });
+  };
 
   // Params base (período + mes + sexo): los comparten el mapa y los charts no-drill.
   const baseParams = useMemo(() => {
@@ -126,19 +138,21 @@ export default function Hallazgos() {
   // OJO: se envía departamentoRaw (valor de BD), no el normalizado del mapa.
   const params = useMemo(() => {
     const o = { ...baseParams };
+    if (jornada) o.jornada = jornada;
     if (departamentoRaw) o.departamento = departamentoRaw;
     if (grupoEtario) o.grupo_etario = grupoEtario;
     if (patologiaId != null) o.patologia_id = patologiaId;
     return o;
-  }, [baseParams, departamentoRaw, grupoEtario, patologiaId]);
+  }, [baseParams, jornada, departamentoRaw, grupoEtario, patologiaId]);
 
   // resumen no acepta patologia_id (contrato) → params sin esa key.
   const resumenParams = useMemo(() => {
     const o = { ...baseParams };
+    if (jornada) o.jornada = jornada;
     if (departamentoRaw) o.departamento = departamentoRaw;
     if (grupoEtario) o.grupo_etario = grupoEtario;
     return o;
-  }, [baseParams, departamentoRaw, grupoEtario]);
+  }, [baseParams, jornada, departamentoRaw, grupoEtario]);
 
   // El mapa siempre muestra el país COMPLETO: NO se le filtra por departamento
   // (la selección es solo un highlight). Sí respeta período/sexo/edad/patología.
@@ -166,6 +180,7 @@ export default function Hallazgos() {
   };
 
   const clearAll = () => {
+    quitarJornada();
     setDepartamento(null);
     setDepartamentoRaw(null);
     setGrupoEtario(null);
@@ -252,9 +267,12 @@ export default function Hallazgos() {
       )}
 
       {/* ── Chips de filtros activos (drill-down) ────────────────────── */}
-      {hasDrill && (
+      {(hasDrill || jornada) && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-fg-muted font-medium">Filtros activos:</span>
+          {jornada && (
+            <FilterChip label="Jornada" value={jornada} onRemove={quitarJornada} />
+          )}
           {departamento && (
             <FilterChip label="Depto" value={(departamentoRaw || departamento).toLowerCase()}
                         onRemove={() => pickDepto(null, null)} />

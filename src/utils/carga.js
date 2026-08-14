@@ -22,7 +22,10 @@
 
 const CLAVES_CAPA_EPI = ['epi', 'epidemiologia'];
 const CLAVES_CAPA_OPERATIVA = ['operativo', 'operativa'];
-const CLAVES_CAPA = [...CLAVES_CAPA_EPI, ...CLAVES_CAPA_OPERATIVA];
+// El cierre de jornada envuelve su resumen en `cierre` (mismo papel que las
+// capas del maestro): sin listarlo acá, planoResumen no vería ningún contador.
+const CLAVES_CAPA_CIERRE = ['cierre'];
+const CLAVES_CAPA = [...CLAVES_CAPA_EPI, ...CLAVES_CAPA_OPERATIVA, ...CLAVES_CAPA_CIERRE];
 const CLAVES_ANIDADAS = ['totales', 'defectos', 'conflictos', 'bloqueos', 'cambios_jornadas'];
 
 /** La rama epidemiológica del resumen (o el resumen entero si viene plano). */
@@ -174,6 +177,34 @@ export const ETIQUETAS_CLAVE = {
 
   // ── Patologías del catálogo ──
   patologias_desconocidas: 'Patologías que no están en el catálogo',
+
+  // ── Cierre de jornada (análisis de datos por jornada) ──
+  epi_jornada_codigo: 'Código epidemiológico de la jornada (N-YYYY)',
+  jornada_operativa: 'Jornada operativa ancla',
+  fecha_atencion: 'Fecha de atención del archivo',
+  pacientes_triaje: 'Pacientes con triaje (hoja «Pacientes»)',
+  con_laboratorio: 'Pacientes con laboratorio (hoja «Base Extraída»)',
+  personas_ya_estaban: 'Personas que ya estaban cargadas',
+  triaje_insertadas: 'Fichas de triaje nuevas (presión, IMC, frecuencia)',
+  triaje_actualizadas: 'Fichas de triaje actualizadas',
+  labs_insertados: 'Resultados de laboratorio nuevos',
+  labs_actualizados: 'Resultados de laboratorio actualizados',
+  hallazgos_ya_estaban: 'Hallazgos que ya estaban cargados',
+  personas_con_hallazgo: 'Personas con al menos un hallazgo',
+  encuestas_insertadas: 'Respuestas de encuesta nuevas',
+  encuestas_ya_estaban: 'Respuestas de encuesta que ya estaban',
+  encuestados_totales: 'Respuestas de encuesta del archivo',
+  encuestados_sin_asistir: 'Encuestados que no asistieron a la jornada',
+  divergencias_base_resumen: 'Diferencias entre el motor del portal y la hoja «Base Resumen»',
+  personas_enriquecidas: 'Personas a las que se les rellenó un dato vacío',
+  atendidos_rellenados: 'Jornadas a las que se les completó «atendidos» (estaba vacío)',
+  pacientes_sin_laboratorio: 'Pacientes del triaje sin resultado de laboratorio',
+  pacientes_sin_triaje: 'Pacientes con laboratorio pero sin triaje',
+  encuesta_dpi_reasignado_afiliacion:
+    'Encuestas cuyo «DPI» era el número de afiliación: se reasignaron a la persona correcta',
+  encuesta_duplicada_misma_persona: 'Personas que llenaron la encuesta más de una vez',
+  hallazgos_preexistentes_del_maestro:
+    'Hallazgos que ya trae el maestro y el archivo del cierre no incluye (se conservan)',
 };
 
 /** Etiqueta legible de una clave del servidor. Nunca devuelve el nombre interno. */
@@ -812,6 +843,16 @@ export const MODO_CARGA = {
   PREVIEW: 'Previsualización',
   APLICAR: 'Aplicada',
 };
+
+/** Tipo de carga (maestro histórico vs cierre de una jornada). */
+export const TIPO_CARGA = {
+  MAESTRO: 'Excel maestro',
+  CIERRE_JORNADA: 'Cierre de jornada',
+};
+
+export function etiquetaTipoCarga(tipo) {
+  return TIPO_CARGA[tipo] || 'Excel maestro';
+}
 
 /** Tamaño de archivo legible. */
 export function fmtBytes(n) {

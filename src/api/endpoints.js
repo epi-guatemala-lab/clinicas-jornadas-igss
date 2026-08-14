@@ -156,7 +156,12 @@ const SUBIDA_TIMEOUT_MS = 15 * 60 * 1000;   // 15 min: red institucional lenta
 export const apiCrearCarga = (fileObj, modo = 'PREVIEW', opts = {}) => {
   const fd = new FormData();
   fd.append('file', fileObj);
-  return api.post(`/api/cargas?modo=${modo}`, fd, {
+  // opts.jornadaId → la carga es el CIERRE de ESA jornada (el backend registra
+  // tipo='CIERRE_JORNADA' y ancla el job a la jornada operativa).
+  const url = opts.jornadaId
+    ? `/api/jornadas/${opts.jornadaId}/carga-cierre?modo=${modo}`
+    : `/api/cargas?modo=${modo}`;
+  return api.post(url, fd, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: SUBIDA_TIMEOUT_MS,
     onUploadProgress: opts.onUploadProgress,
@@ -241,3 +246,14 @@ export const apiCreatePatologia = (body) =>
 
 export const apiUpdatePatologia = (id, body) =>
   api.put(`/api/admin/patologias/${id}`, body).then((r) => r.data);
+
+// ── Cierre de jornada: análisis de datos ─────────────────────────────
+// Estado del análisis cargado de UNA jornada (para la ficha): última carga
+// aplicada tipo CIERRE + mini-KPIs del resumen.
+export const apiGetCierreJornada = (jornadaId) =>
+  api.get(`/api/jornadas/${jornadaId}/cierre`).then((r) => r.data);
+
+// Listado de colaboradores con hallazgos para REFERIR (nombres descifrados;
+// mismo permiso que subir el cierre, acceso auditado en el servidor).
+export const apiGetReferidos = (jornadaId) =>
+  api.get(`/api/jornadas/${jornadaId}/referidos`).then((r) => r.data);
