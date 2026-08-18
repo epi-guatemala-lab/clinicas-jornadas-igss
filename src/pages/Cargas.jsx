@@ -4,7 +4,8 @@ import { apiAplicarCarga, apiCrearCarga } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
 import { useCargaJob, esFinal } from '../hooks/useCargaJob';
 import { describirError } from '../utils/apiError';
-import { ESTADO_CARGA, fmtBytes, resultadoCarga } from '../utils/carga';
+import { ESTADO_CARGA, fmtBytes, resultadoCarga, separarBloqueoEmpresa } from '../utils/carga';
+import { avisoSiHayCargaEnCurso } from '../utils/carrilCarga';
 import { fmtN } from '../utils/format';
 import ResumenCarga from '../components/cargas/ResumenCarga';
 import BloqueosCarga from '../components/cargas/BloqueosCarga';
@@ -12,7 +13,13 @@ import ConflictosCarga from '../components/cargas/ConflictosCarga';
 import HistorialCargas from '../components/cargas/HistorialCargas';
 
 const EXTENSIONES = ['.xlsx', '.xlsm'];
-const LIMITE_MB = 120;   // config.CARGA_MAX_MB del backend
+// Un pelo por debajo de config.CARGA_MAX_MB (120) a propósito: el servidor
+// corta por Content-Length, que es el archivo MÁS la envoltura multipart
+// (~176 bytes). Con el mismo número de los dos lados, un archivo de exactamente
+// 120 MB pasa el filtro de acá y allá lo rechaza un 413 que sale ANTES de leer
+// el cuerpo — o sea, la barra congelada otra vez. El maestro real pesa ~34 MB,
+// así que este margen no le quita nada a nadie.
+const LIMITE_MB = 119;   // config.CARGA_MAX_MB del backend es 120
 
 /**
  * Carga de datos — el Excel maestro (BASE_EPIDE) en una sola pantalla.
@@ -44,6 +51,9 @@ export default function Cargas() {
   const [enviando, setEnviando] = useState(false);
   const [reenviando, setReenviando] = useState(false);     // el servidor pidió el archivo otra vez
   const [error, setError] = useState(null);               // {titulo, detalle, sugerencia}
+  // Acción que quedó sin hacer porque el servidor estaba ocupado, para ofrecer
+  // «Reintentar» sin tener que volver a elegir el archivo.
+  const [reintento, setReintento] = useState(null);       // 'previsualizar' | 'aplicar' | null
   const [tokenHistorial, setTokenHistorial] = useState(0);
   const inputRef = useRef(null);
   const abortRef = useRef(null);
@@ -67,11 +77,13 @@ export default function Cargas() {
     abortRef.current = null;
     setArchivo(null); setCargaId(null); setSoloLectura(false);
     setPctSubida(null); setEnviando(false); setReenviando(false); setError(null);
+    setReintento(null);
     if (inputRef.current) inputRef.current.value = '';
   }, []);
 
   function elegir(f) {
     setError(null); setCargaId(null); setSoloLectura(false); setPctSubida(null);
+    setReintento(null);
     if (!f) { setArchivo(null); return; }
     const nombre = f.name.toLowerCase();
     if (!EXTENSIONES.some((x) => nombre.endsWith(x))) {
@@ -99,7 +111,17 @@ export default function Cargas() {
 
   async function previsualizar() {
     if (!archivo) return;
-    setError(null); setEnviando(true); setReenviando(false);
+    setError(null); setReintento(null); setEnviando(true); setReenviando(false);
+    setPctSubida(null);
+    // El servidor atiende UNA carga por vez (SQLite tiene un solo escritor).
+    // Preguntar antes de empezar ahorra subir 34 MB —80 segundos medidos— para
+    // que después lo rechacen, y evita que el rechazo llegue a mitad de la
+    // subida, que es cuando el navegador no lo muestra (ver utils/carrilCarga).
+    const ocupado = await avisoSiHayCargaEnCurso();
+    if (ocupado) {
+      setError(ocupado); setReintento('previsualizar'); setEnviando(false);
+      return;
+    }
     setPctSubida(0); setCargaId(null); setSoloLectura(false);
     abortRef.current = new AbortController();
     try {
@@ -129,7 +151,15 @@ export default function Cargas() {
       + '¿Confirmás?',
     );
     if (!ok) return;
-    setError(null); setEnviando(true); setReenviando(false); setPctSubida(null);
+    setError(null); setReintento(null); setEnviando(true); setReenviando(false);
+    setPctSubida(null);
+    // Aplicar normalmente no sube nada (reusa el archivo del servidor), pero si
+    // ese archivo venció reenvía los 34 MB: mismo riesgo, misma comprobación.
+    const ocupado = await avisoSiHayCargaEnCurso();
+    if (ocupado) {
+      setError(ocupado); setReintento('aplicar'); setEnviando(false);
+      return;
+    }
     abortRef.current = new AbortController();
     try {
       const r = await apiAplicarCarga(cargaId, archivo, {
@@ -262,7 +292,18 @@ export default function Cargas() {
             </div>
           )}
 
-          {error && <BannerError error={error} />}
+          {error && (
+            <BannerError
+              error={error}
+              accion={reintento && (
+                <button type="button" className="btn-secondary text-xs whitespace-nowrap"
+                  disabled={enviando}
+                  onClick={() => (reintento === 'aplicar' ? aplicar() : previsualizar())}>
+                  Reintentar
+                </button>
+              )}
+            />
+          )}
         </section>
       )}
 
@@ -327,11 +368,33 @@ export default function Cargas() {
           )}
 
           {carga.estado === 'BLOQUEADA' && (
-            <BloqueosCarga
-              bloqueos={carga.bloqueos}
-              canWrite={canWrite}
-              onReintentar={archivo && canWrite ? previsualizar : null}
-            />
+            <div className="space-y-3">
+              {/* Un cierre detenido por el nombre de la empresa se resuelve en
+                  la pantalla de ESA jornada, que es donde están los dos nombres
+                  y el botón de confirmar. Acá solo se lee el motivo. */}
+              {separarBloqueoEmpresa(carga.bloqueos).empresa && carga.jornada_id != null && (
+                <div className="rounded-lg border border-warning/50 bg-warning-soft/40 p-3 text-sm">
+                  <b className="text-warning">
+                    Esta carga espera que alguien confirme de qué empresa es el archivo.
+                  </b>{' '}
+                  <span className="text-fg-muted">
+                    Se decide en la pantalla de análisis de esa jornada, donde están los dos
+                    nombres y las empresas parecidas.
+                  </span>
+                  <div className="mt-2">
+                    <Link className="btn-secondary text-xs"
+                      to={`/jornadas/${carga.jornada_id}/analisis`}>
+                      Ir a la jornada para resolverlo
+                    </Link>
+                  </div>
+                </div>
+              )}
+              <BloqueosCarga
+                bloqueos={carga.bloqueos}
+                canWrite={canWrite}
+                onReintentar={archivo && canWrite ? previsualizar : null}
+              />
+            </div>
           )}
 
           {carga.estado === 'OK' && (

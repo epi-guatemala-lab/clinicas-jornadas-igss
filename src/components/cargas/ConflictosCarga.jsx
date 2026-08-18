@@ -24,13 +24,30 @@ const PAGINA = 50;
  *    información que no tapan las 6 que cambian la base.
  */
 export default function ConflictosCarga({ conflictos, aplicado = false }) {
-  const { sobrescriben, informativas } = useMemo(
+  const { sobrescriben, informativas, constancias } = useMemo(
     () => separarConflictos(conflictos), [conflictos]);
 
-  if (!sobrescriben.filas.length && !informativas.filas.length) return null;
+  if (!sobrescriben.filas.length && !informativas.filas.length
+    && !constancias.filas.length) return null;
 
   return (
     <div className="space-y-4">
+      {constancias.filas.length > 0 && (
+        <section className="space-y-2">
+          <div className="rounded-lg border border-info/40 bg-info-soft/30 p-3 text-sm">
+            <h4 className="font-semibold text-info">
+              Constancia: de qué empresa venía este archivo
+            </h4>
+            <p className="mt-1 text-xs text-fg-muted">
+              El nombre de empresa del archivo no era idéntico al que tiene el portal. Queda
+              anotado qué decía cada uno, cuánto se parecen y qué hizo el sistema.{' '}
+              <b>No se cambió ningún dato de la empresa</b>: es solo el rastro de la decisión.
+            </p>
+          </div>
+          <TablaDiferencias filas={constancias.filas} />
+        </section>
+      )}
+
       {sobrescriben.filas.length > 0 && (
         <section className="space-y-2">
           <div className="rounded-lg border border-warning/50 bg-warning-soft/40 p-3 text-sm">

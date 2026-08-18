@@ -682,6 +682,43 @@ export function normalizarBloqueos(bloqueos) {
   return { patologias, otros };
 }
 
+// ── Bloqueo que se resuelve DECIDIENDO, no corrigiendo el archivo ─────
+/*
+ * El cotejo de empresa del cierre (backend: `empresa_match.entrada_bloqueo`)
+ * manda un bloqueo con forma propia:
+ *
+ *   {origen:'cierre', tipo:'empresa_sin_confirmar', confirmable:true,
+ *    accion:'confirmar_empresa', nivel:3, motivo, mensaje,
+ *    empresa_archivo, empresas_en_archivo:[{empresa, filas}],
+ *    parecido_pct, jornada:{id, codigo, fecha_inicio, fecha_fin},
+ *    empresa_jornada:{empresa_id, nombre_legal, nombre_comercial, nit,
+ *                     parecido_pct, coincidencia},
+ *    candidatas:[{empresa_id, nombre_legal, nombre_comercial, parecido_pct,
+ *                 coincidencia, jornadas:[{id, codigo, fecha_inicio, …}]}]}
+ *
+ * `normalizarBloqueos` lo dejaría como un renglón de texto en «otros motivos
+ * del bloqueo» —correcto pero sin salida—, así que se aparta antes: la pantalla
+ * lo muestra con los dos nombres y los dos botones.
+ */
+
+/**
+ * Aparta el bloqueo de empresa (el que la operadora puede resolver decidiendo)
+ * del resto, que se corrigen en el archivo.
+ * @returns {{empresa:object|null, resto:any}}
+ */
+export function separarBloqueoEmpresa(bloqueos) {
+  if (!Array.isArray(bloqueos)) return { empresa: null, resto: bloqueos };
+  let empresa = null;
+  const resto = [];
+  bloqueos.forEach((b) => {
+    const esEmpresa = b && typeof b === 'object'
+      && b.tipo === 'empresa_sin_confirmar' && b.confirmable;
+    if (esEmpresa && !empresa) empresa = b;
+    else resto.push(b);
+  });
+  return { empresa, resto };
+}
+
 // ── Diferencias entre el archivo y lo que ya está cargado ─────────────
 /*
  * Forma REAL que entrega el servidor (`conflictos_json`), ya normalizada por él
@@ -723,6 +760,20 @@ function contenedores(conflictos) {
 /** true si el contenedor viene de la capa epidemiológica (la que NO se pisa). */
 function esDeEpi(cont) {
   return String(cont.origen || cont.capa || '').toLowerCase().startsWith('epi');
+}
+
+/*
+ * Contenedores que NO tocan ningún dato guardado: son la CONSTANCIA de una
+ * decisión. Hoy solo el cotejo de empresa del cierre (`empresa_del_archivo`),
+ * que se emite cuando el nombre del archivo no era idéntico al del portal —lo
+ * aceptó el sistema por parecido, o lo confirmó una persona—. Sin separarlos
+ * caían en el grupo «se van a sobrescribir», que para este aviso es falso: no
+ * se cambia ni un dato de la empresa.
+ */
+const TIPOS_CONSTANCIA = ['empresa_del_archivo'];
+
+function esConstancia(cont) {
+  return TIPOS_CONSTANCIA.includes(String(cont.tipo || ''));
 }
 
 function filasDeContenedor(cont) {
@@ -787,15 +838,20 @@ function armarGrupo(conts) {
 }
 
 /**
- * Separa las diferencias en las que SÍ pisan datos guardados (capa operativa)
- * y las que solo se reportan (capa epidemiológica).
- * @returns {{sobrescriben:{filas,total,truncado}, informativas:{filas,total,truncado}}}
+ * Separa las diferencias en las que SÍ pisan datos guardados (capa operativa),
+ * las que solo se reportan (capa epidemiológica) y las que son constancia de
+ * una decisión (el cotejo de empresa del cierre), que no pisan nada.
+ * @returns {{sobrescriben:{filas,total,truncado},
+ *            informativas:{filas,total,truncado},
+ *            constancias:{filas,total,truncado}}}
  */
 export function separarConflictos(conflictos) {
   const conts = contenedores(conflictos);
+  const diferencias = conts.filter((c) => !esConstancia(c));
   return {
-    sobrescriben: armarGrupo(conts.filter((c) => !esDeEpi(c))),
-    informativas: armarGrupo(conts.filter(esDeEpi)),
+    sobrescriben: armarGrupo(diferencias.filter((c) => !esDeEpi(c))),
+    informativas: armarGrupo(diferencias.filter(esDeEpi)),
+    constancias: armarGrupo(conts.filter(esConstancia)),
   };
 }
 
@@ -828,6 +884,7 @@ export const NOMBRE_CAPA = {
   epidemiologia: 'Epidemiología',
   operativo: 'Operativa',
   operativa: 'Operativa',
+  cierre: 'Cierre de jornada',
 };
 
 /** Etiqueta de estado de una carga. */

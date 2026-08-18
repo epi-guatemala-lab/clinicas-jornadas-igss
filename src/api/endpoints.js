@@ -150,7 +150,8 @@ const SUBIDA_TIMEOUT_MS = 15 * 60 * 1000;   // 15 min: red institucional lenta
  * Sube el Excel y encola la carga.
  * @param {File} fileObj archivo elegido por el usuario
  * @param {'PREVIEW'|'APLICAR'} modo
- * @param {{onUploadProgress?:Function, signal?:AbortSignal}} opts
+ * @param {{onUploadProgress?:Function, signal?:AbortSignal, jornadaId?:number,
+ *          confirmarEmpresa?:boolean}} opts
  * @returns {Promise<{id:number, estado:string, mensaje?:string}>}
  */
 export const apiCrearCarga = (fileObj, modo = 'PREVIEW', opts = {}) => {
@@ -158,8 +159,14 @@ export const apiCrearCarga = (fileObj, modo = 'PREVIEW', opts = {}) => {
   fd.append('file', fileObj);
   // opts.jornadaId → la carga es el CIERRE de ESA jornada (el backend registra
   // tipo='CIERRE_JORNADA' y ancla el job a la jornada operativa).
+  // opts.confirmarEmpresa → la operadora YA respondió «sí, es la misma empresa»
+  // para ESTE archivo y esta jornada, y el archivo que tenía el servidor venció
+  // (se guarda unas horas porque trae datos personales), así que hay que
+  // subirlo de nuevo. El servidor solo se salta esa comprobación —fecha, DPI y
+  // el resto se revisan igual— y deja constancia en la auditoría.
   const url = opts.jornadaId
-    ? `/api/jornadas/${opts.jornadaId}/carga-cierre?modo=${modo}`
+    ? `/api/jornadas/${opts.jornadaId}/carga-cierre?modo=${modo}${
+      opts.confirmarEmpresa ? '&confirmar_empresa=true' : ''}`
     : `/api/cargas?modo=${modo}`;
   return api.post(url, fd, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -233,6 +240,20 @@ function _normalizarCarga(carga) {
 export const apiGetCarga = (cargaId) =>
   api.get(`/api/cargas/${cargaId}`).then((r) => _normalizarCarga(r.data));
 
+/**
+ * ¿Hay una carga ocupando el servidor AHORA MISMO?
+ *
+ * El servidor procesa una carga por vez (SQLite tiene un solo escritor), así
+ * que mientras dura una, la siguiente subida termina rechazada. Este endpoint
+ * —barato, en memoria, y lo puede consultar cualquier usuario— existe para
+ * preguntarlo ANTES de empezar a mandar 35 MB. Ver `utils/carrilCarga`.
+ *
+ * @returns {Promise<{activa:boolean, carga_id:?number, modo:?string,
+ *                    etapa:?string, progreso:number, mensaje:?string}>}
+ */
+export const apiEstadoCarga = () =>
+  api.get('/api/cargas/estado').then((r) => r.data);
+
 export const apiListCargas = (limit = 20) =>
   api.get('/api/cargas', { params: { limit } })
     .then((r) => (Array.isArray(r.data) ? r.data : (r.data?.data || [])));
@@ -257,3 +278,27 @@ export const apiGetCierreJornada = (jornadaId) =>
 // mismo permiso que subir el cierre, acceso auditado en el servidor).
 export const apiGetReferidos = (jornadaId) =>
   api.get(`/api/jornadas/${jornadaId}/referidos`).then((r) => r.data);
+
+/**
+ * «Sí, es la misma empresa»: repite una carga de cierre que quedó BLOQUEADA
+ * porque el nombre de la empresa del archivo no cuadraba con el de la jornada.
+ *
+ * NO vuelve a subir el archivo: el servidor conservó el .xlsm de esa carga
+ * (con su caducidad de siempre, porque trae datos personales) y lo comprueba
+ * antes de reusarlo. Devuelve la carga NUEVA que hay que seguir sondeando.
+ *
+ * El servidor responde 410 si el archivo ya venció; ahí toca volver a subirlo
+ * con `apiCrearCarga(..., {confirmarEmpresa: true})` — y ese camino solo lo
+ * acepta si existe una previsualización DEL MISMO archivo (por SHA-256) que
+ * haya quedado detenida por este motivo.
+ *
+ * Siempre previsualiza: el modo no es parámetro. Confirmar la empresa no puede
+ * convertirse en escribir sin revisar; para escribir hay que pasar después por
+ * «aplicar».
+ *
+ * @returns {Promise<{id:number, estado:string, mensaje?:string}>}
+ */
+export const apiConfirmarEmpresaCierre = (jornadaId, cargaId) =>
+  api.post(
+    `/api/jornadas/${jornadaId}/carga-cierre/${cargaId}/confirmar-empresa`,
+  ).then((r) => r.data);

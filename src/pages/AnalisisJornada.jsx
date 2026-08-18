@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  apiAplicarCarga, apiCrearCarga, apiGetCierreJornada, apiGetJornada, apiGetReferidos,
+  apiAplicarCarga, apiConfirmarEmpresaCierre, apiCrearCarga, apiGetCierreJornada,
+  apiGetJornada, apiGetReferidos,
 } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
 import { useCargaJob, esFinal } from '../hooks/useCargaJob';
 import { describirError } from '../utils/apiError';
-import { ESTADO_CARGA, fmtBytes } from '../utils/carga';
+import { ESTADO_CARGA, fmtBytes, separarBloqueoEmpresa } from '../utils/carga';
+import { avisoSiHayCargaEnCurso } from '../utils/carrilCarga';
 import { fmtN } from '../utils/format';
 import BloqueosCarga from '../components/cargas/BloqueosCarga';
+import ConfirmarEmpresaCierre from '../components/cargas/ConfirmarEmpresaCierre';
 import ConflictosCarga from '../components/cargas/ConflictosCarga';
 
 const EXTENSIONES = ['.xlsx', '.xlsm'];
@@ -42,6 +45,11 @@ export default function AnalisisJornada() {
   const [pctSubida, setPctSubida] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
+  // Acción que quedó sin hacer porque el servidor estaba ocupado, para poder
+  // ofrecer «Reintentar» sin que haya que volver a elegir el archivo.
+  const [reintento, setReintento] = useState(null);   // 'previsualizar' | 'aplicar' | null
+  const [confirmandoEmpresa, setConfirmandoEmpresa] = useState(false);
+  const [errorEmpresa, setErrorEmpresa] = useState(null);
   const inputRef = useRef(null);
   const abortRef = useRef(null);
 
@@ -66,16 +74,28 @@ export default function AnalisisJornada() {
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  // El cotejo de empresa es el ÚNICO bloqueo que no se arregla corrigiendo el
+  // archivo, sino decidiendo: se aparta del resto para mostrarlo con los dos
+  // nombres y las dos salidas explícitas.
+  const { empresa: bloqueoEmpresa, resto: bloqueosRestantes } = useMemo(
+    () => separarBloqueoEmpresa(carga?.bloqueos), [carga?.bloqueos]);
+  // ¿Esta previsualización se corrió con la empresa confirmada a mano? Se lee
+  // de lo que devolvió el servidor (no de una variable de la pantalla): está
+  // atado al archivo exacto que se revisó.
+  const empresaConfirmadaEnPreview = Boolean(
+    carga?.resumen?.cierre?.empresa_match?.confirmada);
+
   const limpiar = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
     setArchivo(null); setCargaId(null); setPctSubida(null);
-    setEnviando(false); setError(null);
+    setEnviando(false); setError(null); setErrorEmpresa(null); setReintento(null);
     if (inputRef.current) inputRef.current.value = '';
   }, []);
 
   function elegir(f) {
-    setError(null); setCargaId(null); setPctSubida(null);
+    setError(null); setErrorEmpresa(null); setCargaId(null); setPctSubida(null);
+    setReintento(null);
     if (!f) { setArchivo(null); return; }
     const nombre = f.name.toLowerCase();
     if (!EXTENSIONES.some((x) => nombre.endsWith(x))) {
@@ -104,7 +124,17 @@ export default function AnalisisJornada() {
 
   async function previsualizar() {
     if (!archivo) return;
-    setError(null); setEnviando(true); setPctSubida(0); setCargaId(null);
+    setError(null); setReintento(null); setEnviando(true); setPctSubida(null);
+    // El servidor atiende UNA carga por vez. Preguntarle antes de empezar
+    // ahorra subir 35 MB para que los rechace, y sobre todo evita que el
+    // rechazo llegue a mitad de la subida: ahí el navegador no lo muestra y la
+    // barra queda congelada (ver utils/carrilCarga).
+    const ocupado = await avisoSiHayCargaEnCurso();
+    if (ocupado) {
+      setError(ocupado); setReintento('previsualizar'); setEnviando(false);
+      return;
+    }
+    setPctSubida(0); setCargaId(null);
     abortRef.current = new AbortController();
     try {
       const r = await apiCrearCarga(archivo, 'PREVIEW', {
@@ -132,11 +162,25 @@ export default function AnalisisJornada() {
       + 'visibles para todos.\n\nMientras se aplica, el portal queda en solo lectura unos segundos.\n\n¿Confirmás?',
     );
     if (!ok) return;
-    setError(null); setEnviando(true); setPctSubida(null);
+    setError(null); setReintento(null); setEnviando(true); setPctSubida(null);
+    // Igual que al previsualizar: si el servidor está ocupado, ni siquiera
+    // empezamos (aplicar puede terminar reenviando el archivo si el del
+    // servidor venció, así que también puede quedar colgado a mitad).
+    const ocupado = await avisoSiHayCargaEnCurso();
+    if (ocupado) {
+      setError(ocupado); setReintento('aplicar'); setEnviando(false);
+      return;
+    }
     abortRef.current = new AbortController();
     try {
       const r = await apiAplicarCarga(cargaId, archivo, {
         jornadaId,
+        // Si esta previsualización se corrió con la empresa confirmada por la
+        // operadora, aplicar tiene que llevar la misma confirmación: es el
+        // MISMO archivo. Solo hace falta en el camino de excepción (el archivo
+        // del servidor venció y hay que volver a subirlo); por el camino normal
+        // el servidor lo lee del resumen de la previsualización.
+        confirmarEmpresa: empresaConfirmadaEnPreview,
         signal: abortRef.current.signal,
         onUploadProgress: (e) => {
           if (e.total) setPctSubida(Math.round((e.loaded * 100) / e.total));
@@ -151,6 +195,58 @@ export default function AnalisisJornada() {
       setPctSubida(null);
       abortRef.current = null;
     }
+  }
+
+  /**
+   * «Sí, es la misma empresa»: repite la carga bloqueada con la confirmación.
+   *
+   * Camino normal: el servidor conservó el .xlsm de la carga bloqueada, así que
+   * no se vuelve a subir nada (35 MB son ~80 s). Si ese archivo ya caducó
+   * —se guarda unas horas porque trae datos personales— el servidor responde
+   * 410; ahí, si el navegador todavía tiene el archivo elegido, se sube de
+   * nuevo llevando la confirmación que la operadora acaba de dar, en vez de
+   * dejarla sin salida (mismo criterio que aplicar una previsualización).
+   *
+   * Siempre en PREVIEW, aunque la carga detenida fuera un APLICAR: confirmar la
+   * empresa no puede convertirse en escribir sin revisar. Después se aplica con
+   * el botón de siempre.
+   */
+  async function confirmarEmpresa() {
+    if (!cargaId || !canWrite) return;
+    setErrorEmpresa(null); setConfirmandoEmpresa(true);
+    try {
+      const r = await apiConfirmarEmpresaCierre(jornadaId, cargaId);
+      if (r?.id) setCargaId(r.id); else refrescar();
+    } catch (e) {
+      if (e?.response?.status === 410 && archivo) {
+        try {
+          setPctSubida(0); setEnviando(true);
+          const r = await apiCrearCarga(archivo, 'PREVIEW', {
+            jornadaId,
+            confirmarEmpresa: true,
+            onUploadProgress: (ev) => {
+              if (ev.total) setPctSubida(Math.round((ev.loaded * 100) / ev.total));
+            },
+          });
+          setPctSubida(100);
+          setCargaId(r.id);
+        } catch (e2) {
+          setErrorEmpresa(describirError(e2, 'confirmar la empresa'));
+        } finally {
+          setEnviando(false);
+        }
+      } else {
+        setErrorEmpresa(describirError(e, 'confirmar la empresa'));
+      }
+    } finally {
+      setConfirmandoEmpresa(false);
+    }
+  }
+
+  /** «No, me equivoqué de jornada»: no se escribe nada y vuelve al listado. */
+  function rechazarEmpresa() {
+    limpiar();
+    navigate('/jornadas');
   }
 
   if (!jornada) {
@@ -266,7 +362,18 @@ export default function AnalisisJornada() {
             </div>
           )}
 
-          {error && <BannerError error={error} />}
+          {error && (
+            <BannerError
+              error={error}
+              accion={reintento && (
+                <button type="button" className="btn-secondary text-xs whitespace-nowrap"
+                  disabled={enviando}
+                  onClick={() => (reintento === 'aplicar' ? aplicar() : previsualizar())}>
+                  Reintentar
+                </button>
+              )}
+            />
+          )}
         </section>
       )}
 
@@ -315,11 +422,26 @@ export default function AnalisisJornada() {
           )}
 
           {carga.estado === 'BLOQUEADA' && (
-            <BloqueosCarga
-              bloqueos={carga.bloqueos}
-              canWrite={canWrite}
-              onReintentar={archivo && canWrite ? previsualizar : null}
-            />
+            <div className="space-y-4">
+              {bloqueoEmpresa && (
+                <ConfirmarEmpresaCierre
+                  bloqueo={bloqueoEmpresa}
+                  canWrite={canWrite}
+                  confirmando={confirmandoEmpresa || enviando}
+                  error={errorEmpresa}
+                  onConfirmar={confirmarEmpresa}
+                  onCancelar={rechazarEmpresa}
+                />
+              )}
+              {(!bloqueoEmpresa
+                || (Array.isArray(bloqueosRestantes) && bloqueosRestantes.length > 0)) && (
+                <BloqueosCarga
+                  bloqueos={bloqueoEmpresa ? bloqueosRestantes : carga.bloqueos}
+                  canWrite={canWrite}
+                  onReintentar={archivo && canWrite ? previsualizar : null}
+                />
+              )}
+            </div>
           )}
 
           {carga.estado === 'OK' && (
@@ -336,6 +458,14 @@ export default function AnalisisJornada() {
               ) : (
                 <Aviso tono="success" titulo="Cierre aplicado. Los datos ya están en el sistema.">
                   Antes de escribir se guardó un respaldo de la base.
+                </Aviso>
+              )}
+
+              {empresaConfirmadaEnPreview && (
+                <Aviso tono="warning" titulo="Con la empresa confirmada a mano.">
+                  El nombre de empresa del archivo no coincidía con el de esta jornada y alguien
+                  confirmó que eran la misma. Quedó registrado en la auditoría, con los dos
+                  nombres y el usuario que lo confirmó.
                 </Aviso>
               )}
 

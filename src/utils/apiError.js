@@ -81,10 +81,15 @@ export function describirError(e, accion = 'completar la operación') {
         sugerencia: 'Puede que la carga se haya borrado o que el servidor esté en una versión anterior.',
       };
     case 409:
+      // Con el portal preguntando antes de subir (`utils/carrilCarga`), llegar
+      // acá significa que el servidor se ocupó ENTRE esa consulta y la subida:
+      // el archivo viajó y se descartó, nada quedó a medias. La sugerencia no
+      // puede mandar «al historial de abajo»: esta pantalla puede ser la de una
+      // jornada, que no lo tiene.
       return {
         titulo: 'Ya hay una carga en proceso',
         detalle: backend,
-        sugerencia: 'Esperá a que termine la carga en curso —abajo, en el historial, ves cuál es— y volvé a intentarlo.',
+        sugerencia: 'El servidor atiende una carga por vez y otra se le adelantó por segundos. No se guardó nada: esperá a que termine y volvé a intentarlo.',
       };
     case 413:
       return {
