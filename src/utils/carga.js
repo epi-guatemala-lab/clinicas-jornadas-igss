@@ -195,7 +195,12 @@ export const ETIQUETAS_CLAVE = {
   encuestas_ya_estaban: 'Respuestas de encuesta que ya estaban',
   encuestados_totales: 'Respuestas de encuesta del archivo',
   encuestados_sin_asistir: 'Encuestados que no asistieron a la jornada',
-  divergencias_base_resumen: 'Diferencias entre el motor del portal y la hoja «Base Resumen»',
+  // Las dos claves del cotejo cuentan lo MISMO —diferencias sin explicación
+  // entre lo que calculó el portal y lo que trae el archivo— y por eso dicen lo
+  // mismo: la de la raíz del resumen y la que viaja entre los avisos del
+  // proceso. Las que sí tienen una causa conocida no entran en este conteo.
+  divergencias_base_resumen: 'Diferencias sin explicación entre lo que calculó el portal y el archivo',
+  divergencias_vs_base_resumen: 'Diferencias sin explicación entre lo que calculó el portal y el archivo',
   personas_enriquecidas: 'Personas a las que se les rellenó un dato vacío',
   atendidos_rellenados: 'Jornadas a las que se les completó «atendidos» (estaba vacío)',
   pacientes_sin_laboratorio: 'Pacientes del triaje sin resultado de laboratorio',
@@ -203,6 +208,10 @@ export const ETIQUETAS_CLAVE = {
   encuesta_dpi_reasignado_afiliacion:
     'Encuestas cuyo «DPI» era el número de afiliación: se reasignaron a la persona correcta',
   encuesta_duplicada_misma_persona: 'Personas que llenaron la encuesta más de una vez',
+  encuesta_multiples_empresas: 'Empresas distintas mencionadas en las encuestas del archivo',
+  encuesta_dpi_invalido: 'Encuestas descartadas porque el documento de identidad es ilegible',
+  base_resumen_incompleta:
+    'Personas con laboratorio que faltan en la hoja «Base Resumen» del archivo',
   hallazgos_preexistentes_del_maestro:
     'Hallazgos que ya trae el maestro y el archivo del cierre no incluye (se conservan)',
 };

@@ -7,8 +7,9 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { useCargaJob, esFinal } from '../hooks/useCargaJob';
 import { describirError } from '../utils/apiError';
-import { ESTADO_CARGA, fmtBytes, separarBloqueoEmpresa } from '../utils/carga';
+import { ESTADO_CARGA, etiquetaDeClave, fmtBytes, separarBloqueoEmpresa } from '../utils/carga';
 import { avisoSiHayCargaEnCurso } from '../utils/carrilCarga';
+import { leerAvisosProceso, leerCotejo, textoParaReportar } from '../utils/divergencias';
 import { fmtN } from '../utils/format';
 import BloqueosCarga from '../components/cargas/BloqueosCarga';
 import ConfirmarEmpresaCierre from '../components/cargas/ConfirmarEmpresaCierre';
@@ -291,14 +292,17 @@ export default function AnalisisJornada() {
 
       {cierre?.carga_id && <EstadoCierre cierre={cierre} jornada={jornada} />}
 
+      {/* Informativos, no alarmas: acá no hay nada que la operadora pueda hacer
+          —ni siquiera se muestra el formulario de subida—, así que van en azul.
+          El naranja queda reservado para lo que se resuelve apretando algo. */}
       {!tipoValido && (
-        <Aviso tono="warning" titulo="Esta jornada no lleva análisis de cierre">
+        <Aviso tono="info" titulo="Esta jornada no lleva análisis de cierre">
           Es de tipo «{jornada.tipo}»: solo las jornadas de clínica (SIPRESALUD / Clínicas de
           Empresa) generan el archivo de análisis de datos.
         </Aviso>
       )}
       {cancelada && (
-        <Aviso tono="warning" titulo="La jornada está cancelada">
+        <Aviso tono="info" titulo="La jornada está cancelada">
           Una jornada cancelada no admite carga de análisis.
         </Aviso>
       )}
@@ -461,15 +465,25 @@ export default function AnalisisJornada() {
                 </Aviso>
               )}
 
+              {/* Constancia de una decisión que YA se tomó: no queda nada por
+                  hacer, así que es informativa y no una alarma. */}
               {empresaConfirmadaEnPreview && (
-                <Aviso tono="warning" titulo="Con la empresa confirmada a mano.">
+                <Aviso tono="info" titulo="Con la empresa confirmada a mano.">
                   El nombre de empresa del archivo no coincidía con el de esta jornada y alguien
                   confirmó que eran la misma. Quedó registrado en la auditoría, con los dos
                   nombres y el usuario que lo confirmó.
                 </Aviso>
               )}
 
-              {resumenCierre && <ComprobanteCierre r={resumenCierre} aplicado={!esPreview} />}
+              {resumenCierre && (
+                <ComprobanteCierre
+                  r={resumenCierre}
+                  aplicado={!esPreview}
+                  jornadaCodigo={jornada.codigo}
+                  cargaId={carga.id}
+                  archivo={carga.archivo_nombre || archivo?.name || null}
+                />
+              )}
 
               <ConflictosCarga conflictos={carga.conflictos} aplicado={!esPreview} />
 
@@ -563,7 +577,9 @@ function Kpi({ etiqueta, valor }) {
 }
 
 /** Comprobante específico del cierre: el universo de la jornada. */
-function ComprobanteCierre({ r, aplicado }) {
+function ComprobanteCierre({ r, aplicado, jornadaCodigo, cargaId, archivo }) {
+  const cotejo = useMemo(() => leerCotejo(r), [r]);
+  const avisos = useMemo(() => leerAvisosProceso(r, etiquetaDeClave, aplicado), [r, aplicado]);
   const filas = [
     ['Pacientes con triaje (hoja «Pacientes»)', r.pacientes_triaje],
     ['Con laboratorio (hoja «Base Extraída»)', r.con_laboratorio],
@@ -575,8 +591,6 @@ function ComprobanteCierre({ r, aplicado }) {
     ['Encuestas importadas (incluye no asistentes)', r.encuestas_insertadas],
     ['Encuestados que no asistieron', r.encuestados_sin_asistir],
   ];
-  const defectos = Object.entries(r.defectos || {}).filter(([, v]) => v);
-  const avisos = (r.avisos_base_resumen || []).slice(0, 10);
 
   return (
     <div className="space-y-3">
@@ -608,52 +622,305 @@ function ComprobanteCierre({ r, aplicado }) {
         </div>
       )}
 
-      {avisos.length > 0 && (
-        <div className="rounded-lg border border-warning/40 bg-warning-soft/40 p-3 text-sm space-y-1">
-          <b className="text-warning">
-            El motor del portal calculó {avisos.length}
-            {r.divergencias_base_resumen > avisos.length
-              ? ` de ${fmtN(r.divergencias_base_resumen)} ` : ' '}
-            diferencia(s) contra la hoja «Base Resumen» del archivo
+      <CotejoConElArchivo
+        cotejo={cotejo} aplicado={aplicado}
+        jornadaCodigo={jornadaCodigo} cargaId={cargaId} archivo={archivo}
+      />
+
+      <AvisosDelProceso avisos={avisos} aplicado={aplicado} />
+    </div>
+  );
+}
+
+/**
+ * Cómo le fue al portal comprobando su propio cálculo contra el archivo.
+ *
+ * Tres cajas, en este orden y con este color, porque el color significa UNA
+ * cosa: qué tiene que hacer ella.
+ *
+ *   VERDE   → lo que se verificó bien. Va primero: es la mayoría abrumadora
+ *             (2,873 de 2,877 en la carga que originó este rediseño) y antes no
+ *             se mostraba nunca, así que una validación exitosa se leía como
+ *             una alarma de seis renglones.
+ *   AZUL    → diferencias con una causa que el equipo ya entendió. No hay nada
+ *             que corregir; se dice explícitamente que puede aplicar y que no
+ *             tiene que avisar nada. Informativo, nunca naranja.
+ *   NARANJA → lo único sin explicación. Es naranja porque acá SÍ hay algo que
+ *             ella puede apretar: el botón que copia el detalle para el equipo
+ *             técnico. Si esto no aparece, no hay nada que reportar.
+ *
+ * Los números salen todos del cotejo que manda el servidor. Ninguno se calcula
+ * ni se estima acá.
+ */
+function CotejoConElArchivo({ cotejo, aplicado, jornadaCodigo, cargaId, archivo }) {
+  if (!cotejo) return null;
+  // Se decide con los DOS números que la frase imprime, no con las cubetas de
+  // al lado: así la oración no puede contradecir a los números que tiene
+  // pegados. Si el servidor mandara un bloque descuadrado, se cae en la forma
+  // «X de Y», que sigue siendo cierta, en vez de afirmar un «coinciden todos».
+  const todoCoincide = cotejo.coinciden != null && cotejo.coinciden >= cotejo.comparaciones;
+
+  return (
+    <section className="space-y-2">
+      {/* No hubo ni una celda que comparar. Se dice en una línea neutra:
+          callarlo hacía que «no hubo verificación» se viera igual que «la
+          verificación salió perfecta», que son lo contrario.
+          El texto NO afirma por qué —puede ser que el archivo no trajera la
+          hoja, que ninguna fila cruzara, o que el servidor mandara el bloque de
+          otra forma—, porque desde acá no se puede saber cuál de las tres fue y
+          adivinar mal es peor que no decirlo. */}
+      {cotejo.nadaQueCotejar && (
+        <div className="rounded-lg border border-line bg-sunken/50 p-3 text-sm">
+          <b className="text-fg">Esta vez el portal no pudo compararse contra el archivo.</b>{' '}
+          <span className="text-fg-muted">
+            Los datos entran igual —el portal los calcula de los resultados de laboratorio, no de
+            la hoja «Base Resumen» del Excel—, pero esta carga no lleva la comprobación de que
+            los dos den lo mismo.
+          </span>
+        </div>
+      )}
+
+      {cotejo.completo && (
+        <div className="rounded-lg border border-success/40 bg-success-soft/40 p-3 text-sm">
+          <b className="text-success">
+            {todoCoincide
+              ? `Comprobación con el archivo: coinciden los ${fmtN(cotejo.comparaciones)} valores`
+              : `Comprobación con el archivo: ${fmtN(cotejo.coinciden)} de `
+                + `${fmtN(cotejo.comparaciones)} valores coinciden`}
+            {cotejo.porcentaje ? ` (${cotejo.porcentaje})` : ''}.
           </b>
-          <p className="text-xs text-fg-muted">
-            Los datos guardados son los del MOTOR DEL PORTAL. Las diferencias más comunes son
-            un archivo sin recalcular o un umbral clínico que Sipresalud cambió en el Excel —
-            si es eso, avisá al equipo técnico para actualizar el motor.
+          <p className="mt-1 text-xs text-fg-muted">
+            El portal recalculó los resultados
+            {cotejo.personas ? ` de ${fmtN(cotejo.personas)} personas` : ''}
+            {cotejo.campos ? `, ${fmtN(cotejo.campos)} columnas cada una,` : ''}
+            {' '}y los comparó uno por uno con lo que trae el archivo. Lo que se guarda es
+            siempre lo que calculó el portal.
           </p>
-          <ul className="text-xs text-fg-muted list-disc pl-4">
-            {avisos.slice(0, 5).map((a, i) => (
-              <li key={i}>{a.dpi} · {a.campo}: archivo «{a.en_archivo}» vs calculado «{a.calculado_portal}»</li>
+        </div>
+      )}
+
+      {cotejo.explicadasTotal > 0 && (
+        <div className="rounded-lg border border-info/40 bg-info-soft/30 p-3 text-sm space-y-2">
+          <div>
+            <b className="text-info">
+              {cotejo.explicadasTotal === 1
+                ? 'Un valor se calculó distinto'
+                : `${fmtN(cotejo.explicadasTotal)} valores se calcularon distinto`}
+              {cotejo.explicadas.length > 1
+                ? ', por motivos ya conocidos.' : ', por un motivo ya conocido.'}
+            </b>{' '}
+            <span className="text-fg-muted">
+              {/* Cuando además hay algo sin explicación, la caja naranja de
+                  abajo ya dice que igual puede aplicar: repetirlo acá deja dos
+                  «podés aplicar» seguidos que se leen como duda. */}
+              {aplicado || cotejo.hayQueReportar
+                ? 'No hay nada que corregir.'
+                : 'No hay nada que corregir y podés aplicar la carga.'}
+            </span>
+          </div>
+          {cotejo.explicadas.length > 0 && (
+            <ul className="space-y-1.5 text-xs text-fg-muted">
+              {cotejo.explicadas.map((e) => (
+                <li key={e.causa} className="border-l-2 border-info/40 pl-2">
+                  <b className="text-fg tabular-nums">
+                    {fmtN(e.total)} {e.total === 1 ? 'caso' : 'casos'}
+                  </b>
+                  {' · '}
+                  <b className="text-fg">
+                    {e.titulo || 'diferencia con una causa ya identificada'}
+                  </b>
+                  {e.explicacion && <div className="mt-0.5">{e.explicacion}</div>}
+                  {e.campos.length > 0 && (
+                    <div className="mt-0.5 text-fg-subtle">
+                      {e.campos.length === 1 ? 'Columna: ' : 'Columnas: '}
+                      {/* Con una sola columna el número ya se dijo dos renglones
+                          arriba («4 casos»): repetirlo es el ruido numérico que
+                          este rediseño vino a sacar. */}
+                      {e.campos.length === 1
+                        ? e.campos[0].campo
+                        : e.campos.map((c) => `${c.campo} (${fmtN(c.total)})`).join(' · ')}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-xs text-fg-muted">
+            {cotejo.hayQueReportar
+              ? 'Estas no hace falta que las avises.'
+              : 'No hace falta que avises nada.'}
+          </p>
+        </div>
+      )}
+
+      {cotejo.hayQueReportar && (
+        <DiferenciasSinExplicacion
+          cotejo={cotejo} aplicado={aplicado}
+          jornadaCodigo={jornadaCodigo} cargaId={cargaId} archivo={archivo}
+        />
+      )}
+    </section>
+  );
+}
+
+/**
+ * Lo único del cotejo que merece la atención de alguien: valores que no
+ * coinciden y para los que el motor no tiene una causa identificada.
+ *
+ * El texto explicativo lo escribe el SERVIDOR (`nota`): es el que sabe qué
+ * comparó. Antes la pantalla lo descartaba y escribía uno propio, peor, así que
+ * había dos textos para lo mismo y ganaba el peor.
+ */
+function DiferenciasSinExplicacion({ cotejo, aplicado, jornadaCodigo, cargaId, archivo }) {
+  const [copiado, setCopiado] = useState(false);
+  const [falloCopiar, setFalloCopiar] = useState(false);
+  const reporte = useMemo(
+    () => textoParaReportar({ jornada: jornadaCodigo, cargaId, archivo, cotejo }),
+    [jornadaCodigo, cargaId, archivo, cotejo]);
+
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(reporte);
+      setCopiado(true); setFalloCopiar(false);
+      setTimeout(() => setCopiado(false), 4000);
+    } catch {
+      // Sin portapapeles (navegador viejo o página sin HTTPS): se abre el texto
+      // para que lo seleccione a mano en vez de dejarla sin forma de reportar.
+      setFalloCopiar(true);
+    }
+  }
+
+  const n = cotejo.sinExplicacion;
+  // El conteo por columna existe para UNA cosa: ser el total completo cuando la
+  // muestra de ejemplos viene topada, o repartir el total entre varias columnas.
+  // Con una sola columna y la muestra entera repite exactamente lo que dicen los
+  // ejemplos de abajo, y dos listas iguales seguidas se leen como dos problemas.
+  const muestraPorCampo = cotejo.porCampo.length > 0
+    && (cotejo.ejemplosNoListados > 0 || cotejo.porCampo.length > 1);
+  return (
+    <div className="rounded-lg border border-warning/50 bg-warning-soft/40 p-3 text-sm space-y-2">
+      <b className="text-warning">
+        {n === 1
+          ? 'Un valor no coincide con el archivo y el portal no sabe por qué.'
+          : `${fmtN(n)} valores no coinciden con el archivo y el portal no sabe por qué.`}
+      </b>
+      <p className="text-xs text-fg-muted">
+        {cotejo.nota
+          || ('Lo que se guarda es lo que calculó el portal, así que la carga está bien hecha y '
+            + 'no hay nada que corregir en el archivo. Pasale este detalle al equipo técnico.')}
+      </p>
+
+      {/* Sin este encabezado la lista quedaba colgando debajo del párrafo, sin
+          decir qué se está contando ni que este conteo sí es el total. */}
+      {muestraPorCampo && (
+        <div className="text-xs text-fg-muted space-y-1">
+          <div className="text-fg-subtle">En qué columnas, y cuántas en cada una:</div>
+          <ul className="list-disc pl-4">
+            {cotejo.porCampo.map((c) => (
+              <li key={c.campo}>
+                {c.campo}: <b className="tabular-nums">{fmtN(c.total)}</b>{' '}
+                {c.total === 1 ? 'caso' : 'casos'}
+              </li>
             ))}
           </ul>
         </div>
       )}
 
-      {defectos.length > 0 && (
-        <details className="text-xs text-fg-muted">
-          <summary className="cursor-pointer">
-            Detalle del proceso ({defectos.length} avisos)
-          </summary>
-          <ul className="list-disc pl-4 mt-1">
-            {defectos.map(([k, v]) => (
-              <li key={k}>{ETIQUETAS_DEFECTOS[k] || k}: {fmtN(v)}</li>
+      {cotejo.ejemplos.length > 0 && (
+        <div className="text-xs text-fg-muted space-y-1">
+          <div className="text-fg-subtle">Así se ven las diferencias:</div>
+          <ul className="list-disc pl-4">
+            {cotejo.ejemplos.map((g) => (
+              <li key={g.id}>
+                {g.campo}: el archivo dice «{g.enArchivo}» y el portal calculó «{g.calculado}»
+                {' '}— {fmtN(g.casos)} {g.casos === 1 ? 'caso' : 'casos'}
+              </li>
             ))}
           </ul>
-        </details>
+          {/* El encabezado anunciaba 6 y la lista mostraba 5: contaba y no le
+              cuadraba. Lo que falta se dice, no se recorta en silencio.
+              El paréntesis solo se promete si la lista por columna está: en una
+              carga guardada por el backend viejo ese conteo no viaja, y la
+              frase mandaba a buscar una tabla que no estaba en la pantalla. */}
+          {cotejo.ejemplosNoListados > 0 && (
+            <div>
+              {cotejo.ejemplosNoListados === 1
+                ? 'y 1 caso más que no se lista acá'
+                : `y ${fmtN(cotejo.ejemplosNoListados)} casos más que no se listan acá`}
+              {muestraPorCampo ? ' (el conteo por columna sí está completo).' : '.'}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className="btn-secondary text-xs" onClick={copiar}>
+          {copiado ? 'Copiado ✓' : 'Copiar el detalle para el equipo técnico'}
+        </button>
+        <span className="text-xs text-fg-muted">
+          {aplicado
+            ? 'Los datos ya entraron: esto es para que el equipo revise el motor.'
+            : 'Podés aplicar igual: esto no cambia lo que se guarda.'}
+        </span>
+      </div>
+      {falloCopiar && (
+        <textarea
+          className="input font-mono text-[11px] h-32" readOnly value={reporte}
+          onFocus={(e) => e.target.select()}
+        />
       )}
     </div>
   );
 }
 
-const ETIQUETAS_DEFECTOS = {
-  encuesta_dpi_reasignado_afiliacion: 'Encuestas con la afiliación escrita en el campo DPI (reasignadas)',
-  encuesta_duplicada_misma_persona: 'Personas que llenaron la encuesta dos veces',
-  atendidos_rellenados: 'Se completó «atendidos» de la jornada (estaba vacío)',
-  pacientes_sin_laboratorio: 'Pacientes del triaje sin laboratorio',
-  pacientes_sin_triaje: 'Pacientes con laboratorio pero sin triaje',
-  divergencias_vs_base_resumen: 'Diferencias contra la hoja «Base Resumen»',
-  hallazgos_preexistentes_del_maestro: 'Hallazgos previos del maestro conservados',
-};
+/**
+ * Cómo salió el proceso: notas que no son diferencias con el archivo.
+ *
+ * Se separan por lo que exigen de ella, no por de dónde salen. Ninguna es
+ * naranja porque ninguna se resuelve apretando algo en esta pantalla; las que
+ * conviene mirar antes de aplicar van abiertas y las demás, plegadas.
+ */
+function AvisosDelProceso({ avisos, aplicado }) {
+  const { revisar, info } = avisos;
+  if (!revisar.length && !info.length) return null;
+  // «antes de aplicar» solo mientras aplicar siga siendo algo que puede pasar:
+  // en el comprobante de una carga YA aplicada mandaba a hacer a tiempo algo
+  // que ya se hizo, que es la clase de instrucción que enseña a no leer.
+  const cuando = aplicado ? '' : ' antes de aplicar';
+  return (
+    <section className="space-y-2">
+      {revisar.length > 0 && (
+        <div className="rounded-lg border border-info/40 bg-info-soft/30 p-3 text-sm space-y-1">
+          <b className="text-info">
+            {revisar.length === 1
+              ? `Un aviso del proceso, conviene mirarlo${cuando}`
+              : `${revisar.length} avisos del proceso, conviene mirarlos${cuando}`}
+          </b>
+          <ul className="space-y-1.5 text-xs text-fg-muted">
+            {revisar.map((a) => (
+              <li key={a.clave} className="border-l-2 border-info/40 pl-2">
+                <span className="text-fg">{a.texto}</span>
+                {a.queHacer && <div className="mt-0.5">{a.queHacer}</div>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {info.length > 0 && (
+        <details className="text-xs text-fg-muted">
+          <summary className="cursor-pointer">
+            Cómo salió el proceso ({info.length}{' '}
+            {info.length === 1 ? 'aviso' : 'avisos'}, ninguno pide nada)
+          </summary>
+          <ul className="list-disc pl-4 mt-1 space-y-1">
+            {info.map((a) => <li key={a.clave}>{a.texto}</li>)}
+          </ul>
+        </details>
+      )}
+    </section>
+  );
+}
 
 /** Listado de colaboradores con hallazgos para referir (imprimible). */
 function Referidos({ jornadaId, puedeVer }) {
@@ -760,6 +1027,20 @@ function Referidos({ jornadaId, puedeVer }) {
   );
 }
 
+/*
+ * El color dice UNA sola cosa: qué tiene que hacer la operadora.
+ *
+ *   rojo (BannerError / carga fallida) → falló y no se guardó nada.
+ *   warning  → solo si hay un botón que ella puede apretar para resolverlo
+ *              (un bloqueo, confirmar la empresa, copiar el detalle para el
+ *              equipo técnico). Si no hay acción suya, NO es warning. Nunca.
+ *   info     → informativo, y abre diciéndole que puede aplicar.
+ *   success  → lo que se verificó bien.
+ *
+ * Se llegó a esta regla porque el mismo naranja hacía tres trabajos a la vez
+ * —«la carga se detuvo en seco», «tenés que decidir vos» y «dos sistemas
+ * escriben lo mismo distinto»— y entrenaba a ignorarlo.
+ */
 const TONOS = {
   info: { caja: 'border-info/40 bg-info-soft/40', titulo: 'text-info' },
   warning: { caja: 'border-warning/40 bg-warning-soft/40', titulo: 'text-warning' },
