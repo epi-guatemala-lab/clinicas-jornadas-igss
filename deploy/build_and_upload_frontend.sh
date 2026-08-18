@@ -3,8 +3,15 @@
 
 set -euo pipefail
 
-SERVER="${SERVER:-root@100.119.44.71}"
-SSHPASS="${SSHPASS:-***CREDENCIAL-ELIMINADA-DEL-HISTORIAL***\$%}"
+# Este repo es PUBLICO: nunca poner acá una contraseña, una IP interna ni un
+# host real, ni siquiera como valor por defecto. Se pasan por variable de
+# entorno al invocar, y el script falla si faltan en vez de traer un default.
+#
+#   SERVER=root@<host> SSHPASS='<clave>' ./deploy/build_and_upload_frontend.sh
+#
+# (Una credencial de producción vivió acá desde may-2026 hasta ago-2026.)
+: "${SERVER:?falta SERVER — ej: SERVER=root@mi-host}"
+: "${SSHPASS:?falta SSHPASS — pasala por entorno, nunca la escribas en el repo}"
 LOCAL_FRONT="$(cd "$(dirname "$0")/.." && pwd)"
 
 echo "▶ Build con base /clinicas-jornadas/ + API en /jornadas/api"
