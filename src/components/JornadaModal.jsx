@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   apiGetJornada, apiCancelarJornada, apiCerrarJornada, apiReprogramarJornada,
   apiSetMaterial, apiSetCharlas, apiCatalogoCharlas, apiListPersonal,
-  apiGetCierreJornada,
+  apiGetCierreJornada, apiAmarrarClinica,
 } from '../api/endpoints';
 import { SEMAFORO_BG, TIPO_LABEL, ESTADO_LABEL, fmtN, fmtQ, fmtPct } from '../utils/format';
 import { useAuth } from '../hooks/useAuth';
@@ -37,6 +37,7 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
   const [charlasEdit, setCharlasEdit] = useState([]);
   const [savingMat, setSavingMat] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [amarrando, setAmarrando] = useState(false);
 
   const [cierre, setCierre] = useState(null);
 
@@ -125,16 +126,29 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
     if (form.atendidos == null || form.atendidos === '') {
       alert('Atendidos requerido'); return;
     }
+    // Cierre manual (jornadas sin archivo: talleres/webinars). Ya NO se piden
+    // viáticos acá: el monto entra después, por persona, desde su propio flujo,
+    // y el backend ignora `viaticos_real` en el cierre.
     const body = {
       atendidos: Number(form.atendidos),
       afiliados_atendidos: form.afiliados_atendidos !== '' ? Number(form.afiliados_atendidos) : null,
       kits_consumidos: form.kits_consumidos !== '' ? Number(form.kits_consumidos) : null,
-      viaticos_real: form.viaticos_real !== '' ? Number(form.viaticos_real) : null,
       notas: form.notas || null,
       confirmar_amarre_clinica: !!form.confirmar_amarre_clinica,
     };
     const upd = await apiCerrarJornada(j.id, body);
     setJ(upd); setMode('view'); onChanged?.();
+  }
+  async function doAmarrar() {
+    // Rescate: amarra la clínica de una inauguración que se cerró sin confirmarlo
+    // (/cerrar ya da 409). Idempotente y conserva la trazabilidad a la jornada.
+    setAmarrando(true);
+    try {
+      const upd = await apiAmarrarClinica(j.id);
+      setJ(upd); onChanged?.();
+    } catch (e) {
+      alert(e.response?.data?.detail || 'No se pudo amarrar la clínica');
+    } finally { setAmarrando(false); }
   }
 
   return (
@@ -177,6 +191,29 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
             )}
           </Field>
         </div>
+
+        {/* Rescate del amarre: una inauguración que se cerró SIN confirmar el
+            amarre queda con la clínica sin registrar, y /cerrar ya no se puede
+            repetir (409). Este botón la amarra aparte, en cualquier estado y
+            conservando la trazabilidad a la jornada de origen (que el arreglo a
+            mano de la empresa perdía). Solo se muestra si la empresa aún no
+            figura amarrada. */}
+        {j.inaugura_clinica && j.empresa_id && !j.empresa_clinica_amarrada
+          && j.estado === 'CERRADA' && canWrite && (
+          <div className="rounded-lg border border-warning/50 bg-warning-soft/40 p-3 space-y-2 text-sm">
+            <div className="font-semibold text-warning">
+              La clínica de esta inauguración no quedó amarrada
+            </div>
+            <p className="text-fg-muted text-xs">
+              La jornada inauguró una clínica permanente en «{j.empresa_nombre}», pero la empresa
+              no figura como amarrada: se cerró sin confirmarlo. Confirmalo acá y quedará contada
+              en la meta institucional, con la trazabilidad a esta jornada.
+            </p>
+            <button className="btn-primary text-xs" onClick={doAmarrar} disabled={amarrando}>
+              {amarrando ? 'Amarrando…' : 'Confirmar amarre de clínica'}
+            </button>
+          </div>
+        )}
 
         {/* Charlas de educación en salud — MÚLTIPLES (D1/D4) */}
         <div>
@@ -310,6 +347,12 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
         {mode === 'close' && (
           <div className="bg-success-soft border border-success/30 rounded p-3 space-y-2">
             <h4 className="font-semibold text-success">Cerrar jornada con métricas</h4>
+            {/* Este cierre manual es para jornadas SIN archivo (talleres, webinars).
+                Las jornadas de clínica se cierran solas al aplicar el análisis. */}
+            <p className="text-xs text-fg-muted">
+              Para jornadas con archivo de cierre, cerrá desde «Análisis de cierre»: los atendidos
+              y los kits los toma del archivo y la jornada se cierra al aplicarlo.
+            </p>
             <div className="grid grid-cols-2 gap-2">
               <div><label className="label">Atendidos *</label>
                 <input type="number" className="input" min="0"
@@ -323,17 +366,27 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
                 <input type="number" className="input" min="0"
                   value={form.kits_consumidos ?? ''}
                   onChange={(e) => setForm({ ...form, kits_consumidos: e.target.value })} /></div>
-              <div><label className="label">Viáticos reales (Q)</label>
-                <input type="number" className="input" step="0.01" min="0"
-                  value={form.viaticos_real ?? ''}
-                  onChange={(e) => setForm({ ...form, viaticos_real: e.target.value })} /></div>
             </div>
-            {j.inaugura_clinica && (
-              <label className="flex items-center gap-2 text-sm mt-1">
-                <input type="checkbox" checked={!!form.confirmar_amarre_clinica}
-                  onChange={(e) => setForm({ ...form, confirmar_amarre_clinica: e.target.checked })} />
-                Confirmar amarre de clínica permanente en esta empresa
-              </label>
+            {/* Amarre prominente y tildado por defecto (ver el default al abrir
+                este modo). Solo con empresa: sin ella la confirmación no haría
+                nada y se descartaría en silencio. */}
+            {j.inaugura_clinica && j.empresa_id && (
+              <div className="rounded-lg border border-warning/50 bg-warning-soft/40 p-2 mt-1 space-y-1">
+                <label className="flex items-start gap-2 text-sm font-medium text-fg">
+                  <input type="checkbox" className="mt-0.5" checked={!!form.confirmar_amarre_clinica}
+                    onChange={(e) => setForm({ ...form, confirmar_amarre_clinica: e.target.checked })} />
+                  <span>Confirmar el amarre de la clínica permanente en esta empresa</span>
+                </label>
+                <p className="text-[11px] text-fg-muted pl-6">
+                  Viene marcado a propósito: si cerrás sin confirmarlo, la clínica no queda contada
+                  y corregirlo después es a mano. Destildalo solo si de verdad no se inauguró.
+                </p>
+              </div>
+            )}
+            {j.inaugura_clinica && !j.empresa_id && (
+              <p className="text-[11px] text-warning mt-1">
+                Inaugura una clínica pero no tiene empresa asignada: no hay a quién amarrarla.
+              </p>
             )}
             <textarea className="input" rows="2" placeholder="Notas del cierre (opcional)"
               value={form.notas ?? ''}
@@ -388,7 +441,13 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
               <>
                 <button className="btn-secondary" onClick={() => { setForm({}); setMode('reprogramar'); }}>Reprogramar</button>
                 <button className="btn-danger" onClick={() => { setForm({}); setMode('cancel'); }}>Cancelar</button>
-                <button className="btn-primary" onClick={() => { setForm({}); setMode('close'); }}>Cerrar con métricas</button>
+                <button className="btn-primary"
+                  onClick={() => {
+                    // Amarre tildado por defecto en inauguraciones con empresa:
+                    // el descuido caro es cerrar sin amarrar la clínica.
+                    setForm({ confirmar_amarre_clinica: Boolean(j.inaugura_clinica && j.empresa_id) });
+                    setMode('close');
+                  }}>Cerrar con métricas</button>
               </>
             )}
           </div>

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  apiAplicarCarga, apiConfirmarEmpresaCierre, apiCrearCarga, apiGetCierreJornada,
-  apiGetJornada, apiGetReferidos,
+  apiAplicarCarga, apiCerrarJornada, apiConfirmarEmpresaCierre, apiCrearCarga,
+  apiGetCierreJornada, apiGetJornada, apiGetReferidos,
 } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
 import { useCargaJob, esFinal } from '../hooks/useCargaJob';
@@ -51,6 +51,22 @@ export default function AnalisisJornada() {
   const [reintento, setReintento] = useState(null);   // 'previsualizar' | 'aplicar' | null
   const [confirmandoEmpresa, setConfirmandoEmpresa] = useState(false);
   const [errorEmpresa, setErrorEmpresa] = useState(null);
+  // Aplicar-y-cerrar (ago-2026): cerrar la jornada dejó de ser un paso aparte.
+  // Al aplicar el análisis se cierra en la misma acción; el panel de abajo es la
+  // ÚNICA confirmación. atendidos y kits los deriva el backend del propio
+  // análisis (ver JornadaCierreIn); el único dato manual es afiliados_atendidos.
+  const [mostrandoConfirmacion, setMostrandoConfirmacion] = useState(false);
+  const [formCierre, setFormCierre] = useState({
+    afiliados_atendidos: '', notas: '', confirmar_amarre_clinica: false,
+  });
+  // Datos del cierre capturados al confirmar, a la espera de que el APLICAR
+  // termine en el servidor: recién ahí (carga OK y ya no PREVIEW) se cierra.
+  const [pendienteCierre, setPendienteCierre] = useState(null);
+  const [cerrando, setCerrando] = useState(false);
+  const [errorCierre, setErrorCierre] = useState(null);   // separado del error del apply
+  const [cierreOk, setCierreOk] = useState(false);
+  // Que el cierre se dispare UNA sola vez por cada apply (el sondeo re-renderiza).
+  const cierreDisparado = useRef(false);
   const inputRef = useRef(null);
   const abortRef = useRef(null);
 
@@ -91,6 +107,10 @@ export default function AnalisisJornada() {
     abortRef.current = null;
     setArchivo(null); setCargaId(null); setPctSubida(null);
     setEnviando(false); setError(null); setErrorEmpresa(null); setReintento(null);
+    setMostrandoConfirmacion(false); setPendienteCierre(null);
+    setCerrando(false); setErrorCierre(null); setCierreOk(false);
+    setFormCierre({ afiliados_atendidos: '', notas: '', confirmar_amarre_clinica: false });
+    cierreDisparado.current = false;
     if (inputRef.current) inputRef.current.value = '';
   }, []);
 
@@ -158,11 +178,10 @@ export default function AnalisisJornada() {
 
   async function aplicar() {
     if (!cargaId) return;
-    const ok = window.confirm(
-      'Vas a aplicar la carga del análisis de cierre: los datos entran a la base y quedan '
-      + 'visibles para todos.\n\nMientras se aplica, el portal queda en solo lectura unos segundos.\n\n¿Confirmás?',
-    );
-    if (!ok) return;
+    // Sin window.confirm: la confirmación es ahora el panel «Aplicar y cerrar la
+    // jornada» (más rico y con el dato manual de afiliados). Acá solo se aplica.
+    // Re-armamos el disparo del cierre por si esto es un reintento del apply.
+    cierreDisparado.current = false;
     setError(null); setReintento(null); setEnviando(true); setPctSubida(null);
     // Igual que al previsualizar: si el servidor está ocupado, ni siquiera
     // empezamos (aplicar puede terminar reenviando el archivo si el del
@@ -196,6 +215,104 @@ export default function AnalisisJornada() {
       setPctSubida(null);
       abortRef.current = null;
     }
+  }
+
+  /**
+   * Cierra la jornada tras un apply exitoso. Solo manda el dato que el sistema
+   * no puede saber solo (afiliados_atendidos) + notas + amarre; atendidos y kits
+   * los deriva el backend del análisis que se acaba de aplicar. El error de este
+   * paso se maneja APARTE del error del apply: si esto falla, los datos clínicos
+   * YA entraron —solo faltó marcar la jornada como cerrada— y se puede reintentar.
+   */
+  const ejecutarCierre = useCallback(async (payload) => {
+    setCerrando(true); setErrorCierre(null);
+    // `atendidos` se MANDA explícito (no se deja derivar en el backend) para que
+    // lo que se guarda sea exactamente el conteo que la operadora vio y confirmó
+    // en el panel. Si el backend cayera a `jornadas.atendidos` y ese quedó de un
+    // apply anterior más chico (el ETL no refresca un atendidos ya puesto),
+    // guardaría un número distinto del confirmado. Solo se incluye si es número.
+    const body = {
+      afiliados_atendidos: payload.afiliados_atendidos,
+      notas: payload.notas,
+      confirmar_amarre_clinica: payload.confirmar_amarre_clinica,
+    };
+    if (typeof payload.atendidos === 'number') body.atendidos = payload.atendidos;
+    try {
+      const upd = await apiCerrarJornada(jornadaId, body);
+      setJornada(upd);
+      setPendienteCierre(null);
+      setCierreOk(true);
+      setCierreToken((t) => t + 1);
+    } catch (e) {
+      // 409 = la jornada YA estaba cerrada (una carrera, o los labs que llegaron
+      // días después re-dispararon el cierre). No es un fallo: los datos clínicos
+      // entraron y el objetivo —jornada cerrada— ya está cumplido. Se muestra como
+      // hecho y se refresca la ficha, en vez del banner rojo con «Reintentar» que
+      // volvería a dar 409 para siempre.
+      if (e?.response?.status === 409) {
+        setPendienteCierre(null);
+        setCierreOk(true);
+        setCierreToken((t) => t + 1);
+        apiGetJornada(jornadaId).then(setJornada).catch(() => {});
+      } else {
+        setErrorCierre(describirError(e, 'cerrar la jornada'));
+      }
+    } finally {
+      setCerrando(false);
+    }
+  }, [jornadaId]);
+
+  // Cuando el APLICAR termina bien (carga OK y ya no es PREVIEW) y hay un cierre
+  // pendiente, se cierra la jornada en el acto. Si el apply NO llega a buen
+  // puerto (falla o queda bloqueado), se suelta el pendiente: no se cierra sobre
+  // datos que no entraron —el error del apply se muestra por su cuenta—.
+  useEffect(() => {
+    if (!pendienteCierre || !carga) return;
+    if (carga.estado === 'OK' && carga.modo !== 'PREVIEW') {
+      if (cierreDisparado.current) return;
+      cierreDisparado.current = true;
+      ejecutarCierre(pendienteCierre);
+    } else if (carga.estado === 'FALLIDA' || carga.estado === 'BLOQUEADA') {
+      setPendienteCierre(null);
+      cierreDisparado.current = false;
+    }
+  }, [carga, pendienteCierre, ejecutarCierre]);
+
+  /**
+   * «Aplicar y cerrar la jornada»: confirma el panel. Captura el único dato
+   * manual (afiliados) + notas + amarre, y lanza el apply. El cierre en sí lo
+   * dispara el efecto de arriba cuando el apply termina OK; acá no se cierra
+   * todavía porque el apply es asíncrono (corre en el worker del servidor).
+   */
+  function confirmarAplicarYCerrar() {
+    const payload = {
+      // El conteo que el panel MOSTRÓ y la operadora confirmó: se manda tal cual
+      // para que lo guardado sea ese número (ver ejecutarCierre).
+      atendidos: typeof atendidosArchivo === 'number' ? atendidosArchivo : null,
+      afiliados_atendidos: formCierre.afiliados_atendidos !== ''
+        ? Number(formCierre.afiliados_atendidos) : null,
+      notas: formCierre.notas?.trim() ? formCierre.notas.trim() : null,
+      confirmar_amarre_clinica: !!formCierre.confirmar_amarre_clinica,
+    };
+    setPendienteCierre(payload);
+    setCierreOk(false); setErrorCierre(null);
+    cierreDisparado.current = false;
+    setMostrandoConfirmacion(false);
+    aplicar();
+  }
+
+  /**
+   * Jornada YA cerrada (los labs suelen llegar días después): re-aplicar el
+   * archivo solo actualiza los datos clínicos. NO se dispara el cierre
+   * —`pendienteCierre` queda null—, así el flujo no se pega contra el 409 de
+   * ya-cerrada ni pinta un fallo donde no lo hay.
+   */
+  function confirmarSoloAplicar() {
+    setPendienteCierre(null);
+    setCierreOk(false); setErrorCierre(null);
+    cierreDisparado.current = false;
+    setMostrandoConfirmacion(false);
+    aplicar();
   }
 
   /**
@@ -261,7 +378,15 @@ export default function AnalisisJornada() {
 
   const tipoValido = TIPOS_CON_ANALISIS.includes(jornada.tipo);
   const cancelada = jornada.estado === 'CANCELADA';
+  // Una jornada de clínica se puede re-cargar aunque ya esté CERRADA (los labs
+  // llegan días después). En ese caso NO se vuelve a cerrar: solo se actualizan
+  // los datos clínicos (ver confirmarSoloAplicar / PanelSoloAplicar).
+  const yaCerrada = jornada.estado === 'CERRADA';
   const puedeCargar = canWrite && tipoValido && !cancelada;
+  // Amarre TILDADO por defecto en inauguraciones con empresa: el error caro es
+  // cerrar una inauguración sin amarrar la clínica (queda sin contar y trabada en
+  // 409). Que el default haga lo correcto; saltarlo es un acto deliberado.
+  const amarrePorDefecto = Boolean(jornada.inaugura_clinica && jornada.empresa_id);
 
   const enProceso = carga && !esFinal(carga.estado);
   const estadoBadge = carga ? (ESTADO_CARGA[carga.estado] || { texto: carga.estado, clase: 'badge-neutral' }) : null;
@@ -270,6 +395,14 @@ export default function AnalisisJornada() {
   const puedeAplicar = carga?.estado === 'OK' && esPreview && canWrite
     && !enviando && archivoDisponible;
   const resumenCierre = carga?.resumen?.cierre || null;
+  // El conteo de atendidos NO se hardcodea: sale del comprobante del archivo
+  // (el mismo «universo» que el ETL deja en jornadas.atendidos al aplicar). Si el
+  // comprobante no lo trae —caso típico: re-subir el MISMO archivo devuelve un
+  // NOOP sin `totales`—, se cae a `jornada.atendidos`, que un apply anterior ya
+  // dejó puesto; así el panel no queda en «Calculando…» eterno con el botón
+  // deshabilitado. Si no hay ni uno ni otro, null y el panel lo dice.
+  const atendidosArchivo = resumenCierre?.totales?.personas ?? jornada.atendidos ?? null;
+  const llevaKit = jornada.aplica_kit_lab;
 
   return (
     <div className="space-y-5">
@@ -487,21 +620,96 @@ export default function AnalisisJornada() {
 
               <ConflictosCarga conflictos={carga.conflictos} aplicado={!esPreview} />
 
-              {puedeAplicar && (
+              {puedeAplicar && !mostrandoConfirmacion && (
                 <div className="space-y-2 border-t border-line-subtle pt-3">
                   <div className="flex flex-wrap items-center gap-3">
-                    <button type="button" className="btn-primary" onClick={aplicar} disabled={enviando}>
-                      {enviando ? 'Aplicando…' : 'Aplicar la carga'}
+                    <button type="button" className="btn-primary"
+                      onClick={() => {
+                        setErrorCierre(null); setCierreOk(false);
+                        // Deja el amarre tildado por defecto al abrir el panel de
+                        // una inauguración con empresa (ver amarrePorDefecto).
+                        setFormCierre((f) => ({
+                          ...f,
+                          confirmar_amarre_clinica: amarrePorDefecto ? true : f.confirmar_amarre_clinica,
+                        }));
+                        setMostrandoConfirmacion(true);
+                      }}
+                      disabled={enviando}>
+                      {yaCerrada ? 'Aplicar los datos nuevos' : 'Aplicar y cerrar la jornada'}
                     </button>
                     <button type="button" className="btn-secondary" onClick={limpiar} disabled={enviando}>
                       Descartar
                     </button>
                   </div>
                   <p className="text-xs text-fg-muted max-w-3xl">
-                    Se aplica con el archivo que ya subiste. Mientras se aplica, el portal queda en{' '}
-                    <b>solo lectura</b> unos segundos.
+                    {yaCerrada ? (
+                      <>La jornada <b>ya está cerrada</b>. Al aplicar se actualizan los datos
+                        clínicos (por ejemplo, laboratorios que llegaron días después) sin volver
+                        a cerrarla ni cambiar las métricas del cierre. Mientras se aplica, el portal
+                        queda en <b>solo lectura</b> unos segundos.</>
+                    ) : (
+                      <>Al aplicar el archivo se escriben los datos clínicos <b>y</b> se cierra la
+                        jornada en un solo paso. Mientras se aplica, el portal queda en{' '}
+                        <b>solo lectura</b> unos segundos.</>
+                    )}
                   </p>
                 </div>
+              )}
+
+              {puedeAplicar && mostrandoConfirmacion && (
+                yaCerrada ? (
+                  <PanelSoloAplicar
+                    atendidos={atendidosArchivo}
+                    onConfirmar={confirmarSoloAplicar}
+                    onVolver={() => setMostrandoConfirmacion(false)}
+                  />
+                ) : (
+                  <PanelAplicarYCerrar
+                    atendidos={atendidosArchivo}
+                    llevaKit={llevaKit}
+                    inauguraClinica={jornada.inaugura_clinica}
+                    tieneEmpresa={Boolean(jornada.empresa_id)}
+                    form={formCierre}
+                    setForm={setFormCierre}
+                    onConfirmar={confirmarAplicarYCerrar}
+                    onVolver={() => setMostrandoConfirmacion(false)}
+                  />
+                )
+              )}
+
+              {/* Estado del cierre (segundo paso del «aplicar y cerrar»). Se
+                  maneja aparte del apply: si los datos entraron pero el cierre
+                  falló, se dice con todas las letras y se ofrece reintentar. */}
+              {!esPreview && cerrando && (
+                <div className="rounded-lg border border-info/40 bg-info-soft/30 p-3 text-sm">
+                  <b className="text-info">Cerrando la jornada…</b>{' '}
+                  <span className="text-fg-muted">
+                    Los datos clínicos ya entraron; falta marcar la jornada como cerrada.
+                  </span>
+                </div>
+              )}
+              {!esPreview && cierreOk && (
+                <Aviso tono="success" titulo="Jornada cerrada.">
+                  Los datos clínicos entraron y la jornada quedó cerrada con el conteo del
+                  análisis. Los viáticos se cargan después, por persona, desde su propio flujo.
+                </Aviso>
+              )}
+              {!esPreview && errorCierre && (
+                <BannerError
+                  error={{
+                    titulo: 'Los datos entraron, pero la jornada NO se cerró',
+                    detalle: errorCierre.detalle || errorCierre.titulo,
+                    sugerencia: 'El análisis quedó guardado; solo faltó marcar la jornada como '
+                      + 'cerrada. Podés reintentar el cierre sin volver a subir el archivo.',
+                  }}
+                  accion={pendienteCierre && (
+                    <button type="button" className="btn-secondary text-xs whitespace-nowrap"
+                      disabled={cerrando}
+                      onClick={() => ejecutarCierre(pendienteCierre)}>
+                      Reintentar el cierre
+                    </button>
+                  )}
+                />
               )}
 
               {!esPreview && (
@@ -532,6 +740,156 @@ export default function AnalisisJornada() {
 function VolverJornadas() {
   return (
     <Link to="/jornadas" className="text-sm text-igss-primary hover:underline">← Jornadas</Link>
+  );
+}
+
+/**
+ * Confirmación de «aplicar y cerrar». Junta en una sola pantalla lo que antes
+ * eran dos pasos (aplicar el archivo + cerrar la jornada por el modal).
+ *
+ * atendidos y kits van en SOLO LECTURA porque el sistema ya los sabe: el conteo
+ * sale del comprobante del archivo (no se escribe a mano) y los kits van 1:1 con
+ * los atendidos. El único campo editable es «Afiliados atendidos», que no viene
+ * en el archivo y NO es igual a los atendidos; por eso no se autocompleta. Las
+ * notas quedan por si hace falta dejar constancia de algo. Los viáticos ya no se
+ * piden acá: el monto entra después, por persona, desde su propio flujo.
+ */
+function PanelAplicarYCerrar({
+  atendidos, llevaKit, inauguraClinica, tieneEmpresa, form, setForm, onConfirmar, onVolver,
+}) {
+  const sinConteo = atendidos == null;
+  return (
+    <div className="space-y-3 border-t border-line-subtle pt-3">
+      <div className="rounded-lg border border-info/40 bg-info-soft/30 p-3 space-y-3 text-sm">
+        <div>
+          <b className="text-info">Aplicar y cerrar la jornada</b>
+          <p className="text-fg-muted mt-0.5">
+            Al aplicar el archivo se escriben los datos clínicos y, en la misma acción, se cierra
+            la jornada. Esto es lo que va a quedar registrado:
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="rounded-lg bg-sunken/50 px-3 py-2">
+            <div className="text-xs text-fg-muted">Atendidos</div>
+            <div className="text-lg font-semibold tabular-nums">
+              {sinConteo ? 'Calculando…' : fmtN(atendidos)}
+            </div>
+            <div className="text-[11px] text-fg-subtle">
+              {sinConteo
+                ? 'El comprobante todavía no trae el conteo.'
+                : 'Personas del archivo. No se escribe a mano: lo cuenta el análisis.'}
+            </div>
+          </div>
+          {llevaKit && (
+            <div className="rounded-lg bg-sunken/50 px-3 py-2">
+              <div className="text-xs text-fg-muted">Kits de laboratorio</div>
+              <div className="text-lg font-semibold tabular-nums">
+                {sinConteo ? '—' : fmtN(atendidos)}
+              </div>
+              <div className="text-[11px] text-fg-subtle">
+                Se descuenta 1 kit por persona atendida.
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className="label" htmlFor="cierre_afiliados">Afiliados atendidos (opcional)</label>
+          <input
+            id="cierre_afiliados" type="number" min="0" className="input max-w-[12rem]"
+            value={form.afiliados_atendidos}
+            onChange={(e) => setForm({ ...form, afiliados_atendidos: e.target.value })}
+          />
+          <p className="text-[11px] text-fg-subtle mt-0.5">
+            Cuántos de los atendidos son afiliados titulares IGSS; dejalo vacío si no lo tenés a
+            mano. No es lo mismo que los atendidos: alimenta la meta institucional de afiliados.
+          </p>
+        </div>
+
+        <div>
+          <label className="label" htmlFor="cierre_notas">Notas del cierre (opcional)</label>
+          <textarea
+            id="cierre_notas" rows="2" className="input"
+            value={form.notas}
+            onChange={(e) => setForm({ ...form, notas: e.target.value })}
+          />
+        </div>
+
+        {/* Amarre de clínica: prominente y tildado por defecto (ver
+            amarrePorDefecto). Solo cuando hay empresa a la que amarrar —si no,
+            la confirmación no haría nada y se descartaría en silencio—. */}
+        {inauguraClinica && tieneEmpresa && (
+          <div className="rounded-lg border border-warning/50 bg-warning-soft/40 p-3 space-y-1">
+            <label className="flex items-start gap-2 text-sm font-medium text-fg">
+              <input
+                type="checkbox" className="mt-0.5"
+                checked={!!form.confirmar_amarre_clinica}
+                onChange={(e) => setForm({ ...form, confirmar_amarre_clinica: e.target.checked })}
+              />
+              <span>Confirmar el amarre de la clínica permanente en esta empresa</span>
+            </label>
+            <p className="text-[11px] text-fg-muted pl-6">
+              Esta jornada inaugura una clínica. Si cerrás sin confirmarlo, la clínica no queda
+              registrada en la meta institucional y corregirlo después es a mano. Viene marcado a
+              propósito: destildalo solo si de verdad no se inauguró.
+            </p>
+          </div>
+        )}
+        {inauguraClinica && !tieneEmpresa && (
+          <p className="text-[11px] text-warning">
+            Esta jornada inaugura una clínica pero no tiene empresa asignada, así que no hay a
+            quién amarrarla. Asigná la empresa a la jornada para poder registrar el amarre.
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" className="btn-primary" onClick={onConfirmar} disabled={sinConteo}>
+          Aplicar y cerrar la jornada
+        </button>
+        <button type="button" className="btn-secondary" onClick={onVolver}>
+          Volver
+        </button>
+        <p className="text-xs text-fg-muted">
+          Mientras se aplica, el portal queda en <b>solo lectura</b> unos segundos.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Confirmación para RE-aplicar el archivo a una jornada YA cerrada (los labs
+ * suelen llegar días después del cierre). Solo actualiza los datos clínicos: NO
+ * vuelve a cerrar la jornada ni pide las métricas del cierre (afiliados/amarre ya
+ * se decidieron al cerrar). Sin panel de métricas, entonces, para no sugerir que
+ * algo de eso va a cambiar —y para no dispararse contra el 409 de ya-cerrada—.
+ */
+function PanelSoloAplicar({ atendidos, onConfirmar, onVolver }) {
+  return (
+    <div className="space-y-3 border-t border-line-subtle pt-3">
+      <div className="rounded-lg border border-info/40 bg-info-soft/30 p-3 space-y-2 text-sm">
+        <b className="text-info">Actualizar los datos de una jornada cerrada</b>
+        <p className="text-fg-muted">
+          La jornada ya está cerrada. Al aplicar se <b>reescriben los datos clínicos</b> con lo
+          que trae el archivo (por ejemplo, laboratorios que llegaron después). No se vuelve a
+          cerrar ni se tocan las métricas del cierre
+          {atendidos != null ? <> —los atendidos siguen siendo {fmtN(atendidos)}—</> : null}.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" className="btn-primary" onClick={onConfirmar}>
+          Aplicar los datos nuevos
+        </button>
+        <button type="button" className="btn-secondary" onClick={onVolver}>
+          Volver
+        </button>
+        <p className="text-xs text-fg-muted">
+          Mientras se aplica, el portal queda en <b>solo lectura</b> unos segundos.
+        </p>
+      </div>
+    </div>
   );
 }
 

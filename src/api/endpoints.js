@@ -56,6 +56,11 @@ export const apiUpdateJornada = (id, body) =>
 export const apiCerrarJornada = (id, body) =>
   api.post(`/api/jornadas/${id}/cerrar`, body).then((r) => r.data);
 
+// Rescate del amarre de clínica cuando una inauguración se cerró sin confirmarlo
+// (/cerrar ya devuelve 409). Amarra la empresa en cualquier estado, idempotente.
+export const apiAmarrarClinica = (id) =>
+  api.post(`/api/jornadas/${id}/amarrar-clinica`).then((r) => r.data);
+
 export const apiCancelarJornada = (id, body) =>
   api.post(`/api/jornadas/${id}/cancelar`, body).then((r) => r.data);
 
