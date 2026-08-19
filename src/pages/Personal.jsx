@@ -70,6 +70,10 @@ export default function Personal() {
   // Personal (datos de RRHH/salarios) solo lo edita un admin editor; el resto
   // (sipresalud/ce/gerencia) ve el roster pero no lo modifica. Espeja require_admin_write.
   const canEditPersonal = canWrite && user.rol === 'admin';
+  // El salario lo filtra el BACKEND (`personal_routes._can_see_comp`): a quien no
+  // es gerencia le llega `compensacion: null`. Esto de acá no es la protección —
+  // es no dibujarle una columna entera de guiones a quien nunca va a ver el dato.
+  const verSalario = user.rol === 'gerencia';
   const [list, setList] = useState([]);
   const [filter, setFilter] = useState({ seccion: '' });
   const [q, setQ] = useState('');
@@ -114,7 +118,7 @@ export default function Personal() {
               <th className="text-left p-2">Sección</th>
               <th className="text-left p-2">Rol default</th>
               <th className="text-left p-2">Partida (renglón)</th>
-              <th className="text-right p-2">Salario mensual (Q)</th>
+              {verSalario && <th className="text-right p-2">Salario mensual (Q)</th>}
               <th></th>
             </tr>
           </thead>
@@ -125,7 +129,7 @@ export default function Personal() {
                 <td className="p-2">{p.seccion}</td>
                 <td className="p-2">{p.rol_default}</td>
                 <td className="p-2">{p.renglon} {p.ibm && <span className="text-fg-muted text-xs">({p.ibm})</span>}</td>
-                <td className="p-2 text-right font-mono">{fmtQ(p.compensacion)}</td>
+                {verSalario && <td className="p-2 text-right font-mono">{fmtQ(p.compensacion)}</td>}
                 <td className="p-2">{canEditPersonal && <button className="text-accent text-xs hover:underline" onClick={()=>setEditing(p)}>Editar</button>}</td>
               </tr>
             ))}
@@ -232,7 +236,9 @@ function PersonalForm({ initial, onClose, onSave }) {
               {esPlanilla
                 ? 'Las partidas 011 y 022 se ingresan como salario anual. El sistema lo convierte automáticamente al guardar.'
                 : 'Los honorarios (029 / 182) se ingresan como salario mensual.'}
-              {' '}Se guarda cifrado en la BD. Solo gerencia y admin pueden ver el valor.
+              {' '}Se guarda cifrado en la BD y el valor lo ve únicamente Gerencia.
+              Si el campo aparece vacío es porque tu rol no lo recibe: dejalo así
+              y el salario que ya estaba guardado no se toca.
             </p>
             <CostoDiarioPreview salarioInput={form.salarioInput} renglon={form.renglon} />
           </div>

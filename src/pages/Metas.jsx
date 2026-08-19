@@ -187,14 +187,24 @@ export default function Metas() {
                 // en el período (cero operativo / cero personas epi). 0 real
                 // (hubo base pero logro 0) se pinta como 0% rojo, NO gris.
                 const sinData = m.valor_logrado == null;   // sin base en el período
+                // Sin meta (0 o nula) no hay cociente que calcular: dividir daría
+                // Infinity y pintar 0% mentiría al revés —diría "no cumplió" cuando
+                // nadie definió qué había que cumplir—. Se dice explícitamente.
+                const sinMeta = !(m.valor_meta > 0);
                 const logrado = m.valor_logrado ?? 0;
-                const pctRaw = m.valor_meta ? (100 * logrado / m.valor_meta) : 0;
-                // % logrado capeado a 100% (no se muestra >100 en la columna).
-                const pct = Math.min(100, pctRaw);
-                const cumplida = pctRaw >= 100;
+                // Dos variables a propósito, porque miden cosas distintas:
+                // `pctReal` es el número que se muestra y puede pasar de 100 —
+                // superar la meta es información que el médico pidió ver, no un
+                // exceso que haya que esconder—; `pctTopado` es el que alimenta
+                // todo lo geométrico (semáforo, y una barra si algún día se
+                // agrega), que sí se topa porque un ancho no desborda su caja.
+                const pctReal = sinMeta ? null : (100 * logrado / m.valor_meta);
+                const pctTopado = Math.min(100, pctReal ?? 0);
+                const cumplida = pctReal != null && pctReal >= 100;
                 // 0% real (hubo base, logro 0) → rojo, NO gris. <80% pero >0 →
-                // naranja (warning). El branch "sin data" se evalúa antes.
-                const color = pct >= 90 ? 'verde' : pct >= 80 ? 'amarillo' : pct > 0 ? 'naranja' : 'rojo';
+                // naranja (warning). Los branches "sin data" y "sin meta" se
+                // evalúan antes, así que acá el porcentaje siempre existe.
+                const color = pctTopado >= 90 ? 'verde' : pctTopado >= 80 ? 'amarillo' : pctTopado > 0 ? 'naranja' : 'rojo';
                 const MES_NOM = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
                 const periodoTxt = m.mes ? `${MES_NOM[m.mes]} ${m.anio}` : `Anual ${m.anio}`;
                 const esAnual = !m.mes;
@@ -216,15 +226,23 @@ export default function Metas() {
                           <span className="w-2 h-2 rounded-full bg-neutral" />
                           <span className="text-xs">sin data</span>
                         </span>
+                      ) : sinMeta ? (
+                        <span className="inline-flex items-center gap-1.5 justify-end text-fg-subtle">
+                          <span className="w-2 h-2 rounded-full bg-neutral" />
+                          <span className="text-xs">sin meta definida</span>
+                        </span>
                       ) : cumplida ? (
+                        // El número es el real: quien duplicó la meta tiene que
+                        // poder verlo. La que la alcanzó justo dice 100.0% y la
+                        // que la superó dice más, ambas en verde de cumplida.
                         <span className="inline-flex items-center gap-1.5 justify-end">
                           <span className="badge-success text-[10px]">cumplida</span>
-                          <span className="font-semibold text-success">100%</span>
+                          <span className="font-semibold text-success">{fmtPct(pctReal)}</span>
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 justify-end">
                           <span className={`w-2 h-2 rounded-full ${SEMAFORO_DOT[color]}`}/>
-                          {fmtPct(pct)}
+                          {fmtPct(pctReal)}
                         </span>
                       )}
                     </td>

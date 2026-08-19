@@ -17,8 +17,9 @@ export default function Layout({ children }) {
     { to: '/empresas', label: 'Empresas', roles: ['admin', 'gerencia', 'ce', 'sipresalud'] },
     // Viáticos: todos pueden cargar y ver los SUYOS (backend filtra por personal_id)
     { to: '/viaticos', label: 'Viáticos', roles: ['admin', 'gerencia', 'ce', 'sipresalud'] },
-    // Personal: visible para todas las secciones (roster del equipo); los salarios
-    // se enmascaran salvo gerencia/admin. ce/sipresalud ven su propia sección.
+    // Personal: visible para todas las secciones (roster del equipo); el salario
+    // lo ve SOLO gerencia —el backend lo manda en None para el resto, incluido
+    // admin—. ce/sipresalud ven su propia sección.
     { to: '/personal', label: 'Personal', roles: ['admin', 'gerencia', 'sipresalud', 'ce'] },
     // Metas: todas las secciones VEN sus metas (incl. la de afiliados); crear/editar
     // queda en gerencia/admin (las metas institucionales son estratégicas).

@@ -204,19 +204,32 @@ export default function Dashboard() {
                       xl:[grid-template-columns:repeat(4,minmax(0,1fr))_minmax(240px,280px)]">
         {/* ── Row 1: 4 KPIs (mobile: stack, tablet: 2×2, lg+: 4 en fila) ── */}
         <div className="min-h-[132px]">
-          <StatCard
-            label="% META MENSUAL"
-            value={kpi.pctMeta ?? 0}
-            format="percent"
-            decimals={1}
-            tone={kpi.pctMeta >= 90 ? 'success' : kpi.pctMeta >= 80 ? 'warning' : 'primary'}
-            viz="gauge"
-            vizData={{ value: kpi.pctMeta ?? 0, size: 70, thickness: 8 }}
-            subLabel={kpi.metaMes ? `Meta ${fmtN(kpi.metaMes)}` : 'Sin meta'}
-            delta={kpi.pctMetaDelta != null ? { value: kpi.pctMetaDelta, unit: ' pp', decimals: 1 } : undefined}
-            icon={<TargetIcon />}
-            compact
-          />
+          {!kpi.metaMes ? (
+            // Sin meta del mes el backend manda pct_meta=0 para no dividir por
+            // cero, pero pintar "0.0%" acusaría de incumplimiento a quien nunca
+            // recibió una meta. Mismo trato que el ausentismo sin jornadas: "—".
+            <NeutralKpiCard
+              label="% META MENSUAL"
+              icon={<TargetIcon />}
+              subLabel="Sin meta definida"
+            />
+          ) : (
+            <StatCard
+              label="% META MENSUAL"
+              // Sin tope: el gauge se topa solo (no puede dar más de una vuelta),
+              // el número no — superar la meta se ve.
+              value={kpi.pctMeta ?? 0}
+              format="percent"
+              decimals={1}
+              tone={kpi.pctMeta >= 90 ? 'success' : kpi.pctMeta >= 80 ? 'warning' : 'primary'}
+              viz="gauge"
+              vizData={{ value: kpi.pctMeta ?? 0, size: 70, thickness: 8 }}
+              subLabel={`Meta ${fmtN(kpi.metaMes)}`}
+              delta={kpi.pctMetaDelta != null ? { value: kpi.pctMetaDelta, unit: ' pp', decimals: 1 } : undefined}
+              icon={<TargetIcon />}
+              compact
+            />
+          )}
         </div>
         <div className="min-h-[132px]">
           <StatCard
@@ -229,7 +242,10 @@ export default function Dashboard() {
               color: t.accent.secondary,
               width: 90, height: 38,
             }}
-            subLabel={kpi.faltaMeta > 0 ? `Faltan ${fmtN(kpi.faltaMeta)}` : 'Meta cumplida'}
+            // Sin meta, "falta 0" no significa que se haya cumplido nada: no hay
+            // contra qué comparar. Decirlo, en vez de felicitar por accidente.
+            subLabel={!kpi.metaMes ? 'Sin meta definida'
+              : kpi.faltaMeta > 0 ? `Faltan ${fmtN(kpi.faltaMeta)}` : 'Meta cumplida'}
             icon={<UsersIcon />}
             compact
           />
