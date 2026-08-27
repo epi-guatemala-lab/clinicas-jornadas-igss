@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { apiAplicarCarga, apiCrearCarga } from '../api/endpoints';
+import { apiAplicarCarga, apiCrearCarga, descartarSubida } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
 import { useCargaJob, esFinal } from '../hooks/useCargaJob';
 import { describirError } from '../utils/apiError';
@@ -11,6 +11,7 @@ import ResumenCarga from '../components/cargas/ResumenCarga';
 import BloqueosCarga from '../components/cargas/BloqueosCarga';
 import ConflictosCarga from '../components/cargas/ConflictosCarga';
 import HistorialCargas from '../components/cargas/HistorialCargas';
+import ProgresoSubida from '../components/cargas/ProgresoSubida';
 
 const EXTENSIONES = ['.xlsx', '.xlsm'];
 // Un pelo por debajo de config.CARGA_MAX_MB (120) a propósito: el servidor
@@ -48,6 +49,9 @@ export default function Cargas() {
   const [cargaId, setCargaId] = useState(null);
   const [soloLectura, setSoloLectura] = useState(false);   // viendo una del historial
   const [pctSubida, setPctSubida] = useState(null);
+  // Fase de la subida (subiendo / reintentando / reanudando…). La barra la usa
+  // para decir qué está pasando durante un corte en vez de quedarse muda.
+  const [estadoSubida, setEstadoSubida] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [reenviando, setReenviando] = useState(false);     // el servidor pidió el archivo otra vez
   const [error, setError] = useState(null);               // {titulo, detalle, sugerencia}
@@ -57,6 +61,9 @@ export default function Cargas() {
   const [tokenHistorial, setTokenHistorial] = useState(0);
   const inputRef = useRef(null);
   const abortRef = useRef(null);
+  // Id de la subida en curso del lado del servidor: hace falta para descartar
+  // sus bytes si quien carga cancela.
+  const subidaRef = useRef(null);
 
   const { carga, error: errorSondeo, sondeando, refrescar } = useCargaJob(cargaId);
 
@@ -127,17 +134,19 @@ export default function Cargas() {
     try {
       const r = await apiCrearCarga(archivo, 'PREVIEW', {
         signal: abortRef.current.signal,
-        onUploadProgress: (e) => {
-          if (e.total) setPctSubida(Math.round((e.loaded * 100) / e.total));
-        },
+        onProgreso: setPctSubida,
+        onEstado: setEstadoSubida,
+        onSesion: (id) => { subidaRef.current = id; },
       });
       setPctSubida(100);
       setCargaId(r.id);
+      subidaRef.current = null;    // ya es una carga: no queda nada que descartar
     } catch (e) {
       setError(describirError(e, 'subir el archivo'));
       setPctSubida(null);
     } finally {
       setEnviando(false);
+      setEstadoSubida(null);
       abortRef.current = null;
     }
   }
@@ -166,9 +175,9 @@ export default function Cargas() {
         signal: abortRef.current.signal,
         // Solo si el servidor todavía no tiene la ruta que reusa el archivo.
         onReenvio: () => { setReenviando(true); setPctSubida(0); },
-        onUploadProgress: (e) => {
-          if (e.total) setPctSubida(Math.round((e.loaded * 100) / e.total));
-        },
+        onProgreso: setPctSubida,
+        onEstado: setEstadoSubida,
+        onSesion: (id) => { subidaRef.current = id; },
       });
       if (r?.id && r.id !== cargaId) setCargaId(r.id);
       else refrescar();
@@ -182,12 +191,17 @@ export default function Cargas() {
     }
   }
 
+  /** Cancelar de verdad: además de cortar, descarta en el servidor los bytes
+   *  ya subidos (son un Excel con DPI en claro; no esperan al vencimiento). */
   function cancelarSubida() {
     abortRef.current?.abort();
     abortRef.current = null;
+    descartarSubida(subidaRef.current);
+    subidaRef.current = null;
     setEnviando(false);
     setReenviando(false);
     setPctSubida(null);
+    setEstadoSubida(null);
   }
 
   const enProceso = carga && !esFinal(carga.estado);
@@ -276,13 +290,8 @@ export default function Cargas() {
 
           {pctSubida !== null && enviando && (
             <div className="space-y-1">
-              <Barra pct={pctSubida} />
-              <div className="flex items-center justify-between text-xs text-fg-muted">
-                <span>Subiendo el archivo… {pctSubida}%</span>
-                <button type="button" className="text-danger hover:underline" onClick={cancelarSubida}>
-                  Cancelar
-                </button>
-              </div>
+              <ProgresoSubida pct={pctSubida} estado={estadoSubida}
+                onCancelar={cancelarSubida} />
               {reenviando && (
                 <p className="text-[11px] text-fg-subtle">
                   Este servidor todavía no reusa el archivo de la previsualización, así que hay que

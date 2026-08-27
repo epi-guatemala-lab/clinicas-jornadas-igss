@@ -1,4 +1,7 @@
 import { api } from './client';
+import { subirReanudable } from './subidaReanudable';
+
+export { descartarSubida } from './subidaReanudable';
 
 // ── Auth ────────────────────────────────────────────────────────────
 export const apiLogin = (username, password) =>
@@ -155,11 +158,16 @@ const SUBIDA_TIMEOUT_MS = 15 * 60 * 1000;   // 15 min: red institucional lenta
  * Sube el Excel y encola la carga.
  * @param {File} fileObj archivo elegido por el usuario
  * @param {'PREVIEW'|'APLICAR'} modo
- * @param {{onUploadProgress?:Function, signal?:AbortSignal, jornadaId?:number,
+ * Va por la subida REANUDABLE en trozos (`/api/subidas`): el archivo de cierre
+ * pesa ~37 MB y en un solo POST se moría a los 15 segundos desde la red del
+ * IGSS, sin dejar rastro en el servidor y sin nada que reanudar.
+ *
+ * @param {{onProgreso?:Function, onEstado?:Function, onSesion?:Function,
+ *          onUploadProgress?:Function, signal?:AbortSignal, jornadaId?:number,
  *          confirmarEmpresa?:boolean}} opts
  * @returns {Promise<{id:number, estado:string, mensaje?:string}>}
  */
-export const apiCrearCarga = (fileObj, modo = 'PREVIEW', opts = {}) => {
+const _subirEnUnPost = (fileObj, modo, opts) => {
   const fd = new FormData();
   fd.append('file', fileObj);
   // opts.jornadaId → la carga es el CIERRE de ESA jornada (el backend registra
@@ -179,6 +187,39 @@ export const apiCrearCarga = (fileObj, modo = 'PREVIEW', opts = {}) => {
     onUploadProgress: opts.onUploadProgress,
     signal: opts.signal,
   }).then((r) => r.data);
+};
+
+export const apiCrearCarga = async (fileObj, modo = 'PREVIEW', opts = {}) => {
+  // Camino de «confirmar empresa» reenviando el archivo: sigue yendo por el
+  // POST de una sola vez. El servidor amarra esa confirmación al SHA-256 de una
+  // carga BLOQUEADA anterior —es lo que impide meter el archivo de una empresa
+  // en la jornada de otra— y ese cotejo todavía no existe en `/finalizar`.
+  // Reimplementarlo a medias sería aflojar justo el invariante que protege.
+  // Es además el caso raro: lo normal es confirmar SIN reenviar nada
+  // (POST …/carga-cierre/{carga_id}/confirmar-empresa reusa el archivo).
+  if (opts.confirmarEmpresa) return _subirEnUnPost(fileObj, modo, opts);
+
+  try {
+    return await subirReanudable(fileObj, {
+      tipo: opts.jornadaId ? 'CIERRE_JORNADA' : 'MAESTRO',
+      jornadaId: opts.jornadaId || null,
+      modo,
+      onProgreso: opts.onProgreso,
+      onEstado: opts.onEstado,
+      onSesion: opts.onSesion,
+      signal: opts.signal,
+    });
+  } catch (e) {
+    // Plan B para un único caso: que el backend desplegado todavía no exponga
+    // `/api/subidas`. Así el portal no se rompe si el frontend llega antes que
+    // el backend. Cualquier OTRO error se propaga tal cual — reintentar 37 MB
+    // por el camino que ya se sabe que falla sería cambiar un error claro por
+    // una espera larga y el mismo error.
+    const esBackendViejo = e?.response?.status === 404
+      && String(e?.config?.url || '').includes('/api/subidas');
+    if (!esBackendViejo) throw e;
+    return _subirEnUnPost(fileObj, modo, opts);
+  }
 };
 
 /**

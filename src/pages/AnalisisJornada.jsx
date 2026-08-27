@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   apiAplicarCarga, apiCerrarJornada, apiConfirmarEmpresaCierre, apiCrearCarga,
-  apiGetCierreJornada, apiGetJornada, apiGetReferidos,
+  apiGetCierreJornada, apiGetJornada, apiGetReferidos, descartarSubida,
 } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
 import { useCargaJob, esFinal } from '../hooks/useCargaJob';
@@ -14,6 +14,7 @@ import { fmtN } from '../utils/format';
 import BloqueosCarga from '../components/cargas/BloqueosCarga';
 import ConfirmarEmpresaCierre from '../components/cargas/ConfirmarEmpresaCierre';
 import ConflictosCarga from '../components/cargas/ConflictosCarga';
+import ProgresoSubida from '../components/cargas/ProgresoSubida';
 
 const EXTENSIONES = ['.xlsx', '.xlsm'];
 const LIMITE_MB = 60;    // config.CIERRE_MAX_MB del backend
@@ -44,6 +45,9 @@ export default function AnalisisJornada() {
   const [archivo, setArchivo] = useState(null);
   const [cargaId, setCargaId] = useState(null);
   const [pctSubida, setPctSubida] = useState(null);
+  // Fase de la subida (subiendo / reintentando / reanudando…). La barra la usa
+  // para decir qué está pasando durante un corte en vez de quedarse muda.
+  const [estadoSubida, setEstadoSubida] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState(null);
   // Acción que quedó sin hacer porque el servidor estaba ocupado, para poder
@@ -69,6 +73,9 @@ export default function AnalisisJornada() {
   const cierreDisparado = useRef(false);
   const inputRef = useRef(null);
   const abortRef = useRef(null);
+  // Id de la subida en curso del lado del servidor: hace falta para descartar
+  // sus bytes si quien carga cancela.
+  const subidaRef = useRef(null);
 
   const { carga, error: errorSondeo, sondeando, refrescar } = useCargaJob(cargaId);
 
@@ -101,6 +108,18 @@ export default function AnalisisJornada() {
   // atado al archivo exacto que se revisó.
   const empresaConfirmadaEnPreview = Boolean(
     carga?.resumen?.cierre?.empresa_match?.confirmada);
+
+  /** Cancelar de verdad: además de cortar, descarta en el servidor los bytes
+   *  ya subidos (son un Excel con DPI en claro; no esperan al vencimiento). */
+  function cancelarSubida() {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    descartarSubida(subidaRef.current);
+    subidaRef.current = null;
+    setEnviando(false);
+    setPctSubida(null);
+    setEstadoSubida(null);
+  }
 
   const limpiar = useCallback(() => {
     abortRef.current?.abort();
@@ -161,17 +180,19 @@ export default function AnalisisJornada() {
       const r = await apiCrearCarga(archivo, 'PREVIEW', {
         jornadaId,
         signal: abortRef.current.signal,
-        onUploadProgress: (e) => {
-          if (e.total) setPctSubida(Math.round((e.loaded * 100) / e.total));
-        },
+        onProgreso: setPctSubida,
+        onEstado: setEstadoSubida,
+        onSesion: (id) => { subidaRef.current = id; },
       });
       setPctSubida(100);
       setCargaId(r.id);
+      subidaRef.current = null;    // ya es una carga: no queda nada que descartar
     } catch (e) {
       setError(describirError(e, 'subir el archivo'));
       setPctSubida(null);
     } finally {
       setEnviando(false);
+      setEstadoSubida(null);
       abortRef.current = null;
     }
   }
@@ -202,9 +223,9 @@ export default function AnalisisJornada() {
         // el servidor lo lee del resumen de la previsualización.
         confirmarEmpresa: empresaConfirmadaEnPreview,
         signal: abortRef.current.signal,
-        onUploadProgress: (e) => {
-          if (e.total) setPctSubida(Math.round((e.loaded * 100) / e.total));
-        },
+        onProgreso: setPctSubida,
+        onEstado: setEstadoSubida,
+        onSesion: (id) => { subidaRef.current = id; },
       });
       if (r?.id && r.id !== cargaId) setCargaId(r.id);
       else refrescar();
@@ -487,16 +508,8 @@ export default function AnalisisJornada() {
           </div>
 
           {pctSubida !== null && enviando && (
-            <div className="space-y-1">
-              <Barra pct={pctSubida} />
-              <div className="flex items-center justify-between text-xs text-fg-muted">
-                <span>Subiendo el archivo… {pctSubida}%</span>
-                <button type="button" className="text-danger hover:underline"
-                  onClick={() => { abortRef.current?.abort(); abortRef.current = null; setEnviando(false); setPctSubida(null); }}>
-                  Cancelar
-                </button>
-              </div>
-            </div>
+            <ProgresoSubida pct={pctSubida} estado={estadoSubida}
+              onCancelar={cancelarSubida} />
           )}
 
           {error && (
