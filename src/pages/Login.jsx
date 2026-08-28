@@ -15,7 +15,18 @@ export default function Login() {
     setErr('');
     try {
       await login(u, p);
-      nav('/dashboard');
+      // Vuelta al punto de trabajo. El interceptor de 401 (`api/client.js`) deja
+      // en `post_login` la ruta donde estaba quien perdió la sesión; sin leerla
+      // acá, ese dato no lo consumía nadie y todo el mundo reaparecía en el
+      // tablero después de volver a entrar —el «se sale» que reportó la sección—.
+      // Se lee y se BORRA en el mismo paso: si no, el siguiente inicio de sesión
+      // de la pestaña mandaría a una ficha vieja que ya nadie estaba viendo.
+      let destino = '';
+      try {
+        destino = sessionStorage.getItem('post_login') || '';
+        sessionStorage.removeItem('post_login');
+      } catch { /* navegación privada sin almacenamiento: se vuelve al tablero */ }
+      nav(destino && destino !== '/login' && destino.startsWith('/') ? destino : '/dashboard');
     } catch (e) {
       setErr(e.response?.data?.detail || 'Error al iniciar sesión');
     }

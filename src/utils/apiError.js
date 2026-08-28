@@ -13,10 +13,26 @@ const LIMITE_MB = 120;   // config.CARGA_MAX_MB del backend
 function detalle(e) {
   const d = e?.response?.data?.detail ?? e?.response?.data?.error;
   if (typeof d === 'string' && d.trim()) return d.trim();
-  // FastAPI 422 devuelve una lista de errores de validación
+  // FastAPI/Pydantic devuelve `detail` como ARRAY de objetos {loc, msg} cuando
+  // falla la validación (422). Se aplana UNA LÍNEA POR CAMPO, con el nombre del
+  // campo delante: quedarse con el primer `msg` escondía los demás errores y
+  // obligaba a reenviar el formulario tantas veces como campos malos tuviera,
+  // sin decir nunca cuál era. Y pasar el arreglo tal cual al JSX tumbaba el
+  // portal entero («Objects are not valid as a React child»).
   if (Array.isArray(d) && d.length) {
-    const primero = d[0];
-    if (typeof primero?.msg === 'string') return primero.msg;
+    const partes = d.map((x) => {
+      const campo = (Array.isArray(x?.loc) ? x.loc : [])
+        .filter((p) => p !== 'body')
+        .map((p) => (typeof p === 'number' ? `#${p + 1}` : String(p)))
+        .join(' › ');
+      const msg = (typeof x?.msg === 'string' && x.msg.trim()) ? x.msg.trim() : 'valor inválido';
+      return campo ? `${campo}: ${msg}` : msg;
+    }).filter(Boolean);
+    if (partes.length) return partes.join(' · ');
+  }
+  // Un objeto suelto: preferible verlo serializado a un '[object Object]'.
+  if (d && typeof d === 'object') {
+    try { return JSON.stringify(d); } catch { return ''; }
   }
   return '';
 }

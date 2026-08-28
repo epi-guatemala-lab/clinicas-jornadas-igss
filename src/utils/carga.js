@@ -929,32 +929,9 @@ export function fmtBytes(n) {
   return `${(b / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// SQLite guarda 'YYYY-MM-DD HH:MM:SS' con datetime('now'), que es SIEMPRE UTC
-// aunque la cadena no lleve 'Z'. El backend corre con TZ=America/Guatemala
-// (UTC-6), así que reordenar la cadena tal cual —sin convertir— le mostraba a
-// Berkin una hora 6 horas adelantada: cargó a la 1pm y el historial decía
-// 7pm. Guatemala no tiene horario de verano, así que la conversión es fija.
-const TZ_PORTAL = 'America/Guatemala';
-
-/** Fecha y hora legibles (zona Guatemala) a partir de lo que guarda SQLite. */
-export function fmtFechaHora(s) {
-  if (!s) return '—';
-  const txt = String(s).replace('T', ' ').replace('Z', '');
-  const m = txt.match(/^(\d{4})-(\d{2})-(\d{2})[ ]?(\d{2}:\d{2})?(:\d{2})?/);
-  if (!m) return txt;
-  const [, anio, mes, dia, horaMin] = m;
-  if (!horaMin) return `${dia}/${mes}/${anio}`;
-  const [hh, mm] = horaMin.split(':');
-  const utcMs = Date.UTC(+anio, +mes - 1, +dia, +hh, +mm);
-  if (Number.isNaN(utcMs)) return `${dia}/${mes}/${anio} ${horaMin}`;
-  try {
-    const partes = new Intl.DateTimeFormat('es-GT', {
-      timeZone: TZ_PORTAL, day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', hour12: false,
-    }).formatToParts(new Date(utcMs));
-    const val = (t) => partes.find((p) => p.type === t)?.value;
-    return `${val('day')}/${val('month')}/${val('year')} ${val('hour')}:${val('minute')}`;
-  } catch {
-    return `${dia}/${mes}/${anio} ${horaMin}`;   // navegador sin soporte de TZ IANA
-  }
-}
+// `fmtFechaHora` se mudó a utils/format.js: los sellos de tiempo en UTC que hay
+// que mostrar en hora de Guatemala no son solo del historial de cargas (también
+// material entregado, auditoría, cierres), y dos copias de esa conversión es
+// justo como reaparece el bug de las 6 horas. Se re-exporta desde acá para no
+// romper a quien ya la importa de utils/carga.
+export { fmtFechaHora } from './format';

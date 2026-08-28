@@ -4,7 +4,7 @@ import {
   apiListPersonal, apiListJornadas,
 } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
-import { fmtQ, fmtN, isoLocalDate } from '../utils/format';
+import { fmtQ, fmtN, fmtFecha, isoLocalDate } from '../utils/format';
 import { mensajeDeError } from '../utils/apiError';
 import SearchableSelect from '../components/filters/SearchableSelect';
 import SearchInput from '../components/filters/SearchInput';
@@ -112,7 +112,7 @@ export default function Viaticos() {
                   </td>
                   <td className="p-2">{v.mes_anio}</td>
                   <td className="p-2">{v.personal_nombre || '—'}</td>
-                  <td className="p-2 text-xs">{v.nombramiento} {v.fecha_nombramiento && <span className="text-fg-muted">({v.fecha_nombramiento})</span>}</td>
+                  <td className="p-2 text-xs">{v.nombramiento} {v.fecha_nombramiento && <span className="text-fg-muted">({fmtFecha(v.fecha_nombramiento)})</span>}</td>
                   <td className="p-2 text-right font-mono">{fmtQ(v.monto)}</td>
                   <td className="p-2">
                     <span className={`badge ${STATUS_BG[v.status] || 'bg-neutral-soft text-fg-muted'}`}>
@@ -311,7 +311,7 @@ function NuevoViatico({ onClose, onSaved }) {
             <SearchableSelect value={form.jornada_id || ''}
               onChange={(v) => set('jornada_id', v ? Number(v) : null)}
               placeholder="—"
-              options={jornadas.map((j) => ({ value: j.id, label: `${j.codigo} · ${j.fecha_inicio}` }))} />
+              options={jornadas.map((j) => ({ value: j.id, label: `${j.codigo} · ${fmtFecha(j.fecha_inicio)}` }))} />
           </div>
           <div><label className="label">Nombramiento</label>
             <input className="input" placeholder="ej 223/2026" value={form.nombramiento} onChange={(e)=>set('nombramiento', e.target.value)} /></div>

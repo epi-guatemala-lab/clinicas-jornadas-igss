@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiListMetas, apiCreateMeta, apiMetasPorEmpresa, apiGetConfig, apiSetMetaAfiliados } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
-import { fmtN, fmtPct, fmtQ, SEMAFORO_DOT } from '../utils/format';
+import { fmtN, fmtPct, fmtQ, fmtFecha, SEMAFORO_DOT } from '../utils/format';
 import Modal from '../components/forms/Modal';
 import Field from '../components/forms/Field';
 import StatCard from '../components/cards/StatCard';
@@ -299,7 +299,7 @@ export default function Metas() {
                   </td>
                   <td className="p-2">
                     {e.tiene_clinica_amarrada
-                      ? <span className="badge-success">✓ {e.fecha_amarre || 'activa'}</span>
+                      ? <span className="badge-success">✓ {fmtFecha(e.fecha_amarre) || 'activa'}</span>
                       : <span className="text-fg-subtle">—</span>}
                   </td>
                 </tr>

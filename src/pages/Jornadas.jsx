@@ -4,17 +4,14 @@ import { useAuth } from '../hooks/useAuth';
 import JornadaModal from '../components/JornadaModal';
 import JornadaFormModal from '../components/JornadaFormModal';
 import {
-  SEMAFORO_DOT, TIPO_LABEL, ESTADO_LABEL, fmtN, fmtPct,
+  SEMAFORO_DOT, TIPO_LABEL, ESTADO_LABEL, TIPOS_ACTIVIDAD_UI, fmtFecha, fmtN, fmtPct,
 } from '../utils/format';
 import { useDebounce } from '../hooks/useDebounce';
 import SearchInput from '../components/filters/SearchInput';
 
-const TIPOS = [
-  ['SIPRESALUD_JORNADA', '💉 Jornada SIPRESALUD'],
-  ['INAUGURACION', '🎉 Inauguración (deja clínica permanente)'],
-  ['TALLER', '🎤 Conferencia'],
-  ['WEBINAR', '💻 Webinar'],
-];
+// El catálogo de actividades vive en utils/format: acá estaba duplicado y había
+// que acordarse de tocar las dos listas cada vez que cambiaba un rótulo.
+const TIPOS = TIPOS_ACTIVIDAD_UI.map((t) => [t.value, t.label]);
 
 export default function Jornadas() {
   const { user, canWrite } = useAuth();
@@ -46,9 +43,9 @@ export default function Jornadas() {
 
       <div className="card p-3 flex flex-wrap gap-2 items-end">
         {/* Sin filtro de sección: todas las jornadas son SIPRESALUD (no CE). */}
-        <Select label="Tipo" value={filter.tipo}
+        <Select label="Actividad" value={filter.tipo}
           onChange={(v) => setFilter({ ...filter, tipo: v })}
-          options={[['', 'Todos'], ...TIPOS]} />
+          options={[['', 'Todas'], ...TIPOS]} />
         <Select label="Estado" value={filter.estado}
           onChange={(v) => setFilter({ ...filter, estado: v })}
           options={[['', 'Todos'], ['PROGRAMADA', 'Programada'], ['CERRADA', 'Cerrada'], ['CANCELADA', 'Cancelada']]} />
@@ -62,7 +59,7 @@ export default function Jornadas() {
             <tr>
               <th className="text-left p-2">Código</th>
               <th className="text-left p-2">Fecha</th>
-              <th className="text-left p-2">Tipo</th>
+              <th className="text-left p-2">Actividad</th>
               <th className="text-left p-2">Empresa</th>
               <th className="text-left p-2">Lugar</th>
               <th className="text-right p-2">Atendidos/Prog</th>
@@ -74,7 +71,7 @@ export default function Jornadas() {
             {list.map((j) => (
               <tr key={j.id} className="border-t border-line-subtle hover:bg-surface-elev">
                 <td className="p-2 font-mono text-xs">{j.codigo}</td>
-                <td className="p-2">{j.fecha_inicio}</td>
+                <td className="p-2 whitespace-nowrap">{fmtFecha(j.fecha_inicio)}</td>
                 <td className="p-2">{TIPO_LABEL[j.tipo] || j.tipo}</td>
                 <td className="p-2">{j.empresa_nombre || '—'}</td>
                 <td className="p-2 text-fg-muted">{[j.departamento, j.municipio].filter(Boolean).join(', ')}</td>

@@ -1,6 +1,6 @@
 import { useThemedColors } from '../../theme/useThemedColors';
 import { mapSemaforoLegacy } from '../../utils/derived';
-import { fmtFechaCorta } from '../../utils/format';
+import { fmtFecha } from '../../utils/format';
 
 const TIPO_LABEL_SHORT = {
   SIPRESALUD_JORNADA: 'SIPRES',
@@ -24,7 +24,9 @@ export default function JornadaRow({ jornada, onClick, dense = false }) {
     : sem === 'azul' ? t.status.info
     : t.status.neutral;
 
-  const fechaFmt = fmtFechaCorta(jornada.fecha_inicio);
+  // Fecha completa (dd/mm/aaaa): el recorte a «dd/mm» ahorraba dos caracteres a
+  // costa de no decir el año, y estas listas mezclan jornadas de años distintos.
+  const fechaFmt = fmtFecha(jornada.fecha_inicio);
 
   return (
     <button
@@ -41,7 +43,7 @@ export default function JornadaRow({ jornada, onClick, dense = false }) {
         />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-[11px] tabular-nums text-fg-muted">
-            <span className="font-semibold">{fechaFmt}</span>
+            <span className="font-semibold whitespace-nowrap">{fechaFmt}</span>
             {jornada.hora_inicio && <span>· {jornada.hora_inicio}</span>}
             {jornada.tipo && (
               <span className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase bg-surface-elev text-fg-muted">

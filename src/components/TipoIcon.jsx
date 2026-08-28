@@ -30,6 +30,16 @@ const PATHS = {
       <path d="M8 21h8M12 17v4" />
     </>
   ),
+  // Convenio — documento firmado (hoja con esquina doblada + rúbrica).
+  // Sin esta entrada el fallback es SILENCIOSO: un convenio se pintaría con el
+  // pulso de jornada y nadie notaría que el ícono está mintiendo.
+  CONVENIO: (
+    <>
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z" />
+      <path d="M14 3v5h5" />
+      <path d="M8.5 16.8c1-2.2 2-2.2 2.8 0 .8 2.2 1.8 1.5 2.7-.6" />
+    </>
+  ),
 };
 
 export default function TipoIcon({ tipo, inaugura = false, size = 13, className = '' }) {

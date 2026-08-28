@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { addMonths, format, startOfMonth, endOfMonth } from 'date-fns';
+import { addMonths, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { apiCalendario } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
@@ -8,6 +8,7 @@ import JornadaModal from '../components/JornadaModal';
 import FilterChip from '../components/filters/FilterChip';
 import SearchInput from '../components/filters/SearchInput';
 import { normIncludes } from '../utils/norm';
+import { SERVICIOS_CHIP } from '../utils/derived';
 import TipoIcon from '../components/TipoIcon';
 
 // date-fns sin locale rotula los meses en inglés ("July 2026"). Todo el texto visible
@@ -25,8 +26,14 @@ export default function Calendario() {
   const [q, setQ] = useState('');
   const [ultimoMes, setUltimoMes] = useState(null);  // último mes con jornadas (lookback)
 
-  const desde = useMemo(() => format(startOfMonth(month), 'yyyy-MM-dd'), [month]);
-  const hasta = useMemo(() => format(endOfMonth(month), 'yyyy-MM-dd'), [month]);
+  // La consulta pide la REJILLA completa (los mismos días que dibuja
+  // CalendarMonth), no el mes pelado: la primera y la última semana muestran
+  // días de los meses vecinos y con la ventana recortada al mes salían siempre
+  // en blanco. weekStartsOn: 0 (domingo) tiene que coincidir con el del grid.
+  const desde = useMemo(
+    () => format(startOfWeek(startOfMonth(month), { weekStartsOn: 0 }), 'yyyy-MM-dd'), [month]);
+  const hasta = useMemo(
+    () => format(endOfWeek(endOfMonth(month), { weekStartsOn: 0 }), 'yyyy-MM-dd'), [month]);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,7 +79,14 @@ export default function Calendario() {
           <h1 className="text-xl font-bold text-fg">
             {mesAnio(month)}
           </h1>
-          <p className="text-xs text-fg-muted">{eventos.length} eventos en el mes</p>
+          {/* «que tocan el mes» y no «en el mes»: una actividad de varios días
+              cuenta una sola vez aunque se pinte en tres casillas, y la rejilla
+              incluye los días de relleno de los meses vecinos. */}
+          <p className="text-xs text-fg-muted">
+            {eventos.length === 1
+              ? '1 evento que toca el mes'
+              : `${eventos.length} eventos que tocan el mes`}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setMonth(addMonths(month, -1))}
@@ -100,7 +114,12 @@ export default function Calendario() {
       <CalendarMonth
         month={month}
         eventos={filteredEventos}
-        onEventClick={(e) => { if (!e.es_inauguracion_empresa) setSelected(e.id); }} />
+        /* Guarda POSITIVA: solo las jornadas reales tienen id numérico y ficha.
+           Los eventos que salen de una empresa (inauguración 'emp-7', convenio
+           'conv-7') no son jornadas; con la guarda anterior —negar una sola de
+           esas formas— cada stub nuevo pegaba a /api/jornadas/conv-7, el backend
+           respondía 422 y el modal quedaba colgado sin decir por qué. */
+        onEventClick={(e) => { if (typeof e.id === 'number') setSelected(e.id); }} />
 
       {/* Mes sin eventos: hint accionable hacia el último mes con jornadas */}
       {!soloAlertas && eventos.length === 0 && (
@@ -156,13 +175,29 @@ export default function Calendario() {
           ))}
         </div>
         <div className="flex flex-wrap gap-x-3 gap-y-1.5 items-center">
-          <span className="font-semibold text-fg">Tipo (ícono):</span>
+          <span className="font-semibold text-fg">Actividad (ícono):</span>
           {[
             ['SIPRESALUD_JORNADA', 'Jornada SIPRE'], ['INAUGURACION', 'Inauguración'],
             ['TALLER', 'Conferencia'], ['WEBINAR', 'Webinar'],
+            // El convenio no es una actividad que se programe: es la fecha de firma
+            // con la empresa, informativa (azul, sin alerta) y sin ficha que abrir.
+            ['CONVENIO', 'Convenio (firma con la empresa — informativo)'],
           ].map(([t, l]) => (
             <span key={t} className="flex items-center gap-1 text-fg"><TipoIcon tipo={t} /> {l}</span>
           ))}
+        </div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1.5 items-center">
+          {/* La misma lista que pinta el chip (utils/derived): una sola fuente para
+              que la leyenda no quede describiendo emojis que ya cambiaron. */}
+          <span className="font-semibold text-fg">Servicios de la actividad:</span>
+          {SERVICIOS_CHIP.map((s) => (
+            <span key={s.key} className="flex items-center gap-1 text-fg">
+              <span role="img" aria-label={s.nombre}>{s.emoji}</span> {s.nombre}
+            </span>
+          ))}
+          <span className="flex items-center gap-1">
+            <span className="font-semibold text-fg">día 2/3</span> = actividad de varios días (se repite en cada día)
+          </span>
         </div>
         <div className="flex flex-wrap gap-x-3 gap-y-1.5 items-center">
           <span className="font-semibold text-fg">Sección:</span>

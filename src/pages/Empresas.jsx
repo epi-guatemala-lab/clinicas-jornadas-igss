@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import {
   apiListEmpresas, apiCreateEmpresa, apiUpdateEmpresa, apiSetInauguracion,
-  apiEmpresaGrupos, apiCatalogoSectores, apiCatalogoUnidadesAdscripcion,
+  apiSetConvenio, apiEmpresaGrupos, apiCatalogoSectores, apiCatalogoUnidadesAdscripcion,
 } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
-import { fmtN, isoLocalDate } from '../utils/format';
+import { fmtN, fmtFecha, isoLocalDate } from '../utils/format';
+import { mensajeDeError } from '../utils/apiError';
 import Modal from '../components/forms/Modal';
 import Field from '../components/forms/Field';
 import GeoSelects from '../components/forms/GeoSelects';
@@ -24,6 +25,7 @@ export default function Empresas() {
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
   const [inaugurando, setInaugurando] = useState(null);
+  const [convenioDe, setConvenioDe] = useState(null);
   const [q, setQ] = useState('');
   const dq = useDebounce(q, 300);
 
@@ -69,6 +71,7 @@ export default function Empresas() {
                 <th className="text-left p-2">Unidad adscripción</th>
                 <th className="text-left p-2">Grupo</th>
                 <th className="text-left p-2">{esHistorico ? 'Clínica desde' : 'Inauguración'}</th>
+                <th className="text-left p-2">Convenio</th>
                 {canEdit && <th></th>}
               </tr>
             </thead>
@@ -86,33 +89,41 @@ export default function Empresas() {
                   <td className="p-2 text-fg-muted text-xs">{e.grupo || '—'}</td>
                   <td className="p-2 text-xs">
                     {esHistorico
-                      ? <span className="badge-success">✓ {e.fecha_amarre || ''}</span>
+                      ? <span className="badge-success">✓ {fmtFecha(e.fecha_amarre)}</span>
                       : e.fecha_inauguracion
-                        ? <span className="text-accent">🗓 {e.fecha_inauguracion}{e.inauguracion_hora_inicio ? ` ${e.inauguracion_hora_inicio}` : ''}</span>
+                        ? <span className="text-accent">🗓 {fmtFecha(e.fecha_inauguracion)}{e.inauguracion_hora_inicio ? ` ${e.inauguracion_hora_inicio}` : ''}</span>
                         : <span className="text-fg-subtle">sin agendar</span>}
+                  </td>
+                  <td className="p-2 text-xs">
+                    {e.fecha_convenio
+                      ? <span className="text-accent">🤝 {fmtFecha(e.fecha_convenio)}</span>
+                      : <span className="text-fg-subtle">sin convenio</span>}
                   </td>
                   {canEdit && (
                     <td className="p-2 whitespace-nowrap">
                       <button className="text-accent text-sm hover:underline mr-3" onClick={() => setEditing(e)}>Editar</button>
                       {!esHistorico && (
-                        <button className="text-igss-primary text-sm hover:underline" onClick={() => setInaugurando(e)}>
+                        <button className="text-igss-primary text-sm hover:underline mr-3" onClick={() => setInaugurando(e)}>
                           {e.fecha_inauguracion ? 'Editar inaug.' : 'Agendar inaug.'}
                         </button>
                       )}
+                      <button className="text-igss-primary text-sm hover:underline" onClick={() => setConvenioDe(e)}>
+                        {e.fecha_convenio ? 'Editar convenio' : 'Fecha de convenio'}
+                      </button>
                     </td>
                   )}
                 </tr>
               ))}
               {loadErr && (
-                <tr><td colSpan={canEdit ? 8 : 7} className="text-center py-4 text-danger">
+                <tr><td colSpan={canEdit ? 9 : 8} className="text-center py-4 text-danger">
                   {loadErr} <button className="underline ml-2" onClick={reload}>Reintentar</button>
                 </td></tr>
               )}
               {loading && !loadErr && (
-                <tr><td colSpan={canEdit ? 8 : 7} className="text-center py-4 text-fg-muted">Cargando…</td></tr>
+                <tr><td colSpan={canEdit ? 9 : 8} className="text-center py-4 text-fg-muted">Cargando…</td></tr>
               )}
               {!loading && !loadErr && list.length === 0 && (
-                <tr><td colSpan={canEdit ? 8 : 7} className="text-center py-4 text-fg-muted">
+                <tr><td colSpan={canEdit ? 9 : 8} className="text-center py-4 text-fg-muted">
                   {esHistorico ? 'Sin empresas con clínica' : 'Sin empresas pendientes'}
                 </td></tr>
               )}
@@ -124,6 +135,7 @@ export default function Empresas() {
       {creating && <EmpresaForm onClose={() => setCreating(false)} onSave={() => { setCreating(false); reload(); }} />}
       {editing && <EmpresaForm initial={editing} onClose={() => setEditing(null)} onSave={() => { setEditing(null); reload(); }} />}
       {inaugurando && <InauguracionForm empresa={inaugurando} onClose={() => setInaugurando(null)} onSave={() => { setInaugurando(null); reload(); }} />}
+      {convenioDe && <ConvenioForm empresa={convenioDe} onClose={() => setConvenioDe(null)} onSave={() => { setConvenioDe(null); reload(); }} />}
     </div>
   );
 }
@@ -168,7 +180,12 @@ function EmpresaForm({ initial, onClose, onSave }) {
       if (initial) await apiUpdateEmpresa(initial.id, body);
       else await apiCreateEmpresa(body);
       onSave();
-    } catch (e) { setErr(e.response?.data?.detail || 'Error'); }
+    } catch (e) {
+      // mensajeDeError y no `detail` crudo: un 422 devuelve una LISTA de errores
+      // y pintarla directo revienta el render («Objects are not valid as a React
+      // child») y se lleva la pantalla entera por delante.
+      setErr(mensajeDeError(e, 'guardar la empresa'));
+    }
   }
 
   // Preservar el valor actual aunque no esté en el catálogo (empresas legacy con
@@ -241,7 +258,7 @@ function InauguracionForm({ empresa, onClose, onSave }) {
         inauguracion_lugar: form.inauguracion_lugar || null,
       });
       onSave();
-    } catch (e) { setErr(e.response?.data?.detail || 'Error'); }
+    } catch (e) { setErr(mensajeDeError(e, 'guardar la inauguración')); }
   }
 
   return (
@@ -261,6 +278,48 @@ function InauguracionForm({ empresa, onClose, onSave }) {
                value={form.inauguracion_lugar} onChange={set('inauguracion_lugar')} />
         <p className="col-span-2 text-[11px] text-fg-subtle">Aparece en el calendario para todos.</p>
         {err && <div className="col-span-2 bg-danger-soft text-danger text-sm p-2 rounded">{err}</div>}
+      </form>
+    </Modal>
+  );
+}
+
+/**
+ * Fecha de firma del convenio con la empresa. Igual que la inauguración,
+ * alimenta el calendario (evento propio, no una jornada), pero SIN el tope de
+ * «no puede ser en el pasado»: lo habitual es registrar un convenio que ya se
+ * firmó, a veces meses antes de que alguien lo capture en el portal.
+ */
+function ConvenioForm({ empresa, onClose, onSave }) {
+  const [fecha, setFecha] = useState(empresa.fecha_convenio || '');
+  const [err, setErr] = useState('');
+  const [guardando, setGuardando] = useState(false);
+
+  async function submit(e) {
+    e.preventDefault(); setErr('');
+    if (!fecha) { setErr('Indicá la fecha en que se firmó el convenio.'); return; }
+    setGuardando(true);
+    try {
+      await apiSetConvenio(empresa.id, { fecha_convenio: fecha });
+      onSave();
+    } catch (e2) {
+      setErr(mensajeDeError(e2, 'guardar la fecha del convenio'));
+    } finally { setGuardando(false); }
+  }
+
+  return (
+    <Modal open onClose={onClose} title={`Convenio · ${empresa.nombre_legal}`} size="md"
+      footer={<>
+        <button type="button" className="btn-secondary" onClick={onClose} disabled={guardando}>Cancelar</button>
+        <button type="submit" form="convenio-form" className="btn-primary" disabled={guardando}>
+          {guardando ? 'Guardando…' : 'Guardar convenio'}
+        </button>
+      </>}>
+      <form id="convenio-form" onSubmit={submit} className="space-y-3">
+        <Field label="Fecha de convenio" type="date" required
+               hint="Puede ser una fecha ya pasada: es la fecha en que se firmó."
+               value={fecha} onChange={(e) => setFecha(e.target.value)} />
+        <p className="text-[11px] text-fg-subtle">Aparece en el calendario para todos.</p>
+        {err && <div className="bg-danger-soft text-danger text-sm p-2 rounded">{err}</div>}
       </form>
     </Modal>
   );

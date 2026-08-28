@@ -21,6 +21,20 @@ api.interceptors.response.use(
       const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
       const loginPath = `${base}/login`;
       if (window.location.pathname !== loginPath) {
+        // El token dura horas y NO se renueva: con la pestaña abierta del día
+        // anterior la pantalla se ve normal (estado cacheado) y el primer clic
+        // dispara el 401. Este redirect es una recarga completa, así que sin
+        // apuntar dónde estaba, quien venía trabajando en una ficha reaparece
+        // en el tablero sin explicación (el «se sale» que reportó la sección).
+        // Se guarda la ruta RELATIVA al basename de GitHub Pages, que es como
+        // navega el router; sessionStorage muere con la pestaña.
+        const ruta = window.location.pathname.startsWith(base)
+          ? window.location.pathname.slice(base.length)
+          : window.location.pathname;
+        const destino = `${ruta || '/'}${window.location.search}${window.location.hash}`;
+        try {
+          if (destino !== '/login') sessionStorage.setItem('post_login', destino);
+        } catch { /* navegación privada sin almacenamiento: se pierde el regreso, no la sesión */ }
         window.location.href = loginPath;
       }
     }

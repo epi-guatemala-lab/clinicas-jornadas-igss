@@ -66,6 +66,28 @@ export function isEnCurso(jornada, now = new Date()) {
 }
 
 /**
+ * Servicios que puede llevar una actividad, en el orden en que se pintan en el
+ * chip del calendario. La lista vive acá y no dentro del componente para que la
+ * leyenda y el chip no se separen el día que se agregue el siguiente servicio
+ * (odontología y nutrición nacieron así, calcadas de tamizaje VIH).
+ */
+export const SERVICIOS_CHIP = [
+  { key: 'aplica_kit_lab', emoji: '🧪', nombre: 'Laboratorio' },
+  { key: 'tamizaje_vih', emoji: '🩸', nombre: 'Tamizaje VIH' },
+  { key: 'vacunacion', emoji: '💉', nombre: 'Vacunación' },
+  { key: 'odontologia', emoji: '🦷', nombre: 'Odontología' },
+  { key: 'nutricion', emoji: '🥕', nombre: 'Nutrición' },
+];
+
+// Un servicio se pinta SOLO si el evento afirma que lo lleva. Los eventos que no
+// son jornadas (los stubs de inauguración y de convenio de una empresa) NO traen
+// estas llaves: `undefined` tiene que quedar apagado, así que nunca se evalúa por
+// truthiness. Se acepta también el 1 de SQLite además del booleano porque el
+// endpoint del calendario arma el dict a mano, sin `response_model` de por medio
+// que convierta los enteros a bool como sí pasa en el resto de la API.
+const servicioActivo = (v) => v === true || v === 1;
+
+/**
  * Descriptor visual de un evento del calendario (Opción 2: color de fondo = ESTADO/salud).
  * Centraliza TODA la gramática del chip para que CalendarMonth solo pinte.
  *
@@ -80,19 +102,30 @@ export function isEnCurso(jornada, now = new Date()) {
  *  - saludGlifo: '✓' (cerrada OK) | '!' (cerrada baja) | null
  *  - tachado: bool (cancelada → line-through)
  *  - pulseClass: clase de animación ('' / 'jornada-alerta-pulse-inaug' / 'jornada-encurso-pulse')
+ *  - servicios: [{key, emoji, nombre}] servicios que lleva la actividad
+ *  - esConvenio: bool (firma de convenio con una empresa — evento informativo)
  *
  * @param {object} e - evento de /calendario (tipo, seccion, estado, semaforo, sin_jornada_asociada…)
  * @param {Date} now
  */
 export function getChipDescriptor(e, now = new Date()) {
   const estado = e.estado;
-  const esAlertaInaug = e.sin_jornada_asociada === true;
+  // Firma de convenio con una empresa: NO es una jornada ni una inauguración
+  // pendiente de coordinar, es un dato informativo. Se reconoce por el
+  // discriminador `origen` que manda el endpoint del calendario, con respaldo en
+  // el tipo por si el evento llega de otra ruta que todavía no lo emita.
+  // Sin esta compuerta el chip caería en el café de alerta con pulso y le diría
+  // a la jefatura que hay algo que atender donde no lo hay.
+  const esConvenio = e.origen === 'empresa_convenio' || e.tipo === 'CONVENIO';
+  const esAlertaInaug = !esConvenio && e.sin_jornada_asociada === true;
   const esCancelada = estado === 'CANCELADA';
   const esReprogramada = estado === 'REPROGRAMADA';
-  const esEnCurso = !esCancelada && isEnCurso(e, now);
+  // Un convenio tampoco entra «en curso» el día de la firma: no es una actividad
+  // que ocurra durante una jornada, así que se queda en el azul de programada.
+  const esEnCurso = !esConvenio && !esCancelada && isEnCurso(e, now);
   // Inauguración por FLAG (C1): el tipo dedicado INAUGURACION o cualquier jornada
   // con inaugura_clinica=true (ej. tamizaje SIPRESALUD que además inaugura clínica).
-  const esInaug = e.inaugura_clinica === true || e.tipo === 'INAUGURACION';
+  const esInaug = !esConvenio && (e.inaugura_clinica === true || e.tipo === 'INAUGURACION');
   // Empresa con clínica amarrada (C2) → borde naranja; sin empresa → sin borde.
   const clinicaAmarrada = e.empresa_clinica_amarrada === true;
   // F2.2: jornada DEPARTAMENTAL (en el interior, fuera de la capital) → ícono de
@@ -141,11 +174,15 @@ export function getChipDescriptor(e, now = new Date()) {
   const pulseClass = esAlertaInaug ? 'jornada-alerta-pulse-inaug'
     : esEnCurso ? 'jornada-encurso-pulse' : '';
 
+  // Servicios que ofrece la actividad (fila de emojis del chip).
+  const servicios = SERVICIOS_CHIP.filter((s) => servicioActivo(e[s.key]));
+
   return {
     bgVar, darkText, seccionPrefijo, seccionVar, seccionDashed,
-    esEnCurso, esCancelada, esAlertaInaug, esReprogramada, esInaug, clinicaAmarrada, esDepartamental,
+    esEnCurso, esCancelada, esAlertaInaug, esReprogramada, esInaug, esConvenio,
+    clinicaAmarrada, esDepartamental,
     leadGlifo: esEnCurso ? '●' : null,
-    estadoGlifo, saludGlifo, pctChip,
+    estadoGlifo, saludGlifo, pctChip, servicios,
     tachado: esCancelada,
     pulseClass,
   };

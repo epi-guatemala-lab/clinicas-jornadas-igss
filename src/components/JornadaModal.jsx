@@ -5,7 +5,10 @@ import {
   apiSetMaterial, apiSetCharlas, apiCatalogoCharlas, apiListPersonal,
   apiGetCierreJornada, apiAmarrarClinica,
 } from '../api/endpoints';
-import { SEMAFORO_BG, TIPO_LABEL, ESTADO_LABEL, fmtN, fmtQ, fmtPct } from '../utils/format';
+import {
+  SEMAFORO_BG, TIPO_LABEL, ESTADO_LABEL, fmtN, fmtQ, fmtPct,
+  fmtRangoFechas, fmtFechaHora,
+} from '../utils/format';
 import { useAuth } from '../hooks/useAuth';
 import JornadaFormModal from './JornadaFormModal';
 import SearchableSelect from './filters/SearchableSelect';
@@ -123,21 +126,40 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
     }
   }
   async function doClose() {
-    if (form.atendidos == null || form.atendidos === '') {
-      alert('Atendidos requerido'); return;
-    }
     // Cierre manual (jornadas sin archivo: talleres/webinars). Ya NO se piden
     // viáticos acá: el monto entra después, por persona, desde su propio flujo,
     // y el backend ignora `viaticos_real` en el cierre.
+    //
+    // Un solo conteo (decisión del 2026-08-28): todas las personas atendidas se
+    // registran como afiliadas y los kits de laboratorio van 1:1 con ellas. Los
+    // tres campos que se pedían por separado devolvían números descuadrados de
+    // la misma realidad, así que ahora se derivan del valor capturado.
+    //
+    // La derivación la hace el SERVIDOR y acá se mandan SOLO los atendidos:
+    // `afiliados_atendidos` y `kits_consumidos` viajaban con el mismo número y
+    // eso anulaba el resguardo del backend, que prefiere el conteo de afiliados
+    // ya MEDIDO por el análisis de datos (`epi_personas` con afiliado_igss='SI')
+    // sobre cualquier derivación. Mandarlo desde acá pisaba ese dato real con
+    // una copia de los atendidos. Sin la llave, el servidor resuelve: kits =
+    // atendidos si la jornada lleva laboratorio (NULL si no), y afiliados = el
+    // conteo medido cuando existe, y solo si no existe = atendidos.
+    const atendidos = Number(form.atendidos);
+    if (form.atendidos == null || form.atendidos === ''
+        || !Number.isFinite(atendidos) || atendidos < 0) {
+      alert('Escribí cuántos afiliados se atendieron (un número igual o mayor que cero)');
+      return;
+    }
     const body = {
-      atendidos: Number(form.atendidos),
-      afiliados_atendidos: form.afiliados_atendidos !== '' ? Number(form.afiliados_atendidos) : null,
-      kits_consumidos: form.kits_consumidos !== '' ? Number(form.kits_consumidos) : null,
+      atendidos,
       notas: form.notas || null,
       confirmar_amarre_clinica: !!form.confirmar_amarre_clinica,
     };
-    const upd = await apiCerrarJornada(j.id, body);
-    setJ(upd); setMode('view'); onChanged?.();
+    try {
+      const upd = await apiCerrarJornada(j.id, body);
+      setJ(upd); setMode('view'); onChanged?.();
+    } catch (e) {
+      alert(e.response?.data?.detail || 'No se pudo cerrar la jornada');
+    }
   }
   async function doAmarrar() {
     // Rescate: amarra la clínica de una inauguración que se cerró sin confirmarlo
@@ -166,23 +188,36 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
 
       <div className="p-4 space-y-4">
         <div className="grid grid-cols-2 gap-3 text-sm">
-          <Field label="Fecha">{j.fecha_inicio}{j.fecha_fin && j.fecha_fin !== j.fecha_inicio ? ` → ${j.fecha_fin}` : ''}</Field>
+          <Field label="Fecha">{fmtRangoFechas(j.fecha_inicio, j.fecha_fin)}</Field>
           <Field label="Hora inicio">{j.hora_inicio || '—'}</Field>
           <Field label="Sección">{j.seccion_responsable}</Field>
           <Field label="Modalidad">{j.modalidad}</Field>
           <Field label="Ubicación">{[j.departamento, j.municipio, j.zona && `z. ${j.zona}`].filter(Boolean).join(' · ') || '—'}</Field>
           <Field label="Líder">{j.lider_nombre || '—'}</Field>
           <Field label="Afiliados proyectados">{fmtN(j.programados)}</Field>
-          <Field label="Atendidos">{j.atendidos != null ? `${fmtN(j.atendidos)} (${fmtPct(j.pct_asistencia)})` : '—'}</Field>
-          {j.afiliados_atendidos != null && <Field label="Afiliados atendidos">{fmtN(j.afiliados_atendidos)}</Field>}
-          {j.kits_consumidos != null && <Field label="Kits consumidos">{fmtN(j.kits_consumidos)}</Field>}
+          {/* Un solo renglón para el conteo del cierre: todas las personas
+              atendidas son afiliadas y los kits van 1:1 con ellas, así que los
+              tres números eran el mismo repetido y se leían como tres datos
+              distintos. */}
+          <Field label="Afiliados atendidos">{j.atendidos != null ? `${fmtN(j.atendidos)} (${fmtPct(j.pct_asistencia)})` : '—'}</Field>
+          {/* Cierres viejos, capturados cuando afiliados y kits se escribían
+              aparte: se muestran SOLO si no coinciden con el conteo, para no
+              esconder un dato que quedó registrado distinto. */}
+          {j.afiliados_atendidos != null && j.afiliados_atendidos !== j.atendidos && (
+            <Field label="Afiliados registrados en el cierre">{fmtN(j.afiliados_atendidos)}</Field>
+          )}
+          {j.kits_consumidos != null && j.kits_consumidos !== j.atendidos && (
+            <Field label="Kits consumidos">{fmtN(j.kits_consumidos)}</Field>
+          )}
           {j.viaticos_real != null && <Field label="Viáticos reales">{fmtQ(j.viaticos_real)}</Field>}
           {j.inaugura_clinica && <Field label="Inaugura clínica" className="col-span-2 text-accent font-medium">✂️ Esta jornada inaugura una clínica permanente</Field>}
           <Field label="Material entregado" className="col-span-2">
             <span className={j.material_entregado ? 'text-success font-semibold' : 'text-fg-muted'}>
               {j.material_entregado ? '✓ Entregado' : '○ Pendiente'}
             </span>
-            {j.material_entregado_at && <span className="text-fg-muted text-xs"> · {j.material_entregado_at.replace('T', ' ')}</span>}
+            {/* El sello viene en UTC (SQLite lo escribe con datetime('now')):
+                reordenarlo a mano mostraba la entrega 6 horas adelantada. */}
+            {j.material_entregado_at && <span className="text-fg-muted text-xs"> · {fmtFechaHora(j.material_entregado_at)}</span>}
             {berkin && (
               <button className="ml-3 text-xs underline text-igss-primary disabled:opacity-50"
                 onClick={toggleMaterial} disabled={savingMat}>
@@ -190,6 +225,15 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
               </button>
             )}
           </Field>
+          {/* Observaciones de campo. El servidor ya las devuelve en null para
+              gerencia; la compuerta se repite acá para que una ficha que quedó
+              cacheada en el navegador con otra sesión tampoco se las muestre.
+              La captura vive en el formulario de la jornada, no en la ficha. */}
+          {j.observaciones && user?.rol !== 'gerencia' && (
+            <Field label="Observaciones" className="col-span-2">
+              <span className="font-normal whitespace-pre-line">{j.observaciones}</span>
+            </Field>
+          )}
         </div>
 
         {/* Rescate del amarre: una inauguración que se cerró SIN confirmar el
@@ -277,7 +321,7 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
             </div>
             {cierre?.carga_id ? (
               <p className="text-xs text-fg-muted">
-                Cargado por {cierre.cargado_por} el {cierre.cargado_at} ·{' '}
+                Cargado por {cierre.cargado_por} el {fmtFechaHora(cierre.cargado_at)} ·{' '}
                 <b className="text-fg">{fmtN(cierre.personas)} tamizados</b>
                 {cierre.con_hallazgo != null && (
                   <> · {fmtN(cierre.con_hallazgo)} con hallazgos · {fmtN(cierre.referibles)} por referir</>
@@ -350,22 +394,22 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
             {/* Este cierre manual es para jornadas SIN archivo (talleres, webinars).
                 Las jornadas de clínica se cierran solas al aplicar el análisis. */}
             <p className="text-xs text-fg-muted">
-              Para jornadas con archivo de cierre, cerrá desde «Análisis de cierre»: los atendidos
-              y los kits los toma del archivo y la jornada se cierra al aplicarlo.
+              Para jornadas con archivo de cierre, cerrá desde «Análisis de cierre»: los afiliados
+              atendidos y los kits los toma del archivo y la jornada se cierra al aplicarlo.
             </p>
-            <div className="grid grid-cols-2 gap-2">
-              <div><label className="label">Atendidos *</label>
-                <input type="number" className="input" min="0"
-                  value={form.atendidos ?? ''}
-                  onChange={(e) => setForm({ ...form, atendidos: e.target.value })} /></div>
-              <div><label className="label">Afiliados atendidos</label>
-                <input type="number" className="input" min="0"
-                  value={form.afiliados_atendidos ?? ''}
-                  onChange={(e) => setForm({ ...form, afiliados_atendidos: e.target.value })} /></div>
-              <div><label className="label">Kits consumidos</label>
-                <input type="number" className="input" min="0"
-                  value={form.kits_consumidos ?? ''}
-                  onChange={(e) => setForm({ ...form, kits_consumidos: e.target.value })} /></div>
+            {/* Un solo campo: los tres conteos que se pedían antes (atendidos,
+                afiliados y kits) son el mismo número, y pedirlos por separado
+                era la vía por la que entraban descuadrados. */}
+            <div>
+              <label className="label" htmlFor="cierre_afiliados">Afiliados atendidos *</label>
+              <input id="cierre_afiliados" type="number" className="input max-w-[12rem]" min="0"
+                value={form.atendidos ?? ''}
+                onChange={(e) => setForm({ ...form, atendidos: e.target.value })} />
+              <p className="text-[11px] text-fg-subtle mt-0.5">
+                {j.aplica_kit_lab
+                  ? 'Equivale a los kits de laboratorio consumidos: el sistema descuenta uno por persona atendida.'
+                  : 'Todas las personas atendidas quedan registradas como afiliadas.'}
+              </p>
             </div>
             {/* Amarre prominente y tildado por defecto (ver el default al abrir
                 este modo). Solo con empresa: sin ella la confirmación no haría

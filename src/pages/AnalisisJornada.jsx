@@ -10,7 +10,7 @@ import { describirError } from '../utils/apiError';
 import { ESTADO_CARGA, etiquetaDeClave, fmtBytes, separarBloqueoEmpresa } from '../utils/carga';
 import { avisoSiHayCargaEnCurso } from '../utils/carrilCarga';
 import { leerAvisosProceso, leerCotejo, textoParaReportar } from '../utils/divergencias';
-import { fmtN } from '../utils/format';
+import { fmtFechaHora, fmtN, fmtRangoFechas } from '../utils/format';
 import BloqueosCarga from '../components/cargas/BloqueosCarga';
 import ConfirmarEmpresaCierre from '../components/cargas/ConfirmarEmpresaCierre';
 import ConflictosCarga from '../components/cargas/ConflictosCarga';
@@ -57,11 +57,12 @@ export default function AnalisisJornada() {
   const [errorEmpresa, setErrorEmpresa] = useState(null);
   // Aplicar-y-cerrar (ago-2026): cerrar la jornada dejó de ser un paso aparte.
   // Al aplicar el análisis se cierra en la misma acción; el panel de abajo es la
-  // ÚNICA confirmación. atendidos y kits los deriva el backend del propio
-  // análisis (ver JornadaCierreIn); el único dato manual es afiliados_atendidos.
+  // ÚNICA confirmación. atendidos, afiliados y kits salen todos del propio
+  // análisis: desde la unificación del 2026-08-28 los tres son el mismo conteo,
+  // así que el cierre ya no pide ningún número a mano (solo notas y amarre).
   const [mostrandoConfirmacion, setMostrandoConfirmacion] = useState(false);
   const [formCierre, setFormCierre] = useState({
-    afiliados_atendidos: '', notas: '', confirmar_amarre_clinica: false,
+    notas: '', confirmar_amarre_clinica: false,
   });
   // Datos del cierre capturados al confirmar, a la espera de que el APLICAR
   // termine en el servidor: recién ahí (carga OK y ya no PREVIEW) se cierra.
@@ -128,7 +129,7 @@ export default function AnalisisJornada() {
     setEnviando(false); setError(null); setErrorEmpresa(null); setReintento(null);
     setMostrandoConfirmacion(false); setPendienteCierre(null);
     setCerrando(false); setErrorCierre(null); setCierreOk(false);
-    setFormCierre({ afiliados_atendidos: '', notas: '', confirmar_amarre_clinica: false });
+    setFormCierre({ notas: '', confirmar_amarre_clinica: false });
     cierreDisparado.current = false;
     if (inputRef.current) inputRef.current.value = '';
   }, []);
@@ -239,11 +240,12 @@ export default function AnalisisJornada() {
   }
 
   /**
-   * Cierra la jornada tras un apply exitoso. Solo manda el dato que el sistema
-   * no puede saber solo (afiliados_atendidos) + notas + amarre; atendidos y kits
-   * los deriva el backend del análisis que se acaba de aplicar. El error de este
-   * paso se maneja APARTE del error del apply: si esto falla, los datos clínicos
-   * YA entraron —solo faltó marcar la jornada como cerrada— y se puede reintentar.
+   * Cierra la jornada tras un apply exitoso. Manda el conteo del análisis
+   * (atendidos = afiliados, ver la unificación del 2026-08-28) + notas + amarre;
+   * los kits los deriva el backend cuando la jornada lleva laboratorio. El error
+   * de este paso se maneja APARTE del error del apply: si esto falla, los datos
+   * clínicos YA entraron —solo faltó marcar la jornada como cerrada— y se puede
+   * reintentar.
    */
   const ejecutarCierre = useCallback(async (payload) => {
     setCerrando(true); setErrorCierre(null);
@@ -306,12 +308,15 @@ export default function AnalisisJornada() {
    * todavía porque el apply es asíncrono (corre en el worker del servidor).
    */
   function confirmarAplicarYCerrar() {
+    // El conteo que el panel MOSTRÓ y la operadora confirmó: se manda tal cual
+    // para que lo guardado sea ese número (ver ejecutarCierre). Afiliados va con
+    // el MISMO valor —todos los atendidos son afiliados— en vez de pedirse a
+    // mano: escribirlo aparte era la vía por la que los dos números salían
+    // descuadrados del mismo archivo.
+    const conteo = typeof atendidosArchivo === 'number' ? atendidosArchivo : null;
     const payload = {
-      // El conteo que el panel MOSTRÓ y la operadora confirmó: se manda tal cual
-      // para que lo guardado sea ese número (ver ejecutarCierre).
-      atendidos: typeof atendidosArchivo === 'number' ? atendidosArchivo : null,
-      afiliados_atendidos: formCierre.afiliados_atendidos !== ''
-        ? Number(formCierre.afiliados_atendidos) : null,
+      atendidos: conteo,
+      afiliados_atendidos: conteo,
       notas: formCierre.notas?.trim() ? formCierre.notas.trim() : null,
       confirmar_amarre_clinica: !!formCierre.confirmar_amarre_clinica,
     };
@@ -437,8 +442,7 @@ export default function AnalisisJornada() {
         <h1 className="text-2xl font-bold">Análisis de cierre · {jornada.codigo}</h1>
         <p className="text-sm text-fg-muted max-w-3xl">
           {jornada.empresa_nombre}{jornada.tema ? ` · ${jornada.tema}` : ''} ·{' '}
-          {jornada.fecha_inicio}
-          {jornada.fecha_fin && jornada.fecha_fin !== jornada.fecha_inicio ? ` al ${jornada.fecha_fin}` : ''}.
+          {fmtRangoFechas(jornada.fecha_inicio, jornada.fecha_fin)}.
           Acá se sube el archivo «N - Análisis de Datos …» que genera Sipresalud al cerrar la
           jornada: triaje, encuesta, laboratorio y hallazgos quedan asociados a ESTA jornada.
         </p>
@@ -679,6 +683,7 @@ export default function AnalisisJornada() {
                 ) : (
                   <PanelAplicarYCerrar
                     atendidos={atendidosArchivo}
+                    declarado={jornada.atendidos}
                     llevaKit={llevaKit}
                     inauguraClinica={jornada.inaugura_clinica}
                     tieneEmpresa={Boolean(jornada.empresa_id)}
@@ -760,17 +765,24 @@ function VolverJornadas() {
  * Confirmación de «aplicar y cerrar». Junta en una sola pantalla lo que antes
  * eran dos pasos (aplicar el archivo + cerrar la jornada por el modal).
  *
- * atendidos y kits van en SOLO LECTURA porque el sistema ya los sabe: el conteo
- * sale del comprobante del archivo (no se escribe a mano) y los kits van 1:1 con
- * los atendidos. El único campo editable es «Afiliados atendidos», que no viene
- * en el archivo y NO es igual a los atendidos; por eso no se autocompleta. Las
- * notas quedan por si hace falta dejar constancia de algo. Los viáticos ya no se
- * piden acá: el monto entra después, por persona, desde su propio flujo.
+ * Ya NO se escribe ningún número a mano. El conteo sale del comprobante del
+ * archivo y, desde la unificación del 2026-08-28, los tres números del cierre
+ * son ese mismo: todas las personas atendidas se registran como afiliadas y los
+ * kits de laboratorio van 1:1 con ellas. El campo editable de afiliados se
+ * quitó justamente porque escribirlo aparte era por donde entraban descuadrados.
+ * Las notas quedan por si hace falta dejar constancia de algo. Los viáticos ya
+ * no se piden acá: el monto entra después, por persona, desde su propio flujo.
  */
 function PanelAplicarYCerrar({
-  atendidos, llevaKit, inauguraClinica, tieneEmpresa, form, setForm, onConfirmar, onVolver,
+  atendidos, declarado, llevaKit, inauguraClinica, tieneEmpresa,
+  form, setForm, onConfirmar, onVolver,
 }) {
   const sinConteo = atendidos == null;
+  // La jornada ya traía un conteo declarado distinto del que cuenta el archivo:
+  // al aplicar queda el del análisis, así que se dice ANTES de confirmar y no
+  // después. Informativo (no hay nada que apretar acá para resolverlo).
+  const hayDiscrepancia = typeof declarado === 'number' && typeof atendidos === 'number'
+    && declarado !== atendidos;
   return (
     <div className="space-y-3 border-t border-line-subtle pt-3">
       <div className="rounded-lg border border-info/40 bg-info-soft/30 p-3 space-y-3 text-sm">
@@ -784,14 +796,15 @@ function PanelAplicarYCerrar({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="rounded-lg bg-sunken/50 px-3 py-2">
-            <div className="text-xs text-fg-muted">Atendidos</div>
+            <div className="text-xs text-fg-muted">Afiliados atendidos</div>
             <div className="text-lg font-semibold tabular-nums">
               {sinConteo ? 'Calculando…' : fmtN(atendidos)}
             </div>
             <div className="text-[11px] text-fg-subtle">
               {sinConteo
                 ? 'El comprobante todavía no trae el conteo.'
-                : 'Personas del archivo. No se escribe a mano: lo cuenta el análisis.'}
+                : 'Personas del archivo: lo cuenta el análisis, no se escribe a mano. '
+                  + 'Todos los atendidos son afiliados.'}
             </div>
           </div>
           {llevaKit && (
@@ -807,18 +820,12 @@ function PanelAplicarYCerrar({
           )}
         </div>
 
-        <div>
-          <label className="label" htmlFor="cierre_afiliados">Afiliados atendidos (opcional)</label>
-          <input
-            id="cierre_afiliados" type="number" min="0" className="input max-w-[12rem]"
-            value={form.afiliados_atendidos}
-            onChange={(e) => setForm({ ...form, afiliados_atendidos: e.target.value })}
-          />
-          <p className="text-[11px] text-fg-subtle mt-0.5">
-            Cuántos de los atendidos son afiliados titulares IGSS; dejalo vacío si no lo tenés a
-            mano. No es lo mismo que los atendidos: alimenta la meta institucional de afiliados.
+        {hayDiscrepancia && (
+          <p className="text-[11px] text-info">
+            La jornada tenía declarados {fmtN(declarado)} atendidos y el análisis cuenta{' '}
+            {fmtN(atendidos)}: al aplicar queda el conteo del análisis.
           </p>
-        </div>
+        )}
 
         <div>
           <label className="label" htmlFor="cierre_notas">Notas del cierre (opcional)</label>
@@ -919,8 +926,10 @@ function EstadoCierre({ cierre, jornada }) {
             </span>
           )}
         </h2>
+        {/* El sello de la carga viene en UTC: sin convertirlo a la hora de
+            Guatemala el historial mostraba la subida 6 horas adelantada. */}
         <div className="text-xs text-fg-muted">
-          {cierre.archivo} · {cierre.cargado_por} · {cierre.cargado_at}
+          {cierre.archivo} · {cierre.cargado_por} · {fmtFechaHora(cierre.cargado_at)}
         </div>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">

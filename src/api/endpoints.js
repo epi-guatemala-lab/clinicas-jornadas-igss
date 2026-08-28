@@ -23,6 +23,12 @@ export const apiUpdateEmpresa = (id, body) =>
 export const apiSetInauguracion = (id, body) =>
   api.patch(`/api/empresas/${id}/inauguracion`, body).then((r) => r.data);
 
+// CE: fecha de firma del convenio. Mismo patrón que la inauguración (el
+// calendario la pinta como evento propio 'conv-{id}'), pero SÍ admite fechas
+// pasadas: un convenio se registra después de firmarlo.
+export const apiSetConvenio = (id, body) =>
+  api.patch(`/api/empresas/${id}/convenio`, body).then((r) => r.data);
+
 // A5: valores de 'grupo' para el combobox abierto
 export const apiEmpresaGrupos = () =>
   api.get('/api/empresas/grupos').then((r) => r.data);
@@ -85,6 +91,16 @@ export const apiCatalogoCharlas = () =>
 // ── Admin (usuarios + auditoría) ────────────────────────────────────
 export const apiAdminUsers = (params = {}) =>
   api.get('/api/admin/users', { params }).then((r) => r.data);
+// Alta de usuario desde la pantalla de administración. La contraseña es
+// OPCIONAL: si no se manda, el servidor genera una y la devuelve UNA sola vez
+// (misma mecánica que reset-password).
+export const apiAdminCreateUser = (body) =>
+  api.post('/api/admin/users', body).then((r) => r.data);
+// Cambio de rol/permiso/sección/personal. El servidor rechaza degradar al
+// último admin-editor (si no, bajar el permiso sería desactivar por la puerta
+// de al lado) y rechaza crear o promover a rol=gerencia.
+export const apiAdminPatchUser = (id, body) =>
+  api.patch(`/api/admin/users/${id}`, body).then((r) => r.data);
 export const apiAdminActivateUser = (id) =>
   api.post(`/api/admin/users/${id}/activar`).then((r) => r.data);
 export const apiAdminDeactivateUser = (id) =>

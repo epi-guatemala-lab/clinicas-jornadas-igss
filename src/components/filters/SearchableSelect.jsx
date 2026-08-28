@@ -122,10 +122,13 @@ export default function SearchableSelect({
       if (!open) return;
       setActiveIndex((i) => Math.max(i - 1, 0));
     } else if (e.key === 'Enter') {
-      if (open) {
-        e.preventDefault(); // NO submitear el form al elegir
-        if (activeIndex >= 0 && visible[activeIndex]) select(visible[activeIndex]);
-      }
+      // El Enter NUNCA sale de este control. Con el desplegable abierto elige el
+      // item activo; con el desplegable CERRADO no hace nada. Antes ese segundo
+      // caso caía al <form> padre y guardaba la jornada entera: como el control
+      // es un <input>, un Enter después de escribir para filtrar (o tras cerrar
+      // con Escape) enviaba el formulario a medio llenar sin que nadie lo pidiera.
+      e.preventDefault();
+      if (open && activeIndex >= 0 && visible[activeIndex]) select(visible[activeIndex]);
     } else if (e.key === 'Escape') {
       if (open) { e.preventDefault(); setOpen(false); setQuery(''); }
     } else if (e.key === 'Tab') {
