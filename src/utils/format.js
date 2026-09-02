@@ -161,6 +161,7 @@ export const SEMAFORO_DOT = {
 // («VISITA_SEGUIMIENTO»). Los rótulos son los mismos del servidor a propósito:
 // es la misma actividad y no puede llamarse de dos maneras según por dónde entre.
 export const TIPO_LABEL = {
+  TRASLADO: 'Traslado',
   SIPRESALUD_JORNADA: 'Jornada SIPRESALUD',
   CE_JORNADA: 'Jornada de Clínica de Empresa',
   INAUGURACION: 'Inauguración',

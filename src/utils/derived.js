@@ -110,6 +110,7 @@ const servicioActivo = (v) => v === true || v === 1;
  */
 export function getChipDescriptor(e, now = new Date()) {
   const estado = e.estado;
+  const esTraslado = e.origen === 'traslado_jornada' || e.tipo === 'TRASLADO';
   // Firma de convenio con una empresa: NO es una jornada ni una inauguración
   // pendiente de coordinar, es un dato informativo. Se reconoce por el
   // discriminador `origen` que manda el endpoint del calendario, con respaldo en
@@ -117,21 +118,24 @@ export function getChipDescriptor(e, now = new Date()) {
   // Sin esta compuerta el chip caería en el café de alerta con pulso y le diría
   // a la jefatura que hay algo que atender donde no lo hay.
   const esConvenio = e.origen === 'empresa_convenio' || e.tipo === 'CONVENIO';
-  const esAlertaInaug = !esConvenio && e.sin_jornada_asociada === true;
+  const esAlertaInaug = !esConvenio && !esTraslado && e.sin_jornada_asociada === true;
   const esCancelada = estado === 'CANCELADA';
   const esReprogramada = estado === 'REPROGRAMADA';
   // Un convenio tampoco entra «en curso» el día de la firma: no es una actividad
   // que ocurra durante una jornada, así que se queda en el azul de programada.
-  const esEnCurso = !esConvenio && !esCancelada && isEnCurso(e, now);
+  const esEnCurso = !esConvenio && !esTraslado && !esCancelada && isEnCurso(e, now);
   // Inauguración por FLAG (C1): el tipo dedicado INAUGURACION o cualquier jornada
   // con inaugura_clinica=true (ej. tamizaje SIPRESALUD que además inaugura clínica).
-  const esInaug = !esConvenio && (e.inaugura_clinica === true || e.tipo === 'INAUGURACION');
+  const esInaug = !esConvenio && !esTraslado && (e.inaugura_clinica === true || e.tipo === 'INAUGURACION');
   // Empresa con clínica amarrada (C2) → borde naranja; sin empresa → sin borde.
   const clinicaAmarrada = e.empresa_clinica_amarrada === true;
   // F2.2: jornada DEPARTAMENTAL (en el interior, fuera de la capital) → ícono de
   // ubicación. Requiere viaje/viáticos; se distingue de las de Guatemala capital.
   const dep = (e.departamento || '').trim().toUpperCase();
-  const esDepartamental = dep !== '' && dep !== 'GUATEMALA';
+  // Las jornadas nuevas guardan la decisión explícita. El fallback mantiene
+  // el pin correcto en eventos históricos que todavía no poseen la columna.
+  const esDepartamental = e.es_departamental === true || e.es_departamental === 1
+    || (e.es_departamental == null && dep !== '' && dep !== 'GUATEMALA');
 
   // Sección (prefijo + borde) con fallback por tipo.
   const sec = e.seccion
@@ -152,7 +156,8 @@ export function getChipDescriptor(e, now = new Date()) {
 
   // Fondo de chip = ESTADO/salud, con overrides de alerta (orden de prioridad).
   let bgVar;
-  if (esAlertaInaug) bgVar = '--alert-inaug-chip';          // inaug SIN jornada (alerta, café)
+  if (esTraslado) bgVar = '--traslado-chip';                // día previo reservado para viaje
+  else if (esAlertaInaug) bgVar = '--alert-inaug-chip';     // inaug SIN jornada (alerta, café)
   else if (esCancelada) bgVar = '--estado-cancelada-chip';  // cancelada gana (gris)
   else if (esEnCurso) bgVar = '--estado-encurso-chip';      // en curso ahora (amarillo)
   else if (esInaug) bgVar = '--alert-inaug-chip';           // B7: inauguración (incl. cerradas con inaug) → café
@@ -179,7 +184,7 @@ export function getChipDescriptor(e, now = new Date()) {
 
   return {
     bgVar, darkText, seccionPrefijo, seccionVar, seccionDashed,
-    esEnCurso, esCancelada, esAlertaInaug, esReprogramada, esInaug, esConvenio,
+    esEnCurso, esCancelada, esAlertaInaug, esReprogramada, esInaug, esConvenio, esTraslado,
     clinicaAmarrada, esDepartamental,
     leadGlifo: esEnCurso ? '●' : null,
     estadoGlifo, saludGlifo, pctChip, servicios,

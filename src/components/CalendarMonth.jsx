@@ -109,7 +109,9 @@ export default function CalendarMonth({ month, eventos, onEventClick }) {
                     contra un Date. */}
                 {events.map((e) => {
                   const desc = getChipDescriptor(e, now);
-                  const label = e.empresa || e.tema || TIPO_LABEL[e.tipo] || e.tipo;
+                  const label = desc.esTraslado
+                    ? (e.tema || `Traslado hacia ${e.empresa || 'jornada'}`)
+                    : (e.empresa || e.tema || TIPO_LABEL[e.tipo] || e.tipo);
                   const trailGlifo = desc.saludGlifo || desc.estadoGlifo;
                   const seccionNombre = desc.seccionPrefijo === 'CE' ? 'Clínicas de Empresa' : 'SIPRESALUD';
                   const multiDia = e._dias > 1;
@@ -120,6 +122,8 @@ export default function CalendarMonth({ month, eventos, onEventClick }) {
                   const mostrarPct = desc.pctChip != null && e._ultimoDia !== false;
                   const title = [
                     `${TIPO_LABEL[e.tipo] || e.tipo} · ${seccionNombre}`,
+                    desc.esTraslado ? 'Reserva del día previo para todo el equipo' : null,
+                    desc.esTraslado && e.jornada_id ? `Jornada vinculada #${e.jornada_id}` : null,
                     e.empresa || null,
                     ESTADO_LABEL[e.estado] || e.estado,
                     multiDia ? `Día ${e._dia} de ${e._dias}` : null,

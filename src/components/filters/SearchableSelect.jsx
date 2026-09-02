@@ -11,7 +11,9 @@ import { normIncludes } from '../../utils/norm';
  *                     placeholder="— Sin empresa —" />
  *   `onChange` recibe el value crudo como STRING (igual que e.target.value).
  *
- * options: [{value, label}] o [[value, label]] o [value] (label=value).
+ * options: [{value, label, disabled?, description?}] o [[value, label]] o
+ * [value] (label=value). Un item disabled se muestra con la razón pero no se
+ * puede elegir; se usa para explicar jornadas/traslados que ocupan al personal.
  * placeholder: texto del option vacío (value=''). allowEmpty (default true) lo incluye.
  * filterKeys: si querés buscar también por value (ej. NIT), pasar ['value'].
  * formatOption(o): devuelve el label a mostrar (default o.label).
@@ -23,7 +25,10 @@ function normalizeOptions(options) {
   if (!Array.isArray(options)) return [];
   return options.map((o) => {
     if (Array.isArray(o)) return { value: String(o[0]), label: String(o[1] ?? o[0]) };
-    if (o && typeof o === 'object') return { value: String(o.value), label: String(o.label ?? o.value) };
+    if (o && typeof o === 'object') return {
+      ...o, value: String(o.value), label: String(o.label ?? o.value),
+      disabled: o.disabled === true,
+    };
     return { value: String(o), label: String(o) };
   });
 }
@@ -106,6 +111,7 @@ export default function SearchableSelect({
   };
 
   const select = (o) => {
+    if (o.disabled) return;
     onChange(o.value);
     setOpen(false);
     setQuery('');
@@ -128,7 +134,9 @@ export default function SearchableSelect({
       // es un <input>, un Enter después de escribir para filtrar (o tras cerrar
       // con Escape) enviaba el formulario a medio llenar sin que nadie lo pidiera.
       e.preventDefault();
-      if (open && activeIndex >= 0 && visible[activeIndex]) select(visible[activeIndex]);
+      if (open && activeIndex >= 0 && visible[activeIndex] && !visible[activeIndex].disabled) {
+        select(visible[activeIndex]);
+      }
     } else if (e.key === 'Escape') {
       if (open) { e.preventDefault(); setOpen(false); setQuery(''); }
     } else if (e.key === 'Tab') {
@@ -171,14 +179,24 @@ export default function SearchableSelect({
           )}
           {visible.map((o, i) => (
             <li key={`${o.value}-${i}`} role="option" aria-selected={o.value === valueStr}
+              aria-disabled={o.disabled || undefined}
               data-active={i === activeIndex}
-              onMouseDown={(e) => { e.preventDefault(); select(o); }}
+              onMouseDown={(e) => { e.preventDefault(); if (!o.disabled) select(o); }}
               onMouseEnter={() => setActiveIndex(i)}
-              className={`px-3 py-1.5 text-sm cursor-pointer flex items-center justify-between gap-2
-                ${i === activeIndex ? 'bg-accent text-white' : ''}
+              className={`px-3 py-1.5 text-sm flex items-center justify-between gap-2
+                ${o.disabled ? 'cursor-not-allowed opacity-55 bg-sunken/60' : 'cursor-pointer'}
+                ${i === activeIndex && !o.disabled ? 'bg-accent text-white' : ''}
                 ${o._legacy ? '!bg-warning-soft !text-warning' : ''}
                 ${!o._legacy && o.value === '' ? 'text-fg-muted italic' : ''}`}>
-              <span className="truncate">{o.label}</span>
+              <span className="min-w-0">
+                <span className="block truncate">{o.label}</span>
+                {o.description && (
+                  <span className="block text-[10px] leading-tight opacity-90 truncate">
+                    {o.description}
+                  </span>
+                )}
+              </span>
+              {o.disabled && <span className="text-[10px] uppercase flex-shrink-0">Ocupado</span>}
               {o._legacy && <span className="text-[10px] uppercase opacity-80">no visible</span>}
               {!o._legacy && o.value === valueStr && valueStr !== '' && (
                 <span className="text-xs">✓</span>

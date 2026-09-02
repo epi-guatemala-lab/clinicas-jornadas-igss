@@ -119,7 +119,12 @@ export default function Calendario() {
            'conv-7') no son jornadas; con la guarda anterior —negar una sola de
            esas formas— cada stub nuevo pegaba a /api/jornadas/conv-7, el backend
            respondía 422 y el modal quedaba colgado sin decir por qué. */
-        onEventClick={(e) => { if (typeof e.id === 'number') setSelected(e.id); }} />
+        onEventClick={(e) => {
+          const jornadaId = typeof e.id === 'number'
+            ? e.id
+            : (e.origen === 'traslado_jornada' ? e.jornada_id : null);
+          if (jornadaId) setSelected(jornadaId);
+        }} />
 
       {/* Mes sin eventos: hint accionable hacia el último mes con jornadas */}
       {!soloAlertas && eventos.length === 0 && (
@@ -182,6 +187,7 @@ export default function Calendario() {
             // El convenio no es una actividad que se programe: es la fecha de firma
             // con la empresa, informativa (azul, sin alerta) y sin ficha que abrir.
             ['CONVENIO', 'Convenio (firma con la empresa — informativo)'],
+            ['TRASLADO', 'Traslado previo (todo el equipo)'],
           ].map(([t, l]) => (
             <span key={t} className="flex items-center gap-1 text-fg"><TipoIcon tipo={t} /> {l}</span>
           ))}

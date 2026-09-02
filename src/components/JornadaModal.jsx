@@ -7,7 +7,7 @@ import {
 } from '../api/endpoints';
 import {
   SEMAFORO_BG, TIPO_LABEL, ESTADO_LABEL, fmtN, fmtQ, fmtPct,
-  fmtRangoFechas, fmtFechaHora,
+  fmtRangoFechas, fmtFechaHora, fmtFecha,
 } from '../utils/format';
 import { useAuth } from '../hooks/useAuth';
 import JornadaFormModal from './JornadaFormModal';
@@ -193,6 +193,12 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
           <Field label="Sección">{j.seccion_responsable}</Field>
           <Field label="Modalidad">{j.modalidad}</Field>
           <Field label="Ubicación">{[j.departamento, j.municipio, j.zona && `z. ${j.zona}`].filter(Boolean).join(' · ') || '—'}</Field>
+          <Field label="Tipo de ubicación">{j.es_departamental ? 'Departamental (fuera de la capital)' : 'Capital'}</Field>
+          {j.requiere_dia_traslado_previo && (
+            <Field label="Traslado previo" className="col-span-2 text-cyan-700 dark:text-cyan-300 font-medium">
+              🚐 {fmtFecha(j.fecha_traslado_previo)} · todo el equipo queda reservado ese día
+            </Field>
+          )}
           <Field label="Líder">{j.lider_nombre || '—'}</Field>
           <Field label="Afiliados proyectados">{fmtN(j.programados)}</Field>
           {/* Un solo renglón para el conteo del cierre: todas las personas

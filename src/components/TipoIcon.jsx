@@ -3,6 +3,15 @@
 // El ícono es el portador colorblind-safe del TIPO (el color de fondo = estado).
 
 const PATHS = {
+  // Traslado previo de todo el equipo — vehículo en carretera.
+  TRASLADO: (
+    <>
+      <path d="M3 6h11v10H3Z" />
+      <path d="M14 9h4l3 3v4h-7Z" />
+      <circle cx="7" cy="18" r="2" />
+      <circle cx="18" cy="18" r="2" />
+    </>
+  ),
   // Jornada SIPRESALUD — pulso/actividad (tamizaje en salud)
   SIPRESALUD_JORNADA: <path d="M3 12h4l2-6 4 12 2-6h6" />,
   // Inauguración — tijera (corte de cinta)

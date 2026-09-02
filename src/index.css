@@ -52,6 +52,7 @@
     --chart-7:     219 39 119;     /* magenta */
     /* calendario — fondo de chip = ESTADO/asistencia (texto blanco AA) */
     --estado-programada-chip:   37 99 235;    /* #2563EB azul — programada (B1) */
+    --traslado-chip:            8 145 178;    /* #0891B2 cyan — traslado previo */
     --estado-encurso-chip:      234 179 8;    /* #EAB308 amarillo — en curso (B3, texto oscuro) */
     --estado-ejecutada-chip:    52 211 153;   /* #34D399 verde menta — realizada (B2, texto oscuro) */
     --estado-cerrada-ok-chip:   124 58 237;   /* #7C3AED morado — cerrada ≥90% (B4) */
@@ -106,6 +107,7 @@
     --chart-7:     244 114 182;    /* rosa claro */
     /* calendario dark (mismos significados, ajustados AA con texto blanco) */
     --estado-programada-chip:   59 130 246;   /* #3B82F6 azul (B1) */
+    --traslado-chip:            6 182 212;    /* #06B6D4 cyan — traslado previo */
     --estado-encurso-chip:      250 204 21;   /* #FACC15 amarillo (B3, texto oscuro) */
     --estado-ejecutada-chip:    110 231 183;  /* #6EE7B7 verde menta (B2, texto oscuro) */
     --estado-cerrada-ok-chip:   139 92 246;   /* #8B5CF6 morado (B4) */

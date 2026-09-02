@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   apiListEmpresas, apiListPersonal, apiListJornadas,
-  apiCreateJornada, apiUpdateJornada, apiSetCharlas,
+  apiCreateJornada, apiUpdateJornada, apiSetCharlas, apiDisponibilidadPersonal,
 } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
 import { useApi } from '../hooks/useApi';
-import { isoLocalDate, TIPOS_ACTIVIDAD_UI } from '../utils/format';
+import { fmtFecha, isoLocalDate, TIPOS_ACTIVIDAD_UI } from '../utils/format';
 // Traductor ÚNICO de errores del backend (incluye el aplanado por campo de los
 // 422 de Pydantic). Este archivo tenía su propia copia con el mismo nombre y
 // semántica opuesta en el segundo argumento —texto por defecto acá, acción en
@@ -63,6 +63,10 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
   const [empresas, setEmpresas] = useState([]);
   const [personal, setPersonal] = useState([]);
   const [jornadasSipre, setJornadasSipre] = useState([]);
+  const [disponibilidad, setDisponibilidad] = useState({
+    fecha_traslado_previo: null, conflictos: [],
+  });
+  const [consultandoDisponibilidad, setConsultandoDisponibilidad] = useState(false);
   const [err, setErr] = useState('');
 
   const [form, setForm] = useState(() => isEdit ? {
@@ -81,6 +85,8 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
     // así que si no se lee de la jornada viaja vacía y cada edición borraba la
     // dirección del lugar donde se hace la actividad, sin que nadie la tocara.
     direccion: jornada.direccion || '',
+    es_departamental: !!jornada.es_departamental,
+    requiere_dia_traslado_previo: !!jornada.requiere_dia_traslado_previo,
     programados: jornada.programados ?? 0,
     aplica_kit_lab: !!jornada.aplica_kit_lab,
     tamizaje_vih: !!jornada.tamizaje_vih,
@@ -107,6 +113,8 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
     tipo: 'SIPRESALUD_JORNADA',
     seccion_responsable: 'SIPRESALUD',   // siempre SIPRESALUD (no se hacen jornadas CE)
     modalidad: 'PRESENCIAL',
+    es_departamental: null, // se pregunta explícitamente; no asumir capital
+    requiere_dia_traslado_previo: false,
     fecha_inicio: isoLocalDate(),
     programados: 0,
     aplica_kit_lab: true,
@@ -133,12 +141,74 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
     apiListJornadas({ seccion: 'SIPRESALUD' }).then(setJornadasSipre);
   }, []);
 
+  // La UI avisa y deshabilita personas ocupadas; el backend vuelve a validar al
+  // guardar para cerrar la carrera entre dos usuarios que editan a la vez.
+  useEffect(() => {
+    if (!form.fecha_inicio) return undefined;
+    let cancelled = false;
+    setConsultandoDisponibilidad(true);
+    apiDisponibilidadPersonal({
+      fecha_inicio: form.fecha_inicio,
+      fecha_fin: form.fecha_fin || undefined,
+      hora_inicio: form.hora_inicio || undefined,
+      requiere_dia_traslado_previo: !!form.requiere_dia_traslado_previo,
+      jornada_id: isEdit ? jornada.id : undefined,
+      seccion: form.seccion_responsable,
+    }).then((d) => {
+      if (!cancelled) setDisponibilidad(d || { fecha_traslado_previo: null, conflictos: [] });
+    }).catch(() => {
+      if (!cancelled) setDisponibilidad({ fecha_traslado_previo: null, conflictos: [] });
+    }).finally(() => { if (!cancelled) setConsultandoDisponibilidad(false); });
+    return () => { cancelled = true; };
+  }, [form.fecha_inicio, form.fecha_fin, form.hora_inicio,
+    form.requiere_dia_traslado_previo, form.seccion_responsable, isEdit, jornada?.id]);
+
   // `user?.rol`: si el token venció mientras el modal estaba abierto, el
   // contexto se vacía y leer `user.rol` a secas revienta el render — que es
   // justamente el error de pantalla en blanco que se está corrigiendo.
   const personalDisponible = personal.filter((p) =>
     (user?.rol === 'admin' || user?.rol === 'gerencia') ? true : p.seccion === form.seccion_responsable
   );
+  const conflictosPorPersona = useMemo(() => {
+    const out = new Map();
+    for (const c of disponibilidad.conflictos || []) {
+      const id = Number(c.personal_id);
+      if (!out.has(id)) out.set(id, []);
+      out.get(id).push(c);
+    }
+    return out;
+  }, [disponibilidad]);
+
+  const razonOcupado = (id) => (conflictosPorPersona.get(Number(id)) || [])
+    .map((c) => c.detalle).join(' · ');
+
+  function opcionesPersonal(actualId = null) {
+    const elegidos = new Set((form.personal || []).map((p) => Number(p.personal_id)));
+    return personalDisponible.map((p) => {
+      const ocupado = conflictosPorPersona.has(Number(p.id));
+      const repetido = elegidos.has(Number(p.id)) && Number(actualId) !== Number(p.id);
+      return {
+        value: p.id,
+        label: `${p.nombre_completo} (${p.seccion})`,
+        disabled: ocupado || repetido,
+        description: ocupado ? razonOcupado(p.id) : (repetido ? 'Ya está agregado a esta jornada' : null),
+      };
+    });
+  }
+
+  const opcionesLider = personalDisponible.map((p) => ({
+    value: p.id,
+    label: `${p.nombre_completo} (${p.rol_default || 'sin rol'})`,
+    disabled: conflictosPorPersona.has(Number(p.id)),
+    description: razonOcupado(p.id) || null,
+  }));
+
+  const ocupadosSeleccionados = useMemo(() => {
+    const ids = new Set((form.personal || []).map((p) => Number(p.personal_id)));
+    if (form.lider_personal_id) ids.add(Number(form.lider_personal_id));
+    return [...ids].filter((id) => conflictosPorPersona.has(id));
+  }, [form.personal, form.lider_personal_id, conflictosPorPersona]);
+  const fechaEsFutura = !!form.fecha_inicio && form.fecha_inicio > isoLocalDate();
   function setField(k, v) { setForm((f) => ({ ...f, [k]: v })); }
 
   const { data: catCharlas } = useApi('/api/catalogos/charlas');
@@ -150,8 +220,13 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
   function updCharla(i, k, v) { const c = [...form.charlas]; c[i] = { ...c[i], [k]: v }; setField('charlas', c); }
   function removeCharla(i) { setField('charlas', form.charlas.filter((_, idx) => idx !== i)); }
   function addPersona() {
-    const primero = personalDisponible[0];
-    if (!primero) { alert(`No hay personal activo en la sección ${form.seccion_responsable}`); return; }
+    const elegidos = new Set(form.personal.map((p) => Number(p.personal_id)));
+    const primero = personalDisponible.find((p) =>
+      !elegidos.has(Number(p.id)) && !conflictosPorPersona.has(Number(p.id)));
+    if (!primero) {
+      alert(`No hay más personal disponible en la sección ${form.seccion_responsable}`);
+      return;
+    }
     setField('personal', [...form.personal, { personal_id: primero.id, rol_jornada: 'MEDICO', dias_asignados: 1.0 }]);
   }
   function updPersona(i, k, v) { const c = [...form.personal]; c[i] = { ...c[i], [k]: v }; setField('personal', c); }
@@ -160,6 +235,14 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
   async function submit(e) {
     e.preventDefault();
     setErr('');
+    if (form.es_departamental == null) {
+      setErr('Indicá si la jornada es departamental (fuera de la capital).');
+      return;
+    }
+    if (ocupadosSeleccionados.length > 0) {
+      setErr('Hay personal ocupado en una jornada o traslado para estas fechas. Quitalo o cambiá la programación.');
+      return;
+    }
     // `charlas` sale del cuerpo de la jornada: el PUT las IGNORA a propósito
     // (viajan por su propio endpoint) y mandarlas era el origen del 422 —
     // un responsable vacío ('') que el modelo espera como entero.
@@ -285,8 +368,52 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
                 <SearchableSelect value={form.lider_personal_id || ''}
                   onChange={(v) => setField('lider_personal_id', v ? Number(v) : null)}
                   placeholder="— Sin líder asignado —"
-                  options={personalDisponible.map((p) => ({ value: p.id, label: `${p.nombre_completo} (${p.rol_default || 'sin rol'})` }))} />
+                  options={opcionesLider} />
               </div>
+            </div>
+
+            <div className="rounded-lg border border-line-subtle bg-surface-elev p-3 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                <div>
+                  <label className="label">¿La jornada es departamental? *</label>
+                  <select className="input" required
+                    value={form.es_departamental == null ? '' : (form.es_departamental ? 'SI' : 'NO')}
+                    onChange={(e) => {
+                      const es = e.target.value === '' ? null : e.target.value === 'SI';
+                      setForm((f) => ({
+                        ...f,
+                        es_departamental: es,
+                        requiere_dia_traslado_previo: es ? f.requiere_dia_traslado_previo : false,
+                      }));
+                    }}>
+                    <option value="">— Seleccione —</option>
+                    <option value="NO">No, se realiza en la capital</option>
+                    <option value="SI">Sí, se realiza fuera de la capital</option>
+                  </select>
+                </div>
+                {form.es_departamental === true && (
+                  <label className="flex items-start gap-2 rounded-md border border-line bg-surface p-2.5 text-sm">
+                    <input type="checkbox" className="mt-0.5"
+                      checked={!!form.requiere_dia_traslado_previo}
+                      disabled={!fechaEsFutura && !form.requiere_dia_traslado_previo}
+                      onChange={(e) => setField('requiere_dia_traslado_previo', e.target.checked)} />
+                    <span>
+                      <span className="block font-semibold">🚐 Requiere día de traslado previo</span>
+                      <span className="block text-xs text-fg-muted">
+                        {fechaEsFutura || form.requiere_dia_traslado_previo
+                          ? 'Bloquea a todo el equipo durante el día anterior.'
+                          : 'Disponible únicamente para jornadas futuras.'}
+                      </span>
+                    </span>
+                  </label>
+                )}
+              </div>
+              {form.requiere_dia_traslado_previo && disponibilidad.fecha_traslado_previo && (
+                <div className="rounded-md bg-info-soft px-3 py-2 text-sm text-info">
+                  🚐 Traslado programado para el <b>{fmtFecha(disponibilidad.fecha_traslado_previo)}</b>.
+                  Ese día aparecerá en el calendario y el personal no podrá asignarse a otra actividad.
+                </div>
+              )}
             </div>
 
             {/* Charlas de educación en salud — MÚLTIPLES, desde catálogo */}
@@ -395,15 +522,23 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <h3 className="font-semibold">Personal asignado</h3>
-                <button type="button" className="text-accent text-sm hover:underline" onClick={addPersona}>+ Añadir persona</button>
+                <div className="flex items-center gap-2">
+                  {consultandoDisponibilidad && <span className="text-xs text-fg-muted">Revisando agenda…</span>}
+                  <button type="button" className="text-accent text-sm hover:underline" onClick={addPersona}>+ Añadir persona</button>
+                </div>
               </div>
+              {ocupadosSeleccionados.length > 0 && (
+                <div className="mb-2 rounded-md border border-danger/40 bg-danger-soft p-2 text-xs text-danger">
+                  Hay personal seleccionado que ya está ocupado en estas fechas. Quitalo o cambiá la programación antes de guardar.
+                </div>
+              )}
               <div className="space-y-2">
                 {form.personal.map((p, i) => (
                   <div key={i} className="flex gap-2 items-center bg-surface-elev p-2 rounded">
                     <SearchableSelect className="flex-1" value={p.personal_id}
                       onChange={(v) => updPersona(i, 'personal_id', Number(v))}
                       allowEmpty={false}
-                      options={personalDisponible.map((x) => ({ value: x.id, label: `${x.nombre_completo} (${x.seccion})` }))} />
+                      options={opcionesPersonal(p.personal_id)} />
                     <select className="input w-32" value={p.rol_jornada}
                       onChange={(e) => updPersona(i, 'rol_jornada', e.target.value)}>
                       {ROLES_JOR.map((r) => <option key={r} value={r}>{r}</option>)}
