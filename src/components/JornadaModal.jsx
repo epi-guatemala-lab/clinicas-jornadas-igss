@@ -4,6 +4,7 @@ import {
   apiGetJornada, apiCancelarJornada, apiCerrarJornada, apiReprogramarJornada,
   apiSetMaterial, apiSetCharlas, apiCatalogoCharlas, apiListPersonal,
   apiGetCierreJornada, apiAmarrarClinica,
+  apiListJornadas, apiCorregirJornadaCerrada, apiEliminarJornadaDuplicada,
 } from '../api/endpoints';
 import {
   SEMAFORO_BG, TIPO_LABEL, ESTADO_LABEL, fmtN, fmtQ, fmtPct,
@@ -33,7 +34,7 @@ const CATEGORIAS = [
 export default function JornadaModal({ jornadaId, onClose, onChanged }) {
   const { user, canWrite } = useAuth();
   const [j, setJ] = useState(null);
-  const [mode, setMode] = useState('view');  // view | cancel | close | charlas
+  const [mode, setMode] = useState('view');  // view | cancel | close | charlas | corregir | duplicada
   const [form, setForm] = useState({});
   const [catalogo, setCatalogo] = useState([]);
   const [roster, setRoster] = useState([]);
@@ -41,6 +42,8 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
   const [savingMat, setSavingMat] = useState(false);
   const [editing, setEditing] = useState(false);
   const [amarrando, setAmarrando] = useState(false);
+  const [guardandoCorreccion, setGuardandoCorreccion] = useState(false);
+  const [duplicados, setDuplicados] = useState([]);
 
   const [cierre, setCierre] = useState(null);
 
@@ -171,6 +174,66 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
     } catch (e) {
       alert(e.response?.data?.detail || 'No se pudo amarrar la clínica');
     } finally { setAmarrando(false); }
+  }
+
+  function startCorreccion() {
+    setForm({ atendidos: String(j.atendidos ?? ''), motivo: '' });
+    setMode('corregir');
+  }
+
+  async function doCorregir() {
+    const n = Number(form.atendidos);
+    if (!Number.isSafeInteger(n) || n < 0 || form.atendidos === '') {
+      alert('Ingresá un número entero de atendidos igual o mayor que cero.'); return;
+    }
+    if ((form.motivo || '').trim().length < 20) {
+      alert('Describí el motivo de la corrección (al menos 20 caracteres).'); return;
+    }
+    const body = { atendidos: n, motivo: form.motivo.trim() };
+    // Los campos que replicaban el conteo anterior siguen sincronizados. Si
+    // alguno difería, conserva su valor medido en lugar de sobrescribirlo.
+    if (j.afiliados_atendidos === j.atendidos) body.afiliados_atendidos = n;
+    if (j.aplica_kit_lab && j.kits_consumidos === j.atendidos) body.kits_consumidos = n;
+    setGuardandoCorreccion(true);
+    try {
+      const upd = await apiCorregirJornadaCerrada(j.id, body);
+      setJ(upd); setMode('view'); onChanged?.();
+    } catch (e) {
+      alert(e.response?.data?.detail || 'No se pudo corregir la jornada');
+    } finally { setGuardandoCorreccion(false); }
+  }
+
+  async function startDuplicada() {
+    setForm({ conservar_id: '', codigo_confirmacion: '', motivo: '' });
+    setDuplicados([]);
+    setMode('duplicada');
+    try {
+      const rows = await apiListJornadas({ seccion: 'SIPRESALUD' });
+      setDuplicados(rows.filter((o) => o.id !== j.id && o.estado === 'CERRADA'
+        && o.empresa_id === j.empresa_id && o.fecha_inicio === j.fecha_inicio
+        && o.fecha_fin === j.fecha_fin && o.tipo === j.tipo));
+    } catch (e) {
+      alert(e.response?.data?.detail || 'No se pudieron consultar las jornadas coincidentes');
+      setMode('view');
+    }
+  }
+
+  async function doEliminarDuplicada() {
+    if (!Number(form.conservar_id) || form.codigo_confirmacion !== j.codigo) {
+      alert('Seleccioná la jornada a conservar y escribí el código exacto de la que se eliminará.'); return;
+    }
+    if ((form.motivo || '').trim().length < 20) {
+      alert('Describí el motivo del borrado (al menos 20 caracteres).'); return;
+    }
+    setGuardandoCorreccion(true);
+    try {
+      await apiEliminarJornadaDuplicada(j.id, {
+        conservar_id: Number(form.conservar_id), motivo: form.motivo.trim(),
+      });
+      onChanged?.(); onClose();
+    } catch (e) {
+      alert(e.response?.data?.detail || 'No se pudo eliminar la jornada');
+    } finally { setGuardandoCorreccion(false); }
   }
 
   return (
@@ -477,6 +540,56 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
             </div>
           </div>
         )}
+
+        {mode === 'corregir' && (
+          <div className="rounded-lg border border-warning/40 bg-warning-soft/30 p-3 space-y-3">
+            <h4 className="font-semibold">Corregir atendidos de jornada cerrada</h4>
+            <p className="text-xs text-fg-muted">Actual: {fmtN(j.atendidos)}. La corrección queda en la bitácora.</p>
+            <div><label className="label">Atendidos correctos</label>
+              <input className="input max-w-[12rem]" type="number" min="0" step="1"
+                value={form.atendidos ?? ''}
+                onChange={(e) => setForm({ ...form, atendidos: e.target.value })} /></div>
+            <div><label className="label">Motivo de la corrección</label>
+              <textarea className="input" rows="2" value={form.motivo || ''}
+                onChange={(e) => setForm({ ...form, motivo: e.target.value })}
+                placeholder="Explicá de dónde sale el dato correcto (mínimo 20 caracteres)" /></div>
+            <div className="flex justify-end gap-2">
+              <button className="btn-secondary" onClick={() => setMode('view')}>Volver</button>
+              <button className="btn-primary" disabled={guardandoCorreccion} onClick={doCorregir}>
+                {guardandoCorreccion ? 'Guardando…' : 'Guardar corrección'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {mode === 'duplicada' && (
+          <div className="rounded-lg border border-danger/40 bg-danger-soft/30 p-3 space-y-3">
+            <h4 className="font-semibold text-danger">Eliminar jornada duplicada</h4>
+            <p className="text-xs text-fg-muted">Se eliminará {j.codigo} ({j.empresa_nombre}, {fmtFecha(j.fecha_inicio)}). El servidor impedirá el borrado si hay análisis, cargas o viáticos asociados.</p>
+            <div><label className="label">Jornada que se conservará</label>
+              <select className="input" value={form.conservar_id || ''}
+                onChange={(e) => setForm({ ...form, conservar_id: e.target.value })}>
+                <option value="">— Seleccioná la jornada correcta —</option>
+                {duplicados.map((o) => <option key={o.id} value={o.id}>{o.codigo} · {fmtN(o.atendidos)} atendidos</option>)}
+              </select>
+              {duplicados.length === 0 && <p className="text-xs text-fg-muted mt-1">No hay otra jornada cerrada de la misma empresa, fecha y actividad.</p>}
+            </div>
+            <div><label className="label">Motivo</label>
+              <textarea className="input" rows="2" value={form.motivo || ''}
+                onChange={(e) => setForm({ ...form, motivo: e.target.value })}
+                placeholder="Explicá por qué esta fila es la duplicada (mínimo 20 caracteres)" /></div>
+            <div><label className="label">Escribí {j.codigo} para confirmar</label>
+              <input className="input" value={form.codigo_confirmacion || ''}
+                onChange={(e) => setForm({ ...form, codigo_confirmacion: e.target.value })} /></div>
+            <div className="flex justify-end gap-2">
+              <button className="btn-secondary" onClick={() => setMode('view')}>Volver</button>
+              <button className="btn-danger" disabled={guardandoCorreccion || !duplicados.length}
+                onClick={doEliminarDuplicada}>
+                {guardandoCorreccion ? 'Eliminando…' : 'Eliminar duplicada'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {mode === 'view' && (
@@ -486,6 +599,12 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
             {/* Editar: campos centrales. CERRADA → solo Berkin (E1). CANCELADA → nadie. */}
             {canWrite && (puedeEditar || (j.estado === 'CERRADA' && berkin)) && (
               <button className="btn-secondary" onClick={() => setEditing(true)}>Editar</button>
+            )}
+            {canWrite && berkin && j.estado === 'CERRADA' && j.seccion_responsable === 'SIPRESALUD' && (
+              <>
+                <button className="btn-secondary" onClick={startCorreccion}>Corregir atendidos</button>
+                <button className="btn-danger" onClick={startDuplicada}>Eliminar duplicada</button>
+              </>
             )}
             {puedeEditar && canWrite && (
               <>

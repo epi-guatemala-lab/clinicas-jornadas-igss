@@ -62,6 +62,12 @@ export const apiCreateJornada = (body) =>
 export const apiUpdateJornada = (id, body) =>
   api.put(`/api/jornadas/${id}`, body).then((r) => r.data);
 
+export const apiCorregirJornadaCerrada = (id, body) =>
+  api.post(`/api/admin/jornadas/${id}/corregir`, body).then((r) => r.data);
+
+export const apiEliminarJornadaDuplicada = (id, body) =>
+  api.post(`/api/admin/jornadas/${id}/eliminar-duplicada`, body).then((r) => r.data);
+
 // Agenda efectiva del personal: incluye la jornada y, cuando corresponde, el
 // día calendario anterior reservado para traslado.
 export const apiDisponibilidadPersonal = (params) =>
