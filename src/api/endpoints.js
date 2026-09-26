@@ -73,6 +73,11 @@ export const apiEliminarJornadaDuplicada = (id, body) =>
 export const apiDisponibilidadPersonal = (params) =>
   api.get('/api/jornadas/disponibilidad-personal', { params }).then((r) => r.data);
 
+// Jornadas de la misma sección que terminan el mismo día o hasta dos días antes:
+// de ahí se copia el equipo cuando se va en ruta de una jornada a la siguiente.
+export const apiAnterioresEnRuta = (params) =>
+  api.get('/api/jornadas/anteriores-en-ruta', { params }).then((r) => r.data);
+
 export const apiCerrarJornada = (id, body) =>
   api.post(`/api/jornadas/${id}/cerrar`, body).then((r) => r.data);
 
@@ -98,6 +103,26 @@ export const apiSetCharlas = (id, charlas) =>
 // D2: catálogo fijo de charlas (15)
 export const apiCatalogoCharlas = () =>
   api.get('/api/catalogos/charlas').then((r) => r.data);
+
+// ── Sorteo de personal ──────────────────────────────────────────────
+/**
+ * Propone un equipo para la jornada que se está programando.
+ *
+ * NO guarda nada: devuelve una PROPUESTA (personas, roles, cupos cubiertos y
+ * lo que faltó) y quien programa decide si la adopta, la ajusta o la descarta.
+ * Se manda la jornada COMPLETA —fechas, traslado, si es departamental,
+ * afiliados proyectados— porque de ahí salen los cupos y la agenda que hay que
+ * respetar; el servidor la valida con las mismas reglas que el alta.
+ *
+ * @param {object} body jornada + `{jornada_id, modo, excluir_personal_ids}`
+ * @returns {Promise<{corrida_id:string, lider_personal_id:?number,
+ *                    personal:Array, cupos:object, cubiertos:object,
+ *                    faltantes:Array, avisos:string[],
+ *                    disponibles_por_rol:object, presion_dia:object,
+ *                    explicacion:string}>}
+ */
+export const apiSorteoPropuesta = (body) =>
+  api.post('/api/jornadas/sorteo/propuesta', body).then((r) => r.data);
 
 // ── Admin (usuarios + auditoría) ────────────────────────────────────
 export const apiAdminUsers = (params = {}) =>

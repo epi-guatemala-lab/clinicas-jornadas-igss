@@ -252,14 +252,29 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
       <div className="p-4 space-y-4">
         <div className="grid grid-cols-2 gap-3 text-sm">
           <Field label="Fecha">{fmtRangoFechas(j.fecha_inicio, j.fecha_fin)}</Field>
-          <Field label="Hora inicio">{j.hora_inicio || '—'}</Field>
+          <Field label="Horario">
+            {j.hora_inicio || '—'} a {j.hora_fin || j.hora_fin_efectiva || '—'}
+            {!j.hora_fin && j.hora_fin_efectiva && <span className="text-fg-subtle"> (por defecto)</span>}
+          </Field>
           <Field label="Sección">{j.seccion_responsable}</Field>
           <Field label="Modalidad">{j.modalidad}</Field>
           <Field label="Ubicación">{[j.departamento, j.municipio, j.zona && `z. ${j.zona}`].filter(Boolean).join(' · ') || '—'}</Field>
           <Field label="Tipo de ubicación">{j.es_departamental ? 'Departamental (fuera de la capital)' : 'Capital'}</Field>
-          {j.requiere_dia_traslado_previo && (
+          {j.requiere_dia_traslado_previo && !j.transporte_ida_salida && (
             <Field label="Traslado previo" className="col-span-2 text-cyan-700 dark:text-cyan-300 font-medium">
               🚐 {fmtFecha(j.fecha_traslado_previo)} · todo el equipo queda reservado ese día
+            </Field>
+          )}
+          {(j.transporte_ida_salida || j.transporte_regreso_salida) && (
+            <Field label="Transporte" className="col-span-2 text-cyan-700 dark:text-cyan-300 font-medium">
+              {j.transporte_ida_salida && (
+                <div>🚐 Ida: sale {fmtFecha(j.transporte_ida_salida.slice(0, 10))} {j.transporte_ida_salida.slice(11, 16)}
+                  {' · '}llega {fmtFecha(j.transporte_ida_llegada.slice(0, 10))} {j.transporte_ida_llegada.slice(11, 16)}</div>
+              )}
+              {j.transporte_regreso_salida && (
+                <div>🚐 Regreso: sale {fmtFecha(j.transporte_regreso_salida.slice(0, 10))} {j.transporte_regreso_salida.slice(11, 16)}
+                  {' · '}llega {fmtFecha(j.transporte_regreso_llegada.slice(0, 10))} {j.transporte_regreso_llegada.slice(11, 16)}</div>
+              )}
             </Field>
           )}
           <Field label="Líder">{j.lider_nombre || '—'}</Field>

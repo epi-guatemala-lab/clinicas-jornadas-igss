@@ -58,10 +58,23 @@ export function describirError(e, accion = 'completar la operación') {
   // Sin respuesta del servidor: red caída, VPN, servidor apagado o tiempo agotado
   if (!e?.response) {
     if (e?.code === 'ECONNABORTED') {
+      // El texto anterior hablaba SIEMPRE de subir un archivo («El archivo tardó
+      // demasiado en subir… no quedó nada a medias»), y este helper lo usan
+      // también el sorteo, el cierre de jornada, el alta de patologías y el
+      // guardado de empresas: a quien pedía una propuesta de equipo se le
+      // contestaba por un archivo que no existía. La `accion` ya llega por
+      // parámetro desde 2026 y no se estaba usando.
+      //
+      // Tampoco se puede prometer que no quedó nada: un timeout es justamente
+      // el caso en el que NO se sabe. El cliente corta a los 15 s (client.js) y
+      // el servidor puede haber terminado igual —una propuesta de sorteo tarda
+      // milisegundos y queda registrada aunque la respuesta no llegue, y una
+      // subida por trozos deja el avance guardado a propósito—. Por eso el
+      // consejo es comprobar antes de reintentar, no reintentar a ciegas.
       return {
-        titulo: 'Se agotó el tiempo de espera',
-        detalle: 'El archivo tardó demasiado en subir.',
-        sugerencia: 'Revisá tu conexión y volvé a intentarlo. El servidor no llegó a recibir el archivo completo, así que no quedó nada a medias.',
+        titulo: `No se pudo ${accion}: se agotó el tiempo de espera`,
+        detalle: 'El servidor pudo haberlo procesado igual.',
+        sugerencia: 'Revisá tu conexión y, antes de volver a intentarlo, comprobá si el cambio quedó hecho.',
       };
     }
     return {
@@ -120,18 +133,36 @@ export function describirError(e, accion = 'completar la operación') {
         sugerencia: 'Corregí lo señalado y volvé a enviar.',
       };
     case 429:
+      // El backend del sorteo manda la hora exacta de liberación en `detail`
+      // («Podés volver a intentarlo a las 14:35») y `Retry-After` en segundos.
+      // Cuando viene esa frase, un «esperá un momento» genérico encima es más
+      // vago que lo que ya se dijo: se calla y se deja hablar al servidor.
       return {
         titulo: 'Demasiados intentos seguidos',
         detalle: backend,
-        sugerencia: 'Esperá un momento antes de volver a intentar.',
+        sugerencia: backend ? '' : 'Esperá un momento antes de volver a intentar.',
       };
     case 503:
-      // Mientras se APLICA una carga, el portal queda en solo lectura: la
-      // escritura del Excel toma la base entera durante unos segundos.
+      // Dos 503 distintos llegan por acá y NO se pueden contestar igual:
+      //
+      //  1. `carga_en_curso: true` — el middleware `_escrituras_durante_carga`
+      //     de `main.py` rebota las escrituras mientras se aplica el Excel
+      //     maestro: es de segundos, se sabe por qué y hay que esperar.
+      //  2. Sin esa bandera — un servicio del backend que no está disponible
+      //     (por ejemplo el módulo de sorteo cuando su base no cargó). Mandar a
+      //     «esperar a que termine la carga» que no existe deja al operador
+      //     mirando un historial de cargas vacío mientras el problema es otro.
+      if (e?.response?.data?.carga_en_curso === true) {
+        return {
+          titulo: 'El portal está en solo lectura unos segundos',
+          detalle: backend || 'Se está aplicando una carga del Excel maestro.',
+          sugerencia: 'No se guardó tu cambio. Esperá a que termine la carga —son segundos— y volvé a guardar; podés seguir consultando mientras tanto.',
+        };
+      }
       return {
-        titulo: 'El portal está en solo lectura unos segundos',
-        detalle: backend || 'Se está aplicando una carga del Excel maestro.',
-        sugerencia: 'No se guardó tu cambio. Esperá a que termine la carga —son segundos— y volvé a guardar; podés seguir consultando mientras tanto.',
+        titulo: `No se pudo ${accion}`,
+        detalle: backend || 'El servidor no puede atender esto ahora mismo; probá en un momento.',
+        sugerencia: 'No se guardó nada. Si sigue igual dentro de unos minutos, avisale al equipo técnico con la hora exacta.',
       };
     default:
       if (status >= 500) {
