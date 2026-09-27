@@ -31,6 +31,9 @@ const CATEGORIAS = [
   ['OTRO', 'Otro (especificar)'],
 ];
 
+// «14/10/2026 14:00», o «—» si falta (un tramo a medias no puede dejar la ficha en blanco).
+const fmtMomento = (v) => (v ? `${fmtFecha(String(v).slice(0, 10))} ${String(v).slice(11, 16)}` : '—');
+
 export default function JornadaModal({ jornadaId, onClose, onChanged }) {
   const { user, canWrite } = useAuth();
   const [j, setJ] = useState(null);
@@ -268,12 +271,10 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
           {(j.transporte_ida_salida || j.transporte_regreso_salida) && (
             <Field label="Transporte" className="col-span-2 text-cyan-700 dark:text-cyan-300 font-medium">
               {j.transporte_ida_salida && (
-                <div>🚐 Ida: sale {fmtFecha(j.transporte_ida_salida.slice(0, 10))} {j.transporte_ida_salida.slice(11, 16)}
-                  {' · '}llega {fmtFecha(j.transporte_ida_llegada.slice(0, 10))} {j.transporte_ida_llegada.slice(11, 16)}</div>
+                <div>🚐 Ida: sale {fmtMomento(j.transporte_ida_salida)} · llega {fmtMomento(j.transporte_ida_llegada)}</div>
               )}
               {j.transporte_regreso_salida && (
-                <div>🚐 Regreso: sale {fmtFecha(j.transporte_regreso_salida.slice(0, 10))} {j.transporte_regreso_salida.slice(11, 16)}
-                  {' · '}llega {fmtFecha(j.transporte_regreso_llegada.slice(0, 10))} {j.transporte_regreso_llegada.slice(11, 16)}</div>
+                <div>🚐 Regreso: sale {fmtMomento(j.transporte_regreso_salida)} · llega {fmtMomento(j.transporte_regreso_llegada)}</div>
               )}
             </Field>
           )}

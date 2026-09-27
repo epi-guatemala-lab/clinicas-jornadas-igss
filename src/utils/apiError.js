@@ -10,9 +10,13 @@
 const LIMITE_MB = 120;   // config.CARGA_MAX_MB del backend
 
 /** Detalle textual que mandó el backend (FastAPI usa `detail`). */
+// Pydantic antepone «Value error, » (en inglés) a los mensajes de los
+// validadores; el mensaje ya está en español y el prefijo solo confunde.
+const sinPrefijo = (t) => String(t).replace(/^Value error,\s*/i, '').trim();
+
 function detalle(e) {
   const d = e?.response?.data?.detail ?? e?.response?.data?.error;
-  if (typeof d === 'string' && d.trim()) return d.trim();
+  if (typeof d === 'string' && d.trim()) return sinPrefijo(d);
   // FastAPI/Pydantic devuelve `detail` como ARRAY de objetos {loc, msg} cuando
   // falla la validación (422). Se aplana UNA LÍNEA POR CAMPO, con el nombre del
   // campo delante: quedarse con el primer `msg` escondía los demás errores y
@@ -25,7 +29,7 @@ function detalle(e) {
         .filter((p) => p !== 'body')
         .map((p) => (typeof p === 'number' ? `#${p + 1}` : String(p)))
         .join(' › ');
-      const msg = (typeof x?.msg === 'string' && x.msg.trim()) ? x.msg.trim() : 'valor inválido';
+      const msg = (typeof x?.msg === 'string' && x.msg.trim()) ? sinPrefijo(x.msg) : 'valor inválido';
       return campo ? `${campo}: ${msg}` : msg;
     }).filter(Boolean);
     if (partes.length) return partes.join(' · ');
@@ -110,6 +114,16 @@ export function describirError(e, accion = 'completar la operación') {
         sugerencia: 'Puede que la carga se haya borrado o que el servidor esté en una versión anterior.',
       };
     case 409:
+      // Un choque de agenda (persona ya asignada a otra jornada o traslado) es
+      // un 409 también, pero no tiene nada que ver con las cargas del Excel:
+      // titularlo «Ya hay una carga en proceso» mandaba a buscar donde no era.
+      if (/^Conflicto de agenda/i.test(backend)) {
+        return {
+          titulo: 'Hay personal ocupado en esas fechas',
+          detalle: backend,
+          sugerencia: 'Quitá a esa persona del equipo, cambiá el horario o elegí a otra y volvé a guardar.',
+        };
+      }
       // Con el portal preguntando antes de subir (`utils/carrilCarga`), llegar
       // acá significa que el servidor se ocupó ENTRE esa consulta y la subida:
       // el archivo viajó y se descartó, nada quedó a medias. La sugerencia no

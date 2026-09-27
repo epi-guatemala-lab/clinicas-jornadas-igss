@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   apiListEmpresas, apiListPersonal, apiListJornadas,
   apiCreateJornada, apiUpdateJornada, apiSetCharlas, apiDisponibilidadPersonal,
@@ -75,6 +75,29 @@ const aServidor = (v) => (v ? String(v).replace('T', ' ').slice(0, 16) : null);
 // Hora de fin cuando no se escribe: una jornada normal termina a mediodía y una
 // con odontología a media tarde (la misma regla que aplica el servidor).
 const horaFinPorDefecto = (f) => (f.odontologia ? '15:00' : '12:00');
+const esFechaISO = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '') && v >= '2000-01-01'
+  && !Number.isNaN(Date.parse(`${v}T00:00:00Z`));
+const diasEntre = (a, b) => Math.round(
+  (Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86400000);
+/** Corre un `YYYY-MM-DDTHH:MM` n días, misma hora (lo mismo que hace «Reprogramar»). */
+function moverDias(momento, dias) {
+  if (!momento || !dias) return momento;
+  const [f, h] = String(momento).split('T');
+  const d = new Date(`${f}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return `${d.toISOString().slice(0, 10)}T${h || '00:00'}`;
+}
+/** ¿El transporte de ida sale antes del día de la jornada? (lo mismo que decide el servidor) */
+const traslado = (f) => (f.transporte_ida_salida && esFechaISO(f.fecha_inicio)
+  ? diasEntre(f.fecha_inicio, f.transporte_ida_salida.slice(0, 10)) === 1
+  : !!f.requiere_dia_traslado_previo);
+/** Texto del problema de la ida, si sale fuera del día de la jornada o del anterior. */
+function problemaIda(f) {
+  if (!f.transporte_ida_salida || !esFechaISO(f.fecha_inicio)) return '';
+  const d = diasEntre(f.fecha_inicio, f.transporte_ida_salida.slice(0, 10));
+  if (d === 0 || d === 1) return '';
+  return 'El transporte de ida tiene que salir el día de la jornada o el día anterior.';
+}
 
 /**
  * Charlas tal como vienen del servidor → filas del formulario.
@@ -122,6 +145,9 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
     fecha_traslado_previo: null, conflictos: [],
   });
   const [consultandoDisponibilidad, setConsultandoDisponibilidad] = useState(false);
+  // La revisión de agenda en vivo falló (red, tiempo agotado): se dice, porque
+  // sin ella no se marca a nadie como ocupado aunque lo esté.
+  const [agendaFallo, setAgendaFallo] = useState(false);
   const [err, setErr] = useState('');
 
   // ── Sorteo de personal ───────────────────────────────────────────
@@ -227,6 +253,12 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
     charlas: [],
   });
 
+  // Última fecha de inicio y de fin VÁLIDAS (ver `cambiarFecha`).
+  const fechasValidas = useRef({
+    ini: esFechaISO(form.fecha_inicio) ? form.fecha_inicio : null,
+    fin: esFechaISO(form.fecha_fin || form.fecha_inicio) ? (form.fecha_fin || form.fecha_inicio) : null,
+  });
+
   // Foto de las charlas al abrir el modal: si al guardar no cambiaron, ni se
   // llama al endpoint. Cada llamada BORRA e inserta la tabla de charlas de la
   // jornada, y hacerlo en toda edición era reescribir datos ajenos sin motivo.
@@ -241,7 +273,9 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
   // La UI avisa y deshabilita personas ocupadas; el backend vuelve a validar al
   // guardar para cerrar la carrera entre dos usuarios que editan a la vez.
   useEffect(() => {
-    if (!form.fecha_inicio) return undefined;
+    if (!esFechaISO(form.fecha_inicio) || (form.fecha_fin && !esFechaISO(form.fecha_fin))) {
+      return undefined;
+    }
     let cancelled = false;
     setConsultandoDisponibilidad(true);
     apiDisponibilidadPersonal({
@@ -250,16 +284,16 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
       hora_inicio: form.hora_inicio || undefined,
       hora_fin: form.hora_fin || undefined,
       odontologia: !!form.odontologia,
-      requiere_dia_traslado_previo: !!form.requiere_dia_traslado_previo,
+      requiere_dia_traslado_previo: form.es_departamental === true && traslado(form),
       ...Object.fromEntries(TRAMOS_TRANSPORTE
         .filter(([k]) => form[k])
         .map(([k]) => [k, aServidor(form[k])])),
       jornada_id: isEdit ? jornada.id : undefined,
       seccion: form.seccion_responsable,
     }).then((d) => {
-      if (!cancelled) setDisponibilidad(d || { fecha_traslado_previo: null, conflictos: [] });
+      if (!cancelled) { setDisponibilidad(d || { fecha_traslado_previo: null, conflictos: [] }); setAgendaFallo(false); }
     }).catch(() => {
-      if (!cancelled) setDisponibilidad({ fecha_traslado_previo: null, conflictos: [] });
+      if (!cancelled) { setDisponibilidad({ fecha_traslado_previo: null, conflictos: [] }); setAgendaFallo(true); }
     }).finally(() => { if (!cancelled) setConsultandoDisponibilidad(false); });
     return () => { cancelled = true; };
   }, [form.fecha_inicio, form.fecha_fin, form.hora_inicio, form.hora_fin,
@@ -322,6 +356,42 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
   }, [form.personal, form.lider_personal_id, conflictosPorPersona]);
   const fechaEsFutura = !!form.fecha_inicio && form.fecha_inicio > isoLocalDate();
   function setField(k, v) { setForm((f) => ({ ...f, [k]: v })); }
+
+  /**
+   * Cambiar la fecha corre el transporte con ella, como «Reprogramar»: la ida
+   * con el inicio y el regreso con el fin. Sin esto, el viaje quedaba en la
+   * fecha vieja, el aviso de traslado decía un día que no era y el guardado
+   * fallaba pidiendo corregir a mano los cuatro horarios.
+   */
+  function cambiarFecha(campo, valor) {
+    // El corrimiento se mide contra la ÚLTIMA fecha válida, no contra la tecla
+    // anterior: al escribir la fecha a mano el control pasa por valores vacíos
+    // y por años como 0002 o 0020, y medir contra eso mandaba el transporte al
+    // año 4050 o lo dejaba en la fecha vieja.
+    const previo = fechasValidas.current;
+    const ini = campo === 'fecha_inicio' ? valor : form.fecha_inicio;
+    const fin = campo === 'fecha_fin' ? valor : form.fecha_fin;
+    const iniOk = esFechaISO(ini);
+    const finEfectivo = fin || ini;
+    const finOk = esFechaISO(finEfectivo) && (!fin || esFechaISO(fin));
+    const dIda = iniOk && previo.ini ? diasEntre(ini, previo.ini) : 0;
+    const dRegreso = finOk && previo.fin ? diasEntre(finEfectivo, previo.fin) : 0;
+    if (iniOk) previo.ini = ini;
+    if (finOk) previo.fin = finEfectivo;
+    setForm((f) => {
+      const nuevo = { ...f, [campo]: valor };
+      if (dIda) {
+        nuevo.transporte_ida_salida = moverDias(f.transporte_ida_salida, dIda);
+        nuevo.transporte_ida_llegada = moverDias(f.transporte_ida_llegada, dIda);
+      }
+      if (dRegreso) {
+        nuevo.transporte_regreso_salida = moverDias(f.transporte_regreso_salida, dRegreso);
+        nuevo.transporte_regreso_llegada = moverDias(f.transporte_regreso_llegada, dRegreso);
+      }
+      if (iniOk) nuevo.requiere_dia_traslado_previo = traslado(nuevo);
+      return nuevo;
+    });
+  }
 
   const { data: catCharlas } = useApi('/api/catalogos/charlas');
   const { data: deptosCat } = useApi('/api/catalogos/departamentos');
@@ -404,6 +474,9 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
       if (k in base) base[k] = (typeof base[k] === 'string' ? base[k].trim() : base[k]) || null;
     }
     for (const [k] of TRAMOS_TRANSPORTE) base[k] = aServidor(base[k]);
+    // Nunca una bandera de traslado escondida: en la capital no hay día previo,
+    // y con horario de ida lo decide la fecha de salida.
+    base.requiere_dia_traslado_previo = form.es_departamental === true && traslado(form);
     // Gerencia no ve las observaciones (el servidor se las devuelve en null),
     // así que si su formulario las mandara vacías borraría lo que escribió otro.
     // El servidor ya ignora la llave para ese rol; acá ni se envía.
@@ -428,7 +501,11 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
   // los faltantes y el «equipo mínimo» que se muestran son de otra jornada.
   const firmaCupos = (f) => JSON.stringify([f.fecha_inicio, f.fecha_fin,
     f.es_departamental, Number(f.programados) || 0, !!f.nutricion,
-    !!f.requiere_dia_traslado_previo]);
+    !!f.requiere_dia_traslado_previo,
+    // Los horarios no cambian los cupos pero SÍ quién está libre: con otro
+    // horario de transporte la propuesta puede traer a alguien ocupado.
+    f.hora_inicio || '', f.hora_fin || '', !!f.odontologia,
+    ...TRAMOS_TRANSPORTE.map(([k]) => f[k] || '')]);
   const sorteoDesactualizado = !!sorteo && sorteoPara !== firmaCupos(form);
   // ¿La propuesta dejó algo que atender —cupos sin cubrir, avisos, equipo
   // mínimo por presión del día, o una jornada que cambió después—? Solo
@@ -638,6 +715,10 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
       setErr('Indicá si la jornada es departamental (fuera de la capital).');
       return;
     }
+    if (consultandoDisponibilidad) {
+      setErr('Esperá un momento: se está revisando la agenda del personal con los datos nuevos.');
+      return;
+    }
     if (ocupadosSeleccionados.length > 0) {
       setErr('Hay personal ocupado en una jornada o traslado para estas fechas. Quitalo o cambiá la programación.');
       return;
@@ -702,10 +783,10 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
                   tenga la jornada viaja intacto en `form.tema` y se conserva. */}
               <div><label className="label">Fecha inicio *</label>
                 <input className="input" type="date" value={form.fecha_inicio}
-                  onChange={(e) => setField('fecha_inicio', e.target.value)} required /></div>
+                  onChange={(e) => cambiarFecha('fecha_inicio', e.target.value)} required /></div>
               <div><label className="label">Fecha fin</label>
                 <input className="input" type="date" value={form.fecha_fin || ''}
-                  onChange={(e) => setField('fecha_fin', e.target.value)} /></div>
+                  onChange={(e) => cambiarFecha('fecha_fin', e.target.value)} /></div>
               <div><label className="label">Hora inicio</label>
                 <input className="input" type="time" value={form.hora_inicio || ''}
                   onChange={(e) => setField('hora_inicio', e.target.value)} /></div>
@@ -814,9 +895,13 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
                             const v = e.target.value;
                             setForm((f) => {
                               const nuevo = { ...f, [k]: v };
-                              // La fecha de salida dice si hay día de traslado previo.
-                              if (k === 'transporte_ida_salida' && v && f.fecha_inicio) {
-                                nuevo.requiere_dia_traslado_previo = v.slice(0, 10) < f.fecha_inicio;
+                              // La fecha de salida dice si hay día de traslado previo; al
+                              // borrarla, la bandera se apaga (si no, quedaba marcada sin
+                              // que nada lo mostrara y el guardado fallaba en la capital).
+                              if (k === 'transporte_ida_salida') {
+                                nuevo.requiere_dia_traslado_previo = v
+                                  ? !!f.fecha_inicio && v.slice(0, 10) < f.fecha_inicio
+                                  : false;
                               }
                               return nuevo;
                             });
@@ -825,9 +910,16 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
                   </div>
                 </div>
               )}
-              {form.requiere_dia_traslado_previo && disponibilidad.fecha_traslado_previo && (
+              {problemaIda(form) && (
+                <div className="rounded-md border border-danger/40 bg-danger-soft px-3 py-2 text-sm text-danger">
+                  {problemaIda(form)} Revisá la fecha de salida.
+                </div>
+              )}
+              {form.es_departamental === true && !problemaIda(form)
+                && traslado(form) && disponibilidad.fecha_traslado_previo && (
                 <div className="rounded-md bg-info-soft px-3 py-2 text-sm text-info">
-                  🚐 Traslado programado para el <b>{fmtFecha(disponibilidad.fecha_traslado_previo)}</b>
+                  🚐 Traslado programado para el <b>{fmtFecha(form.transporte_ida_salida
+                    ? form.transporte_ida_salida.slice(0, 10) : disponibilidad.fecha_traslado_previo)}</b>
                   {form.transporte_ida_salida
                     ? <> a las <b>{form.transporte_ida_salida.slice(11, 16)}</b>. Ese día el personal queda
                       ocupado desde la salida; antes puede atender otra actividad.</>
@@ -944,6 +1036,12 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
                 <h3 className="font-semibold">Personal asignado</h3>
                 <div className="flex items-center gap-2 flex-wrap">
                   {consultandoDisponibilidad && <span className="text-xs text-fg-muted">Revisando agenda…</span>}
+                  {!consultandoDisponibilidad && agendaFallo && (
+                    <span className="text-xs text-warning"
+                      title="Sin la revisión en vivo no se marca a nadie como ocupado. El servidor la vuelve a hacer al guardar.">
+                      No se pudo revisar la agenda: se validará al guardar.
+                    </span>
+                  )}
                   {/* Las personas descartadas con el 🎲 de su fila siguen fuera
                       aunque se quiten los propuestos, así que tienen que estar a
                       la vista: sin este chip la exclusión era invisible y quien
@@ -1022,6 +1120,13 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
               {ocupadosSeleccionados.length > 0 && (
                 <div className="mb-2 rounded-md border border-danger/40 bg-danger-soft p-2 text-xs text-danger">
                   Hay personal seleccionado que ya está ocupado en estas fechas. Quitalo o cambiá la programación antes de guardar.
+                  <ul className="mt-1 list-disc pl-4">
+                    {ocupadosSeleccionados.map((id) => (
+                      <li key={id}>
+                        <b>{personalPorId.get(Number(id))?.nombre_completo || `#${id}`}</b>: {razonOcupado(id)}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
               {/* Mientras se arma la propuesta las filas quedan inertes: la
@@ -1030,13 +1135,14 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
                   perdía sin un solo mensaje. */}
               <fieldset disabled={sorteando} className="space-y-2 min-w-0">
                 {form.personal.map((p, i) => (
-                  <div key={i} className="flex gap-2 items-center bg-surface-elev p-2 rounded">
+                  <div key={i} className={`flex flex-wrap sm:flex-nowrap gap-2 items-center bg-surface-elev p-2 rounded${
+                    conflictosPorPersona.has(Number(p.personal_id)) ? ' ring-1 ring-danger' : ''}`}>
                     {p._origen === 'sorteo' && (
                       <span className="shrink-0 rounded bg-accent-soft text-accent text-xs px-1.5 py-1"
                         role="img" aria-label="Propuesto por el sorteo"
                         title="Esta persona la propuso el sorteo">🎲</span>
                     )}
-                    <SearchableSelect className="flex-1" value={p.personal_id}
+                    <SearchableSelect className="flex-1 min-w-[12rem]" value={p.personal_id}
                       onChange={(v) => updPersona(i, 'personal_id', Number(v))}
                       allowEmpty={false}
                       options={opcionesPersonal(p.personal_id)} />
