@@ -29,7 +29,9 @@ export default function Admin() {
   const canWrite = user?.permiso === 'editor';
   // El coordinador (Berkin) solo administra el catálogo de patologías; usuarios y
   // auditoría son de la administración del módulo (el backend lo exige: 403).
-  const esCoordinador = user?.es_coordinador === true;
+  // Mismo criterio que JornadaModal (fallback para sesiones sin el campo).
+  const esCoordinador = user?.es_coordinador === true || user?.personal_id === 10
+    || user?.username === 'Berkin.Santos';
   const [tab, setTab] = useState(esCoordinador ? 'patologias' : 'usuarios');
   return (
     <div className="space-y-4">
@@ -263,7 +265,10 @@ function Usuarios({ canWrite }) {
   const [err, setErr] = useState('');
   const [creando, setCreando] = useState(false);
   const [editando, setEditando] = useState(null);   // usuario cuyo rol/permiso se cambia
-  function reload() { apiAdminUsers().then(setList).catch(() => setList([])); }
+  // Un error (p. ej. 403) se muestra; no se disfraza de «Sin usuarios».
+  function reload() {
+    apiAdminUsers().then(setList).catch((e) => { setList([]); setErr(errorDeAdmin(e, 'cargar los usuarios')); });
+  }
   useEffect(reload, []);
   const [q, setQ] = useState('');
   const filtered = useMemo(() => list.filter((u) => !q
@@ -583,11 +588,14 @@ function EditarUsuarioForm({ usuario, onClose, onSave }) {
 function Auditoria() {
   const [src, setSrc] = useState('jornadas');  // jornadas | auth
   const [rows, setRows] = useState([]);
+  const [err, setErr] = useState('');
   const [q, setQ] = useState('');
   const dq = useDebounce(q, 300);
   useEffect(() => {
     const fn = src === 'jornadas' ? apiAdminAuditJornadas : apiAdminAuditAuth;
-    fn({ limit: 200, ...(dq ? { q: dq } : {}) }).then(setRows).catch(() => setRows([]));
+    setErr('');
+    fn({ limit: 200, ...(dq ? { q: dq } : {}) }).then(setRows)
+      .catch((e) => { setRows([]); setErr(errorDeAdmin(e, 'cargar la auditoría')); });
   }, [src, dq]);
   const cols = src === 'jornadas'
     ? ['timestamp', 'tabla', 'registro_id', 'accion', 'username', 'cambios_json']
@@ -600,6 +608,7 @@ function Auditoria() {
         <SearchInput value={q} onChange={setQ} placeholder="Buscar por usuario, acción, ip…"
           className="ml-auto min-w-[16rem]" />
       </div>
+      {err && <div className="rounded-lg border border-danger/40 bg-danger-soft/40 p-2.5 text-sm text-danger">{err}</div>}
       <div className="card overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-surface-elev text-fg-muted uppercase">
