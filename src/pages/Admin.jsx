@@ -27,20 +27,23 @@ function Pill({ active, onClick, children }) {
 export default function Admin() {
   const { user } = useAuth();
   const canWrite = user?.permiso === 'editor';
-  const [tab, setTab] = useState('usuarios');
+  // El coordinador (Berkin) solo administra el catálogo de patologías; usuarios y
+  // auditoría son de la administración del módulo (el backend lo exige: 403).
+  const esCoordinador = user?.es_coordinador === true;
+  const [tab, setTab] = useState(esCoordinador ? 'patologias' : 'usuarios');
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-bold">Administración</h1>
         <div className="flex gap-1.5">
-          <Pill active={tab === 'usuarios'} onClick={() => setTab('usuarios')}>Usuarios</Pill>
+          {!esCoordinador && <Pill active={tab === 'usuarios'} onClick={() => setTab('usuarios')}>Usuarios</Pill>}
           <Pill active={tab === 'patologias'} onClick={() => setTab('patologias')}>Patologías</Pill>
-          <Pill active={tab === 'audit'} onClick={() => setTab('audit')}>Auditoría</Pill>
+          {!esCoordinador && <Pill active={tab === 'audit'} onClick={() => setTab('audit')}>Auditoría</Pill>}
         </div>
       </div>
-      {tab === 'usuarios' && <Usuarios canWrite={canWrite} />}
+      {tab === 'usuarios' && !esCoordinador && <Usuarios canWrite={canWrite} />}
       {tab === 'patologias' && <Patologias canWrite={canWrite} />}
-      {tab === 'audit' && <Auditoria />}
+      {tab === 'audit' && !esCoordinador && <Auditoria />}
     </div>
   );
 }
