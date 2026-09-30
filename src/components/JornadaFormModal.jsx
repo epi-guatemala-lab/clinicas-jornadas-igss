@@ -78,6 +78,8 @@ const aServidor = (v) => (v ? String(v).replace('T', ' ').slice(0, 16) : null);
 // las 15:00 con odontología— o 4 horas después del inicio, lo que sea más tarde.
 function horaFinPorDefecto(f) {
   const base = f.odontologia ? '15:00' : '12:00';
+  // Varios días: la hora de inicio es la del primero; el último cierra normal.
+  if (f.fecha_fin && f.fecha_inicio && f.fecha_fin > f.fecha_inicio) return base;
   const m = /^(\d{2}):(\d{2})$/.exec(f.hora_inicio || '');
   if (!m) return base;
   const min = Number(m[1]) * 60 + Number(m[2]) + 240;
