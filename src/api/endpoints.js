@@ -125,6 +125,13 @@ export const apiSorteoPropuesta = (body) =>
   api.post('/api/jornadas/sorteo/propuesta', body).then((r) => r.data);
 
 // ── Admin (usuarios + auditoría) ────────────────────────────────────
+// Configuración del sorteo de personal: lista de líderes, comodines y perfiles
+// (solo administración y coordinación).
+export const apiSorteoConfiguracion = () =>
+  api.get('/api/admin/sorteo/configuracion').then((r) => r.data);
+export const apiGuardarSorteoConfiguracion = (body) =>
+  api.put('/api/admin/sorteo/configuracion', body).then((r) => r.data);
+
 export const apiAdminUsers = (params = {}) =>
   api.get('/api/admin/users', { params }).then((r) => r.data);
 // Alta de usuario desde la pantalla de administración. La contraseña es

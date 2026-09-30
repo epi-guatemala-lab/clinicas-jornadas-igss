@@ -74,7 +74,17 @@ const aControl = (v) => (v ? String(v).replace(' ', 'T').slice(0, 16) : '');
 const aServidor = (v) => (v ? String(v).replace('T', ' ').slice(0, 16) : null);
 // Hora de fin cuando no se escribe: una jornada normal termina a mediodía y una
 // con odontología a media tarde (la misma regla que aplica el servidor).
-const horaFinPorDefecto = (f) => (f.odontologia ? '15:00' : '12:00');
+// Hora de fin cuando no se escribe (la misma regla del servidor): las 12:00 —o
+// las 15:00 con odontología— o 4 horas después del inicio, lo que sea más tarde.
+function horaFinPorDefecto(f) {
+  const base = f.odontologia ? '15:00' : '12:00';
+  const m = /^(\d{2}):(\d{2})$/.exec(f.hora_inicio || '');
+  if (!m) return base;
+  const min = Number(m[1]) * 60 + Number(m[2]) + 240;
+  const minima = min >= 1440 ? '23:59'
+    : `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+  return minima > base ? minima : base;
+}
 const esFechaISO = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '') && v >= '2000-01-01'
   && !Number.isNaN(Date.parse(`${v}T00:00:00Z`));
 const diasEntre = (a, b) => Math.round(
@@ -796,7 +806,9 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
                 {!form.hora_fin && (
                   <span className="block text-[11px] text-fg-subtle mt-0.5">
                     Si se deja vacía: {horaFinPorDefecto(form)}
-                    {form.odontologia ? ' (jornada con odontología)' : ' (jornada normal)'}.
+                    {horaFinPorDefecto(form) === (form.odontologia ? '15:00' : '12:00')
+                      ? (form.odontologia ? ' (jornada con odontología)' : ' (jornada normal)')
+                      : ' (4 horas después del inicio)'}.
                   </span>
                 )}</div>
               <div><label className="label">Modalidad</label>

@@ -4,6 +4,7 @@ import {
   apiAdminResetPassword, apiAdminAuditJornadas, apiAdminAuditAuth,
   apiAdminCreateUser, apiAdminPatchUser, apiListPersonal,
   apiListPatologias, apiCreatePatologia, apiUpdatePatologia,
+  apiSorteoConfiguracion, apiGuardarSorteoConfiguracion,
 } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
 import SearchInput from '../components/filters/SearchInput';
@@ -40,12 +41,198 @@ export default function Admin() {
         <div className="flex gap-1.5">
           {!esCoordinador && <Pill active={tab === 'usuarios'} onClick={() => setTab('usuarios')}>Usuarios</Pill>}
           <Pill active={tab === 'patologias'} onClick={() => setTab('patologias')}>Patologías</Pill>
+          {canWrite && (esCoordinador || user?.rol === 'admin') && (
+            <Pill active={tab === 'sorteo'} onClick={() => setTab('sorteo')}>Sorteo</Pill>
+          )}
           {!esCoordinador && <Pill active={tab === 'audit'} onClick={() => setTab('audit')}>Auditoría</Pill>}
         </div>
       </div>
       {tab === 'usuarios' && !esCoordinador && <Usuarios canWrite={canWrite} />}
       {tab === 'patologias' && <Patologias canWrite={canWrite} />}
       {tab === 'audit' && !esCoordinador && <Auditoria />}
+      {tab === 'sorteo' && canWrite && (esCoordinador || user?.rol === 'admin') && <SorteoConfig canWrite={canWrite} />}
+    </div>
+  );
+}
+
+const PERFIL_LABEL = {
+  MEDICO: 'Medicina', ENFERMERIA: 'Enfermería', NUTRICION: 'Nutrición',
+  PSICOLOGIA: 'Psicología (sin cupo)', LOGISTICA_ADMIN: 'Digitación / logística',
+  COORDINACION: 'Coordinación',
+};
+const ES_LOGISTICA = (perfil) => perfil === 'LOGISTICA_ADMIN' || perfil === 'COORDINACION';
+
+// Fuera de SorteoConfig: definida adentro, cada tecla creaba un componente
+// nuevo y React desmontaba la lista (se perdía el foco del buscador).
+function Lista({ titulo, ayuda, lista, set, candidatos, nombre, canWrite }) {
+  const mover = (i, d) => {
+    const j = i + d; if (j < 0 || j >= lista.length) return;
+    const c = [...lista]; [c[i], c[j]] = [c[j], c[i]]; set(c);
+  };
+  const libres = candidatos.filter((p) => !lista.includes(p.personal_id));
+  return (
+    <div className="card p-4 space-y-2">
+      <h3 className="font-semibold">{titulo}</h3>
+      <p className="text-xs text-fg-muted">{ayuda}</p>
+      {lista.length === 0 && <div className="text-sm text-fg-subtle">Nadie todavía.</div>}
+      <ol className="space-y-1">
+        {lista.map((id, i) => (
+          <li key={id} className="flex items-center gap-2 rounded bg-surface-elev px-2 py-1.5 text-sm">
+            <span className="w-6 text-right font-semibold text-igss-primary">{i + 1}</span>
+            <span className="flex-1">{nombre(id)}</span>
+            {canWrite && (<>
+              <button type="button" className="px-1.5 text-fg-muted disabled:opacity-30" disabled={i === 0}
+                title="Subir" aria-label="Subir" onClick={() => mover(i, -1)}>▲</button>
+              <button type="button" className="px-1.5 text-fg-muted disabled:opacity-30" disabled={i === lista.length - 1}
+                title="Bajar" aria-label="Bajar" onClick={() => mover(i, 1)}>▼</button>
+              <button type="button" className="px-1.5 text-danger" title="Quitar" aria-label="Quitar"
+                onClick={() => set(lista.filter((x) => x !== id))}>✕</button>
+            </>)}
+          </li>
+        ))}
+      </ol>
+      {canWrite && libres.length > 0 && (
+        <SearchableSelect value="" placeholder="+ Agregar a la lista…"
+          onChange={(v) => v && set([...lista, Number(v)])}
+          options={libres.map((p) => ({ value: p.personal_id, label: p.nombre }))} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Configuración del sorteo de personal.
+ *
+ * Quién lidera y en qué orden (de los digitadores que salen en el sorteo,
+ * lidera el más alto de la lista), quiénes son comodines (no entran al sorteo
+ * normal: solo si falta logística) y el perfil de cada persona. Se guarda en la
+ * base: no hace falta tocar código ni volver a desplegar.
+ */
+function SorteoConfig({ canWrite }) {
+  const [datos, setDatos] = useState(null);
+  const [lideres, setLideres] = useState([]);
+  const [comodines, setComodines] = useState([]);
+  const [perfiles, setPerfiles] = useState({});
+  const [err, setErr] = useState('');
+  const [ok, setOk] = useState('');
+  const [guardando, setGuardando] = useState(false);
+
+  function cargar(d) {
+    setDatos(d);
+    setLideres((d.prioridad_lider || []).map((p) => p.personal_id));
+    setComodines((d.comodines || []).map((p) => p.personal_id));
+    setPerfiles(Object.fromEntries((d.personas || []).map((p) => [p.personal_id,
+      { perfil: p.perfil, sorteable: !!p.sorteable }])));
+  }
+  useEffect(() => {
+    apiSorteoConfiguracion().then(cargar)
+      .catch((e) => setErr(mensajeDeError(e, 'leer la configuración del sorteo')));
+  }, []);
+
+  const personas = datos?.personas || [];
+  // Las listas pueden traer a alguien que ya está de baja (no sale en `personas`).
+  const nombre = (id) => personas.find((p) => p.personal_id === id)?.nombre
+    || [...(datos?.prioridad_lider || []), ...(datos?.comodines || [])]
+      .find((p) => p.personal_id === id)?.nombre
+    || `#${id}`;
+  const logisticos = personas.filter((p) => ES_LOGISTICA(perfiles[p.personal_id]?.perfil));
+  const cambiosPerfil = personas.filter((p) => {
+    const v = perfiles[p.personal_id];
+    return v && (v.perfil !== p.perfil || v.sorteable !== !!p.sorteable);
+  });
+
+  // Quien cambia a un perfil que no es de logística sale de las dos listas, y
+  // quien deja de entrar al sorteo sale de los comodines (el servidor rechazaría
+  // guardarlo así: nunca se lo propondría).
+  function cambiarPerfil(id, v) {
+    setPerfiles({ ...perfiles, [id]: v });
+    if (!ES_LOGISTICA(v.perfil)) {
+      setLideres((l) => l.filter((x) => x !== id));
+      setComodines((l) => l.filter((x) => x !== id));
+    } else if (!v.sorteable) {
+      setComodines((l) => l.filter((x) => x !== id));
+    }
+  }
+
+  async function guardar() {
+    setErr(''); setOk('');
+    if (lideres.length === 0) { setErr('La lista de líderes no puede quedar vacía.'); return; }
+    setGuardando(true);
+    try {
+      const d = await apiGuardarSorteoConfiguracion({
+        prioridad_lider: lideres,
+        comodines,
+        perfiles: cambiosPerfil.map((p) => ({ personal_id: p.personal_id, ...perfiles[p.personal_id] })),
+      });
+      cargar(d);
+      setOk('Configuración guardada. El próximo «Proponer equipo» ya la usa.');
+    } catch (e2) {
+      setErr(mensajeDeError(e2, 'guardar la configuración del sorteo'));
+    } finally { setGuardando(false); }
+  }
+
+  if (!datos) {
+    return <div className="card p-4 text-sm">{err || 'Cargando configuración…'}</div>;
+  }
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Lista titulo="Líderes, en orden de prioridad"
+          ayuda="El líder es un digitador. Se sortean los digitadores por equidad y, de los que salen, lidera el que esté más arriba en esta lista. Solo quien está en la lista puede liderar."
+          lista={lideres} set={setLideres} candidatos={logisticos} nombre={nombre} canWrite={canWrite} />
+        <Lista titulo="Comodines, en orden"
+          ayuda="No entran al sorteo normal. Solo se proponen si faltan digitadores libres: primero el 1 y, si todavía falta, el 2."
+          lista={comodines} set={setComodines} nombre={nombre} canWrite={canWrite}
+          candidatos={logisticos.filter((p) => perfiles[p.personal_id]?.sorteable)} />
+      </div>
+
+      <div className="card p-4">
+        <h3 className="font-semibold mb-1">Perfiles del personal</h3>
+        <p className="text-xs text-fg-muted mb-3">
+          Qué cupo cubre cada persona en el sorteo y si entra a él. Quien no entra
+          se puede seguir agregando a mano en cualquier jornada.
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="text-left text-fg-muted">
+              <th className="py-1.5 pr-3">Persona</th><th className="py-1.5 pr-3">Perfil</th>
+              <th className="py-1.5">Entra al sorteo</th>
+            </tr></thead>
+            <tbody>
+              {personas.map((p) => {
+                const v = perfiles[p.personal_id] || { perfil: p.perfil, sorteable: !!p.sorteable };
+                return (
+                  <tr key={p.personal_id} className="border-t border-line-subtle">
+                    <td className="py-1.5 pr-3">{p.nombre}</td>
+                    <td className="py-1.5 pr-3">
+                      <select className="input py-1" value={v.perfil} disabled={!canWrite}
+                        onChange={(e) => cambiarPerfil(p.personal_id, { ...v, perfil: e.target.value })}>
+                        {(datos.perfiles_validos || []).map((x) => (
+                          <option key={x} value={x}>{PERFIL_LABEL[x] || x}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-1.5">
+                      <input type="checkbox" checked={!!v.sorteable} disabled={!canWrite}
+                        onChange={(e) => cambiarPerfil(p.personal_id, { ...v, sorteable: e.target.checked })} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {err && <div className="rounded-md border border-danger/40 bg-danger-soft p-2 text-sm text-danger">{err}</div>}
+      {ok && <div className="rounded-md border border-success/40 bg-success-soft p-2 text-sm text-success">{ok}</div>}
+      {canWrite && (
+        <div className="flex justify-end">
+          <button type="button" className="btn-primary" disabled={guardando} onClick={guardar}>
+            {guardando ? 'Guardando…' : 'Guardar configuración'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
