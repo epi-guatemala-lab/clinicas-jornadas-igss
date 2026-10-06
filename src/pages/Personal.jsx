@@ -125,7 +125,7 @@ export default function Personal() {
           <tbody>
             {filtered.map((p) => (
               <tr key={p.id} className="border-t">
-                <td className="p-2 font-medium">{p.nombre_completo}<div className="text-xs text-fg-muted">NIT: {p.nit || '—'}</div></td>
+                <td className="p-2 font-medium">{p.nombre_completo}<div className="text-xs text-fg-muted">{p.nombre_corto ? `En la programación: ${p.nombre_corto} · ` : ''}NIT: {p.nit || '—'}</div></td>
                 <td className="p-2">{p.seccion}</td>
                 <td className="p-2">{p.rol_default}</td>
                 <td className="p-2">{p.renglon} {p.ibm && <span className="text-fg-muted text-xs">({p.ibm})</span>}</td>
@@ -167,6 +167,7 @@ function PersonalForm({ initial, onClose, onSave }) {
     salarioInput: initialSalarioInput,    // lo que muestra el input (anual o mensual según renglón)
     email: initial?.email || '',
     telefono: initial?.telefono || '',
+    nombre_corto: initial?.nombre_corto || '',
   });
   const [err, setErr] = useState('');
   const set = (k,v)=>setForm(f=>({...f, [k]:v}));
@@ -195,6 +196,7 @@ function PersonalForm({ initial, onClose, onSave }) {
         compensacion,
         email: form.email,
         telefono: form.telefono,
+        nombre_corto: form.nombre_corto.trim() || null,
       };
       if (initial) await apiUpdatePersonal(initial.id, body);
       else await apiCreatePersonal(body);
@@ -208,6 +210,13 @@ function PersonalForm({ initial, onClose, onSave }) {
         <div className="p-4 grid grid-cols-2 gap-3">
           <div className="col-span-2"><label className="label">Nombre completo *</label>
             <input className="input" value={form.nombre_completo} onChange={(e)=>set('nombre_completo', e.target.value)} required /></div>
+          <div className="col-span-2"><label className="label">Nombre en la programación impresa</label>
+            <input className="input" value={form.nombre_corto} maxLength={60}
+                   onChange={(e)=>set('nombre_corto', e.target.value)}
+                   placeholder="ej. Dra. Alejandra Posadas" />
+            <p className="text-[10px] text-fg-subtle mt-1">
+              Como aparece en la programación del mes y en su agenda. Si se deja vacío, va el primer nombre y el primer apellido.
+            </p></div>
           <div><label className="label">NIT</label>
             <input className="input" value={form.nit || ''} onChange={(e)=>set('nit', e.target.value)} /></div>
           <div><label className="label">Partida presupuestaria (renglón)</label>

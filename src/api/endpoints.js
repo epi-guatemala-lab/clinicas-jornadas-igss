@@ -161,6 +161,13 @@ export const apiGetConfig = () =>
 export const apiSetMetaAfiliados = (valor) =>
   api.put('/api/config/meta-afiliados', { valor }).then((r) => r.data);
 
+// ── Reportes ────────────────────────────────────────────────────────
+// Programación mensual (PDF o Excel). Devuelve el Blob del archivo; el PDF lo
+// arma Chromium en el servidor y puede tardar unos segundos.
+export const apiDescargarProgramacion = (params) =>
+  api.get('/api/reportes/programacion', { params, responseType: 'blob', timeout: 90000 })
+    .then((r) => r.data);
+
 export const apiCalendario = (desde, hasta, seccion) =>
   api.get('/api/jornadas/calendario', {
     params: { desde, hasta, seccion },

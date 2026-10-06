@@ -10,6 +10,7 @@ import SearchInput from '../components/filters/SearchInput';
 import { normIncludes } from '../utils/norm';
 import { SERVICIOS_CHIP } from '../utils/derived';
 import TipoIcon from '../components/TipoIcon';
+import DescargarProgramacion from '../components/DescargarProgramacion';
 
 // date-fns sin locale rotula los meses en inglés ("July 2026"). Todo el texto visible
 // va en español: un solo helper para no volver a olvidarlo en algún format() suelto.
@@ -95,6 +96,8 @@ export default function Calendario() {
                   className="btn-secondary">Hoy</button>
           <button onClick={() => setMonth(addMonths(month, 1))}
                   className="btn-secondary">Mes siguiente →</button>
+          {/* La programación es de SIPRESALUD: Clínicas de Empresa no la tiene. */}
+          {user?.rol !== 'ce' && <DescargarProgramacion month={month} />}
         </div>
       </div>
 
