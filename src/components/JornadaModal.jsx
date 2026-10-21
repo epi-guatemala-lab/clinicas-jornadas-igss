@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   apiGetJornada, apiCancelarJornada, apiCerrarJornada, apiReprogramarJornada,
   apiSetMaterial, apiSetCharlas, apiCatalogoCharlas, apiListPersonal,
   apiGetCierreJornada, apiAmarrarClinica,
-  apiListJornadas, apiCorregirJornadaCerrada, apiEliminarJornadaDuplicada,
+  apiCorregirJornadaCerrada, apiDuplicadasDe, apiPlanFusion, apiFusionarJornadas,
 } from '../api/endpoints';
 import {
   SEMAFORO_BG, TIPO_LABEL, ESTADO_LABEL, fmtN, fmtQ, fmtPct,
@@ -47,6 +47,13 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
   const [amarrando, setAmarrando] = useState(false);
   const [guardandoCorreccion, setGuardandoCorreccion] = useState(false);
   const [duplicados, setDuplicados] = useState([]);
+  const [planFusion, setPlanFusion] = useState(null);
+  const refPlan = useRef(null);
+  useEffect(() => {
+    if (planFusion) refPlan.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [planFusion]);
+  const [errorFusion, setErrorFusion] = useState('');
+  const [cargandoDup, setCargandoDup] = useState(false);
 
   const [cierre, setCierre] = useState(null);
 
@@ -206,36 +213,54 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
     } finally { setGuardandoCorreccion(false); }
   }
 
+  // Duplicadas: el servidor decide qué es «la misma jornada» (misma fecha y
+  // empresa equivalente: misma ficha, mismo NIT o nombre casi igual). Antes se
+  // filtraba acá con igualdad literal y la copia de Agrosak del 16 de julio no
+  // aparecía: la otra ficha era «Agrosac S.A.» y su fecha de fin estaba vacía.
   async function startDuplicada() {
-    setForm({ conservar_id: '', codigo_confirmacion: '', motivo: '' });
-    setDuplicados([]);
+    setForm({ con: '', confirmacion: '', motivo: '', acepto_cifras: false });
+    setDuplicados([]); setPlanFusion(null); setErrorFusion(''); setCargandoDup(true);
     setMode('duplicada');
     try {
-      const rows = await apiListJornadas({ seccion: 'SIPRESALUD' });
-      setDuplicados(rows.filter((o) => o.id !== j.id && o.estado === 'CERRADA'
-        && o.empresa_id === j.empresa_id && o.fecha_inicio === j.fecha_inicio
-        && o.fecha_fin === j.fecha_fin && o.tipo === j.tipo));
+      setDuplicados(await apiDuplicadasDe(j.id));
     } catch (e) {
-      alert(e.response?.data?.detail || 'No se pudieron consultar las jornadas coincidentes');
-      setMode('view');
+      setErrorFusion(e.response?.data?.detail || 'No se pudieron consultar las jornadas coincidentes');
+    } finally { setCargandoDup(false); }
+  }
+
+  async function elegirDuplicada(con) {
+    setForm((f) => ({ ...f, con, confirmacion: '', acepto_cifras: false }));
+    setPlanFusion(null); setErrorFusion('');
+    if (!con) return;
+    try {
+      setPlanFusion(await apiPlanFusion(j.id, Number(con)));
+    } catch (e) {
+      setErrorFusion(e.response?.data?.detail || 'No se pudo preparar la fusión');
     }
   }
 
-  async function doEliminarDuplicada() {
-    if (!Number(form.conservar_id) || form.codigo_confirmacion !== j.codigo) {
-      alert('Seleccioná la jornada a conservar y escribí el código exacto de la que se eliminará.'); return;
+  async function doFusionar() {
+    if (!planFusion) return;
+    const sale = planFusion.sale.codigo;
+    if ((form.confirmacion || '').trim().toUpperCase() !== sale.toUpperCase()) {
+      setErrorFusion(`Escribí ${sale} para confirmar.`); return;
     }
     if ((form.motivo || '').trim().length < 20) {
-      alert('Describí el motivo del borrado (al menos 20 caracteres).'); return;
+      setErrorFusion('Describí el motivo (al menos 20 caracteres).'); return;
     }
-    setGuardandoCorreccion(true);
+    if (planFusion.requiere_confirmar_cifras && !form.acepto_cifras) {
+      setErrorFusion('Las cifras no coinciden: marcá la casilla si de todos modos es la misma jornada.'); return;
+    }
+    setGuardandoCorreccion(true); setErrorFusion('');
     try {
-      await apiEliminarJornadaDuplicada(j.id, {
-        conservar_id: Number(form.conservar_id), motivo: form.motivo.trim(),
+      const res = await apiFusionarJornadas(j.id, {
+        con: Number(form.con), motivo: form.motivo.trim(), confirmacion: form.confirmacion.trim(),
+        acepto_cifras_distintas: !!form.acepto_cifras,
       });
+      alert(`Listo: queda ${res.conservada_codigo} y se eliminó ${res.eliminada_codigo}.`);
       onChanged?.(); onClose();
     } catch (e) {
-      alert(e.response?.data?.detail || 'No se pudo eliminar la jornada');
+      setErrorFusion(e.response?.data?.detail || 'No se pudo fusionar');
     } finally { setGuardandoCorreccion(false); }
   }
 
@@ -580,28 +605,69 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
 
         {mode === 'duplicada' && (
           <div className="rounded-lg border border-danger/40 bg-danger-soft/30 p-3 space-y-3">
-            <h4 className="font-semibold text-danger">Eliminar jornada duplicada</h4>
-            <p className="text-xs text-fg-muted">Se eliminará {j.codigo} ({j.empresa_nombre}, {fmtFecha(j.fecha_inicio)}). El servidor impedirá el borrado si hay análisis, cargas o viáticos asociados.</p>
-            <div><label className="label">Jornada que se conservará</label>
-              <select className="input" value={form.conservar_id || ''}
-                onChange={(e) => setForm({ ...form, conservar_id: e.target.value })}>
-                <option value="">— Seleccioná la jornada correcta —</option>
-                {duplicados.map((o) => <option key={o.id} value={o.id}>{o.codigo} · {fmtN(o.atendidos)} atendidos</option>)}
+            <h4 className="font-semibold text-danger">Fusionar jornada duplicada</h4>
+            <p className="text-xs text-fg-muted">
+              Cuando la misma jornada quedó cargada dos veces, se fusionan: la que queda recibe
+              el equipo, las charlas y los datos que solo tenía la otra, y la copia se elimina.
+              Si las dos fichas de empresa son la misma, también se unen.
+            </p>
+            <div><label className="label">La misma jornada que {j.codigo}</label>
+              <select className="input" value={form.con || ''} disabled={cargandoDup}
+                onChange={(e) => elegirDuplicada(e.target.value)}>
+                <option value="">{cargandoDup ? 'Buscando…' : '— Seleccioná la otra copia —'}</option>
+                {duplicados.map((o) => (
+                  <option key={o.id} value={o.id} disabled={!!o.bloqueo}>
+                    {o.codigo} · {o.empresa_nombre} · {fmtN(o.atendidos)} atendidos
+                    {o.analisis ? ` · análisis ${o.analisis}` : ''} · {o.coincidencia}
+                    {o.bloqueo ? ' · no es duplicada' : ''}
+                  </option>
+                ))}
               </select>
-              {duplicados.length === 0 && <p className="text-xs text-fg-muted mt-1">No hay otra jornada cerrada de la misma empresa, fecha y actividad.</p>}
+              {!cargandoDup && duplicados.length === 0 && !errorFusion && (
+                <p className="text-xs text-fg-muted mt-1">
+                  No hay otra jornada del mismo día de esta empresa (ni de una ficha con el mismo NIT o un nombre casi igual).
+                </p>
+              )}
+              {duplicados.filter((o) => o.bloqueo).map((o) => (
+                <p key={o.id} className="text-xs text-fg-muted mt-1">{o.codigo}: {o.bloqueo}</p>
+              ))}
             </div>
-            <div><label className="label">Motivo</label>
-              <textarea className="input" rows="2" value={form.motivo || ''}
-                onChange={(e) => setForm({ ...form, motivo: e.target.value })}
-                placeholder="Explicá por qué esta fila es la duplicada (mínimo 20 caracteres)" /></div>
-            <div><label className="label">Escribí {j.codigo} para confirmar</label>
-              <input className="input" value={form.codigo_confirmacion || ''}
-                onChange={(e) => setForm({ ...form, codigo_confirmacion: e.target.value })} /></div>
+            {planFusion && (
+              <div ref={refPlan} className="rounded-md border border-line bg-surface p-3 text-sm space-y-2">
+                <div className="font-semibold">
+                  Queda <span className="text-success">{planFusion.queda.codigo}</span> · se elimina{' '}
+                  <span className="text-danger">{planFusion.sale.codigo}</span>
+                </div>
+                <ul className="list-disc pl-5 space-y-1 text-fg-muted">
+                  {planFusion.lineas.map((l, k) => <li key={k}>{l}</li>)}
+                </ul>
+                {planFusion.avisos.map((a, k) => (
+                  <p key={k} className="rounded bg-warning-soft text-warning p-2 text-xs">{a}</p>
+                ))}
+                {planFusion.requiere_confirmar_cifras && (
+                  <label className="flex items-start gap-2 text-xs">
+                    <input type="checkbox" checked={!!form.acepto_cifras}
+                      onChange={(e) => setForm({ ...form, acepto_cifras: e.target.checked })} />
+                    <span>Confirmo que es la misma jornada aunque las cifras no coincidan.</span>
+                  </label>
+                )}
+              </div>
+            )}
+            {planFusion && (<>
+              <div><label className="label">Motivo</label>
+                <textarea className="input" rows="2" value={form.motivo || ''}
+                  onChange={(e) => setForm({ ...form, motivo: e.target.value })}
+                  placeholder="Explicá por qué son la misma jornada (mínimo 20 caracteres)" /></div>
+              <div><label className="label">Escribí {planFusion.sale.codigo} para confirmar</label>
+                <input className="input" value={form.confirmacion || ''}
+                  onChange={(e) => setForm({ ...form, confirmacion: e.target.value })} /></div>
+            </>)}
+            {errorFusion && <div className="rounded-md border border-danger/40 bg-danger-soft p-2 text-sm text-danger">{errorFusion}</div>}
             <div className="flex justify-end gap-2">
               <button className="btn-secondary" onClick={() => setMode('view')}>Volver</button>
-              <button className="btn-danger" disabled={guardandoCorreccion || !duplicados.length}
-                onClick={doEliminarDuplicada}>
-                {guardandoCorreccion ? 'Eliminando…' : 'Eliminar duplicada'}
+              <button className="btn-danger" disabled={guardandoCorreccion || !planFusion}
+                onClick={doFusionar}>
+                {guardandoCorreccion ? 'Fusionando…' : 'Fusionar'}
               </button>
             </div>
           </div>
@@ -619,7 +685,7 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
             {canWrite && berkin && j.estado === 'CERRADA' && j.seccion_responsable === 'SIPRESALUD' && (
               <>
                 <button className="btn-secondary" onClick={startCorreccion}>Corregir atendidos</button>
-                <button className="btn-danger" onClick={startDuplicada}>Eliminar duplicada</button>
+                <button className="btn-danger" onClick={startDuplicada}>Fusionar duplicada</button>
               </>
             )}
             {puedeEditar && canWrite && (

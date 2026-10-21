@@ -462,6 +462,21 @@ const LISTAS_CONOCIDAS = {
     ayuda: 'La plantilla original traía NIT y contactos inventados sobre empresas reales. Se descartan esos seis campos y el resto de la ficha entra normal; los huecos quedan vacíos hasta que llegue el dato verdadero. El sistema nunca inventa un NIT.',
     destacada: true,
   },
+  empresas_variantes_unificadas: {
+    etiqueta: 'Empresas que el archivo escribe distinto y se unieron con su ficha',
+    ayuda: 'El nombre del archivo es la misma empresa que una ficha que ya existe (mismo NIT, la misma razón social con otra puntuación o casi idéntica): se usó esa ficha en vez de crear otra.',
+    destacada: false,
+  },
+  empresas_parecidas_a_otra: {
+    etiqueta: 'Empresas nuevas que se parecen mucho a una que ya existe',
+    ayuda: 'Entraron como ficha nueva porque el parecido no alcanza para unirlas solas. Si es la misma empresa, abrí la jornada y usá «Fusionar duplicada»: se unen las dos jornadas y las dos fichas sin perder datos.',
+    destacada: true,
+  },
+  empresas_nuevas_descartadas: {
+    etiqueta: 'Fichas nuevas que no se crearon porque su jornada ya existía',
+    ayuda: 'El archivo traía una variante del nombre de una empresa, pero su jornada coincidió con una que ya estaba cargada ese mismo día bajo la ficha conocida: se actualizó esa jornada y no se creó una ficha repetida.',
+    destacada: false,
+  },
   plantilla_ejemplo_omitidas: {
     etiqueta: 'Jornadas de ejemplo de la plantilla, descartadas',
     ayuda: 'Filas de ejemplo que reutilizan códigos de jornadas reales con datos inventados. Se reconocen porque no traen fecha de inicio.',

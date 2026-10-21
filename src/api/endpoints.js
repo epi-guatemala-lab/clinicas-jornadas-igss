@@ -13,8 +13,9 @@ export const apiMe = () => api.get('/api/auth/me').then((r) => r.data);
 export const apiListEmpresas = (params = {}) =>
   api.get('/api/empresas', { params }).then((r) => r.data);
 
-export const apiCreateEmpresa = (body) =>
-  api.post('/api/empresas', body).then((r) => r.data);
+export const apiCreateEmpresa = (body, { confirmarParecida = false } = {}) =>
+  api.post('/api/empresas', body, { params: confirmarParecida ? { confirmar_parecida: true } : {} })
+    .then((r) => r.data);
 
 export const apiUpdateEmpresa = (id, body) =>
   api.put(`/api/empresas/${id}`, body).then((r) => r.data);
@@ -67,6 +68,13 @@ export const apiCorregirJornadaCerrada = (id, body) =>
 
 export const apiEliminarJornadaDuplicada = (id, body) =>
   api.post(`/api/admin/jornadas/${id}/eliminar-duplicada`, body).then((r) => r.data);
+// Duplicadas: candidatas (misma fecha y empresa equivalente), plan y fusión.
+export const apiDuplicadasDe = (id) =>
+  api.get(`/api/admin/jornadas/${id}/duplicadas`).then((r) => r.data.candidatas || []);
+export const apiPlanFusion = (id, con) =>
+  api.get(`/api/admin/jornadas/${id}/fusion`, { params: { con } }).then((r) => r.data);
+export const apiFusionarJornadas = (id, body) =>
+  api.post(`/api/admin/jornadas/${id}/fusionar`, body).then((r) => r.data);
 
 // Agenda efectiva del personal: incluye la jornada y, cuando corresponde, el
 // día calendario anterior reservado para traslado.
@@ -167,6 +175,11 @@ export const apiSetMetaAfiliados = (valor) =>
 export const apiDescargarProgramacion = (params) =>
   api.get('/api/reportes/programacion', { params, responseType: 'blob', timeout: 90000 })
     .then((r) => r.data);
+
+// Jornadas que ya existen esos días para la misma empresa o una equivalente
+// (aviso del formulario: dos sedes el mismo día son legítimas).
+export const apiPosiblesDuplicadas = (params) =>
+  api.get('/api/jornadas/posibles-duplicadas', { params }).then((r) => r.data.jornadas || []);
 
 export const apiCalendario = (desde, hasta, seccion) =>
   api.get('/api/jornadas/calendario', {

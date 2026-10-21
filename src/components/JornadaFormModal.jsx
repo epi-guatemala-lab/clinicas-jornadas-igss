@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   apiListEmpresas, apiListPersonal, apiListJornadas,
-  apiCreateJornada, apiUpdateJornada, apiSetCharlas, apiDisponibilidadPersonal,
+  apiCreateJornada, apiUpdateJornada, apiSetCharlas, apiDisponibilidadPersonal, apiPosiblesDuplicadas,
   apiSorteoPropuesta, apiAnterioresEnRuta, apiGetJornada,
 } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
@@ -160,6 +160,7 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
   // La revisión de agenda en vivo falló (red, tiempo agotado): se dice, porque
   // sin ella no se marca a nadie como ocupado aunque lo esté.
   const [agendaFallo, setAgendaFallo] = useState(false);
+  const [posiblesDup, setPosiblesDup] = useState([]);
   const [err, setErr] = useState('');
 
   // ── Sorteo de personal ───────────────────────────────────────────
@@ -281,6 +282,23 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
     apiListPersonal({ activo: true }).then(setPersonal);
     apiListJornadas({ seccion: 'SIPRESALUD' }).then(setJornadasSipre);
   }, []);
+
+  // Aviso de posible duplicada: la misma empresa (o una ficha equivalente: mismo
+  // NIT o nombre casi igual) ya tiene una jornada esos días. No bloquea —dos
+  // sedes el mismo día son legítimas—, pero así no se carga dos veces la misma.
+  useEffect(() => {
+    if (!form.empresa_id || !esFechaISO(form.fecha_inicio)
+        || (form.fecha_fin && !esFechaISO(form.fecha_fin))) {
+      setPosiblesDup([]); return undefined;
+    }
+    let cancelled = false;
+    apiPosiblesDuplicadas({
+      empresa_id: form.empresa_id, fecha_inicio: form.fecha_inicio,
+      fecha_fin: form.fecha_fin || undefined, jornada_id: isEdit ? jornada.id : undefined,
+    }).then((l) => { if (!cancelled) setPosiblesDup(l); })
+      .catch(() => { if (!cancelled) setPosiblesDup([]); });
+    return () => { cancelled = true; };
+  }, [form.empresa_id, form.fecha_inicio, form.fecha_fin, isEdit, jornada?.id]);
 
   // La UI avisa y deshabilita personas ocupadas; el backend vuelve a validar al
   // guardar para cerrar la carrera entre dos usuarios que editan a la vez.
@@ -789,6 +807,21 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
                   onChange={(v) => setField('empresa_id', v ? Number(v) : null)}
                   placeholder="— Sin empresa (webinar/oficina) —"
                   options={empresas.map((e) => ({ value: e.id, label: e.nombre_legal }))} />
+                {posiblesDup.length > 0 && (
+                  <div className="mt-2 rounded-md border border-warning/50 bg-warning-soft p-2 text-xs text-warning space-y-1">
+                    <div className="font-semibold">
+                      {posiblesDup.length === 1 ? 'Ya hay una jornada de esta empresa esos días:' : 'Ya hay jornadas de esta empresa esos días:'}
+                    </div>
+                    {posiblesDup.map((d) => (
+                      <div key={d.id}>
+                        {d.codigo} · {fmtFecha(d.fecha_inicio)}{d.hora_inicio ? ` · ${d.hora_inicio}` : ''}
+                        {d.direccion ? ` · ${d.direccion}` : ''}
+                        {d.coincidencia !== 'misma empresa' ? ` · ficha «${d.empresa_nombre}» (${d.coincidencia})` : ''}
+                      </div>
+                    ))}
+                    <div className="text-fg-muted">Si es la misma jornada, no la cargues otra vez. Si es otra sede o otro turno, seguí normal.</div>
+                  </div>
+                )}
               </div>
               {/* Sin casilla «Tema»: al crear, el servidor lo deriva (empresa,
                   primera charla o la actividad). En edición el valor que ya

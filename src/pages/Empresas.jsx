@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   apiListEmpresas, apiCreateEmpresa, apiUpdateEmpresa, apiSetInauguracion,
   apiSetConvenio, apiEmpresaGrupos, apiCatalogoSectores, apiCatalogoUnidadesAdscripcion,
@@ -168,8 +168,16 @@ function EmpresaForm({ initial, onClose, onSave }) {
     apiEmpresaGrupos().then((d) => setGrupos(d.items || [])).catch(() => {});
   }, []);
 
-  async function submit(e) {
-    e.preventDefault(); setErr('');
+  // Una empresa nueva con un nombre casi igual a otra parte su historial en
+  // dos: el servidor la frena y acá se muestra cuál se parece.
+  const [parecida, setParecida] = useState(null);
+  const avisoParecida = useRef(null);
+  useEffect(() => {
+    if (parecida) avisoParecida.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [parecida]);
+
+  async function submit(e, confirmarParecida = false) {
+    e?.preventDefault?.(); setErr('');
     const _planilla = form.n_empleados_planilla;
     const body = {
       ...form,
@@ -178,9 +186,13 @@ function EmpresaForm({ initial, onClose, onSave }) {
     };
     try {
       if (initial) await apiUpdateEmpresa(initial.id, body);
-      else await apiCreateEmpresa(body);
+      else await apiCreateEmpresa(body, { confirmarParecida });
       onSave();
     } catch (e) {
+      const d = e.response?.data?.detail;
+      if (e.response?.status === 409 && d && d.codigo === 'EMPRESA_PARECIDA') {
+        setParecida(d); return;
+      }
       // mensajeDeError y no `detail` crudo: un 422 devuelve una LISTA de errores
       // y pintarla directo revienta el render («Objects are not valid as a React
       // child») y se lleva la pantalla entera por delante.
@@ -202,6 +214,22 @@ function EmpresaForm({ initial, onClose, onSave }) {
         <button type="submit" form="empresa-form" className="btn-primary">{initial ? 'Guardar' : 'Crear'}</button>
       </>}>
       <form id="empresa-form" onSubmit={submit} className="grid grid-cols-2 gap-3">
+        {parecida && (
+          <div ref={avisoParecida} className="col-span-2 rounded-md border border-warning/50 bg-warning-soft p-3 text-sm text-warning space-y-2">
+            <div>{parecida.mensaje}</div>
+            <ul className="list-disc pl-5 text-xs">
+              {(parecida.parecidas || []).map((p) => (
+                <li key={p.id}>{p.nombre_legal}{p.nit ? ` · NIT ${p.nit}` : ''} · {p.motivo}{p.activa ? '' : ' · inactiva'}</li>
+              ))}
+            </ul>
+            <div className="flex gap-2">
+              <button type="button" className="btn-secondary" onClick={() => setParecida(null)}>Revisar el nombre</button>
+              <button type="button" className="btn-primary" onClick={() => { setParecida(null); submit(null, true); }}>
+                Es otra empresa: crearla igual
+              </button>
+            </div>
+          </div>
+        )}
         <Field className="col-span-2" label="Razón Social" name="nombre_legal" required
                value={form.nombre_legal} onChange={set('nombre_legal')} />
         <Field label="Nombre comercial" value={form.nombre_comercial || ''} onChange={set('nombre_comercial')} />
