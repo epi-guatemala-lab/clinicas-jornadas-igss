@@ -477,6 +477,21 @@ const LISTAS_CONOCIDAS = {
     ayuda: 'El archivo traía una variante del nombre de una empresa, pero su jornada coincidió con una que ya estaba cargada ese mismo día bajo la ficha conocida: se actualizó esa jornada y no se creó una ficha repetida.',
     destacada: false,
   },
+  jornadas_posibles_duplicadas: {
+    etiqueta: 'Jornadas que pueden ser la misma que otra ya cargada',
+    ayuda: 'Con la misma regla de «Fusionar duplicada»: la misma empresa a pocos días, una ficha casi igual o la misma cifra el mismo día en otra empresa. La carga no las une sola porque puede ser otra sede u otro turno. Si es la misma, abrí la jornada y fusionala; si no, el tablero las cuenta como dos.',
+    destacada: true,
+  },
+  jornadas_con_fecha_corregida: {
+    etiqueta: 'Jornadas que se reconocieron aunque estaban en otra fecha',
+    ayuda: 'Estaban cerradas a mano, de la misma empresa y con exactamente los mismos atendidos, a pocos días de la fecha del análisis, y ese día no había otra jornada de esa empresa: era la misma jornada con la fecha sin actualizar. Se enlaza con su análisis y queda la fecha del análisis. Revisá que sea así antes de aplicar.',
+    destacada: true,
+  },
+  jornadas_empresa_conservada: {
+    etiqueta: 'Jornadas que conservan la empresa elegida en el portal',
+    ayuda: 'El archivo nombra otra empresa para estas jornadas, pero en el portal alguien decidió a qué empresa fue el equipo (al fusionar una duplicada o al confirmar que el análisis tenía mal el nombre). Se conserva esa decisión, con su lugar; el resto de los datos del archivo se aplica normal.',
+    destacada: false,
+  },
   plantilla_ejemplo_omitidas: {
     etiqueta: 'Jornadas de ejemplo de la plantilla, descartadas',
     ayuda: 'Filas de ejemplo que reutilizan códigos de jornadas reales con datos inventados. Se reconocen porque no traen fecha de inicio.',

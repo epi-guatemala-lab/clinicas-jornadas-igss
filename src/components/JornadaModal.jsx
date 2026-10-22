@@ -9,8 +9,10 @@ import {
 import {
   SEMAFORO_BG, TIPO_LABEL, ESTADO_LABEL, fmtN, fmtQ, fmtPct,
   fmtRangoFechas, fmtFechaHora, fmtFecha,
+  nombreDepartamento,
 } from '../utils/format';
 import { useAuth } from '../hooks/useAuth';
+import { mensajeDeError } from '../utils/apiError';
 import JornadaFormModal from './JornadaFormModal';
 import SearchableSelect from './filters/SearchableSelect';
 
@@ -49,11 +51,17 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
   const [duplicados, setDuplicados] = useState([]);
   const [planFusion, setPlanFusion] = useState(null);
   const refPlan = useRef(null);
+  // Número del último pedido de plan: si se cambia de opción antes de que
+  // vuelva la respuesta anterior (con la VPN son segundos), la vieja se descarta.
+  const pedidoPlan = useRef(0);
   useEffect(() => {
     if (planFusion) refPlan.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [planFusion]);
   const [errorFusion, setErrorFusion] = useState('');
   const [cargandoDup, setCargandoDup] = useState(false);
+  // Cierre detenido porque otra jornada ya tiene el análisis de esta misma
+  // actividad (409 POSIBLE_DUPLICADA): cerrarla sumaría dos veces lo mismo.
+  const [dupCierre, setDupCierre] = useState(null);
 
   const [cierre, setCierre] = useState(null);
 
@@ -138,7 +146,7 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
       alert(e.response?.data?.detail || 'No se pudo reprogramar');
     }
   }
-  async function doClose() {
+  async function doClose(confirmarDistinta = false) {
     // Cierre manual (jornadas sin archivo: talleres/webinars). Ya NO se piden
     // viáticos acá: el monto entra después, por persona, desde su propio flujo,
     // y el backend ignora `viaticos_real` en el cierre.
@@ -166,12 +174,17 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
       atendidos,
       notas: form.notas || null,
       confirmar_amarre_clinica: !!form.confirmar_amarre_clinica,
+      confirmar_distinta: !!confirmarDistinta,
     };
     try {
       const upd = await apiCerrarJornada(j.id, body);
-      setJ(upd); setMode('view'); onChanged?.();
+      setDupCierre(null); setJ(upd); setMode('view'); onChanged?.();
     } catch (e) {
-      alert(e.response?.data?.detail || 'No se pudo cerrar la jornada');
+      const d = e.response?.data?.detail;
+      if (e.response?.status === 409 && d && d.codigo === 'POSIBLE_DUPLICADA') {
+        setDupCierre(d); return;
+      }
+      alert(mensajeDeError(e, 'cerrar la jornada'));
     }
   }
   async function doAmarrar() {
@@ -217,25 +230,43 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
   // empresa equivalente: misma ficha, mismo NIT o nombre casi igual). Antes se
   // filtraba acá con igualdad literal y la copia de Agrosak del 16 de julio no
   // aparecía: la otra ficha era «Agrosac S.A.» y su fecha de fin estaba vacía.
-  async function startDuplicada() {
-    setForm({ con: '', confirmacion: '', motivo: '', acepto_cifras: false });
+  // `atendidos`: desde el aviso del cierre, la cifra que se iba a cerrar (aún
+  // sin guardar); con ella el servidor reconoce la misma pareja que el cierre.
+  async function startDuplicada(atendidos = null) {
+    setForm({ con: '', confirmacion: '', motivo: '', acepto: {}, empresa_de: null, atendidos });
     setDuplicados([]); setPlanFusion(null); setErrorFusion(''); setCargandoDup(true);
     setMode('duplicada');
     try {
-      setDuplicados(await apiDuplicadasDe(j.id));
+      setDuplicados(await apiDuplicadasDe(j.id, atendidos));
     } catch (e) {
-      setErrorFusion(e.response?.data?.detail || 'No se pudieron consultar las jornadas coincidentes');
+      setErrorFusion(mensajeDeError(e, 'consultar las jornadas coincidentes'));
     } finally { setCargandoDup(false); }
   }
 
   async function elegirDuplicada(con) {
-    setForm((f) => ({ ...f, con, confirmacion: '', acepto_cifras: false }));
+    const n = ++pedidoPlan.current;
+    setForm((f) => ({ ...f, con, confirmacion: '', acepto: {}, empresa_de: null }));
     setPlanFusion(null); setErrorFusion('');
     if (!con) return;
     try {
-      setPlanFusion(await apiPlanFusion(j.id, Number(con)));
+      const plan = await apiPlanFusion(j.id, Number(con), null, form.atendidos);
+      if (n === pedidoPlan.current) setPlanFusion(plan);
     } catch (e) {
-      setErrorFusion(e.response?.data?.detail || 'No se pudo preparar la fusión');
+      if (n === pedidoPlan.current) setErrorFusion(mensajeDeError(e, 'preparar la fusión'));
+    }
+  }
+
+  // Cuando las fichas no son la misma empresa, quien fusiona dice a cuál fue
+  // el equipo; el plan se vuelve a pedir para mostrar lo que va a quedar.
+  async function elegirEmpresaFusion(de) {
+    const n = ++pedidoPlan.current;
+    setForm((f) => ({ ...f, empresa_de: de }));
+    setErrorFusion('');
+    try {
+      const plan = await apiPlanFusion(j.id, Number(form.con), de, form.atendidos);
+      if (n === pedidoPlan.current) setPlanFusion(plan);
+    } catch (e) {
+      if (n === pedidoPlan.current) setErrorFusion(mensajeDeError(e, 'preparar la fusión'));
     }
   }
 
@@ -248,19 +279,24 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
     if ((form.motivo || '').trim().length < 20) {
       setErrorFusion('Describí el motivo (al menos 20 caracteres).'); return;
     }
-    if (planFusion.requiere_confirmar_cifras && !form.acepto_cifras) {
-      setErrorFusion('Las cifras no coinciden: marcá la casilla si de todos modos es la misma jornada.'); return;
+    if (form.empresa_de && planFusion.opciones_empresa && planFusion.empresa_de !== form.empresa_de) {
+      setErrorFusion('Esperá un momento: se está actualizando el plan con la empresa elegida.'); return;
+    }
+    const pedidas = planFusion.requiere_confirmar || [];
+    if (pedidas.some((k) => !form.acepto?.[k])) {
+      setErrorFusion('Marcá las casillas de confirmación: el plan avisa de diferencias entre las dos jornadas.'); return;
     }
     setGuardandoCorreccion(true); setErrorFusion('');
     try {
       const res = await apiFusionarJornadas(j.id, {
         con: Number(form.con), motivo: form.motivo.trim(), confirmacion: form.confirmacion.trim(),
-        acepto_cifras_distintas: !!form.acepto_cifras,
+        acepto: pedidas, empresa_de: planFusion.empresa_de || null,
+        atendidos: form.atendidos ?? null,
       });
       alert(`Listo: queda ${res.conservada_codigo} y se eliminó ${res.eliminada_codigo}.`);
       onChanged?.(); onClose();
     } catch (e) {
-      setErrorFusion(e.response?.data?.detail || 'No se pudo fusionar');
+      setErrorFusion(mensajeDeError(e, 'fusionar'));
     } finally { setGuardandoCorreccion(false); }
   }
 
@@ -286,7 +322,7 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
           </Field>
           <Field label="Sección">{j.seccion_responsable}</Field>
           <Field label="Modalidad">{j.modalidad}</Field>
-          <Field label="Ubicación">{[j.departamento, j.municipio, j.zona && `z. ${j.zona}`].filter(Boolean).join(' · ') || '—'}</Field>
+          <Field label="Ubicación">{[nombreDepartamento(j.departamento), j.municipio, j.zona && `z. ${j.zona}`].filter(Boolean).join(' · ') || '—'}</Field>
           <Field label="Tipo de ubicación">{j.es_departamental ? 'Departamental (fuera de la capital)' : 'Capital'}</Field>
           {j.requiere_dia_traslado_previo && !j.transporte_ida_salida && (
             <Field label="Traslado previo" className="col-span-2 text-cyan-700 dark:text-cyan-300 font-medium">
@@ -545,9 +581,25 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
             <textarea className="input" rows="2" placeholder="Notas del cierre (opcional)"
               value={form.notas ?? ''}
               onChange={(e) => setForm({ ...form, notas: e.target.value })} />
+            {dupCierre && (
+              <div className="rounded-lg border border-warning/60 bg-warning-soft/50 p-2 space-y-2 text-sm" role="alert">
+                <p className="font-semibold text-warning">Esta jornada parece ya contada</p>
+                <p className="text-fg">{dupCierre.mensaje}</p>
+                <div className="flex flex-wrap gap-2 justify-end">
+                  {berkin && j.seccion_responsable === 'SIPRESALUD' && (
+                    <button className="btn-secondary" onClick={() => { setDupCierre(null); startDuplicada(Number(form.atendidos)); }}>
+                      Fusionarla
+                    </button>
+                  )}
+                  <button className="btn-secondary" onClick={() => doClose(true)}>
+                    Fue otra jornada: cerrarla igual
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="flex gap-2 justify-end">
-              <button className="btn-secondary" onClick={() => setMode('view')}>Volver</button>
-              <button className="btn-primary" onClick={doClose}>Cerrar jornada</button>
+              <button className="btn-secondary" onClick={() => { setDupCierre(null); setMode('view'); }}>Volver</button>
+              <button className="btn-primary" onClick={() => doClose(false)}>Cerrar jornada</button>
             </div>
           </div>
         )}
@@ -609,7 +661,8 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
             <p className="text-xs text-fg-muted">
               Cuando la misma jornada quedó cargada dos veces, se fusionan: la que queda recibe
               el equipo, las charlas y los datos que solo tenía la otra, y la copia se elimina.
-              Si las dos fichas de empresa son la misma, también se unen.
+              Si las dos fichas de empresa son la misma, también se unen. No hace falta
+              cambiarle antes la empresa ni la fecha a ninguna: el plan lo resuelve.
             </p>
             <div><label className="label">La misma jornada que {j.codigo}</label>
               <select className="input" value={form.con || ''} disabled={cargandoDup}
@@ -617,7 +670,7 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
                 <option value="">{cargandoDup ? 'Buscando…' : '— Seleccioná la otra copia —'}</option>
                 {duplicados.map((o) => (
                   <option key={o.id} value={o.id} disabled={!!o.bloqueo}>
-                    {o.codigo} · {o.empresa_nombre} · {fmtN(o.atendidos)} atendidos
+                    {o.codigo} · {fmtFecha(o.fecha_inicio)} · {o.empresa_nombre} · {fmtN(o.atendidos)} atendidos
                     {o.analisis ? ` · análisis ${o.analisis}` : ''} · {o.coincidencia}
                     {o.bloqueo ? ' · no es duplicada' : ''}
                   </option>
@@ -625,7 +678,9 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
               </select>
               {!cargandoDup && duplicados.length === 0 && !errorFusion && (
                 <p className="text-xs text-fg-muted mt-1">
-                  No hay otra jornada del mismo día de esta empresa (ni de una ficha con el mismo NIT o un nombre casi igual).
+                  No hay otra jornada que pueda ser esta: de la misma empresa (o una ficha con el mismo
+                  NIT o un nombre casi igual) en los mismos días, o a pocos días con una sola de las dos
+                  con análisis, ni con la misma cifra ese día en otra empresa.
                 </p>
               )}
               {duplicados.filter((o) => o.bloqueo).map((o) => (
@@ -644,13 +699,35 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
                 {planFusion.avisos.map((a, k) => (
                   <p key={k} className="rounded bg-warning-soft text-warning p-2 text-xs">{a}</p>
                 ))}
-                {planFusion.requiere_confirmar_cifras && (
-                  <label className="flex items-start gap-2 text-xs">
-                    <input type="checkbox" checked={!!form.acepto_cifras}
-                      onChange={(e) => setForm({ ...form, acepto_cifras: e.target.checked })} />
-                    <span>Confirmo que es la misma jornada aunque las cifras no coincidan.</span>
-                  </label>
+                {planFusion.opciones_empresa && (
+                  <fieldset className="rounded border border-line-subtle p-2 text-xs space-y-1">
+                    <legend className="px-1 font-semibold">¿A qué empresa fue el equipo ese día?</legend>
+                    {planFusion.opciones_empresa.map((o) => (
+                      <label key={o.de} className="flex items-start gap-2">
+                        <input type="radio" name="empresa_de"
+                          checked={(form.empresa_de || planFusion.empresa_de) === o.de}
+                          onChange={() => elegirEmpresaFusion(o.de)} />
+                        <span>
+                          <b>{o.nombre}</b>{o.lugar ? ` · ${o.lugar}` : ''}
+                          <span className="text-fg-muted">
+                            {o.de === 'analisis' ? ' — la que dice el análisis' : ' — la que estaba programada'}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
                 )}
+                {(planFusion.requiere_confirmar || []).map((k) => (
+                  <label key={k} className="flex items-start gap-2 text-xs">
+                    <input type="checkbox" checked={!!form.acepto?.[k]}
+                      onChange={(e) => setForm({ ...form, acepto: { ...(form.acepto || {}), [k]: e.target.checked } })} />
+                    <span>{{
+                      cifras: 'Confirmo que es la misma jornada aunque los atendidos no coincidan.',
+                      fechas: 'Confirmo que es la misma jornada aunque la fecha no coincida.',
+                      empresas: 'Confirmo que es la misma jornada: ese día el equipo fue a una sola empresa.',
+                    }[k] || k}</span>
+                  </label>
+                ))}
               </div>
             )}
             {planFusion && (<>
@@ -685,7 +762,7 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
             {canWrite && berkin && j.estado === 'CERRADA' && j.seccion_responsable === 'SIPRESALUD' && (
               <>
                 <button className="btn-secondary" onClick={startCorreccion}>Corregir atendidos</button>
-                <button className="btn-danger" onClick={startDuplicada}>Fusionar duplicada</button>
+                <button className="btn-danger" onClick={() => startDuplicada()}>Fusionar duplicada</button>
               </>
             )}
             {puedeEditar && canWrite && (

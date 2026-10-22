@@ -5,6 +5,7 @@ import JornadaModal from '../components/JornadaModal';
 import JornadaFormModal from '../components/JornadaFormModal';
 import {
   SEMAFORO_DOT, TIPO_LABEL, ESTADO_LABEL, TIPOS_ACTIVIDAD_UI, fmtFecha, fmtN, fmtPct,
+  nombreDepartamento,
 } from '../utils/format';
 import { useDebounce } from '../hooks/useDebounce';
 import SearchInput from '../components/filters/SearchInput';
@@ -74,7 +75,7 @@ export default function Jornadas() {
                 <td className="p-2 whitespace-nowrap">{fmtFecha(j.fecha_inicio)}</td>
                 <td className="p-2">{TIPO_LABEL[j.tipo] || j.tipo}</td>
                 <td className="p-2">{j.empresa_nombre || '—'}</td>
-                <td className="p-2 text-fg-muted">{[j.departamento, j.municipio].filter(Boolean).join(', ')}</td>
+                <td className="p-2 text-fg-muted">{[nombreDepartamento(j.departamento), j.municipio].filter(Boolean).join(', ')}</td>
                 <td className="p-2 text-right">
                   {j.atendidos != null ? `${fmtN(j.atendidos)}/${fmtN(j.programados)} (${fmtPct(j.pct_asistencia)})`
                                        : `—/${fmtN(j.programados)}`}

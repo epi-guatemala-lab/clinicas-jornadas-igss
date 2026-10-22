@@ -1,6 +1,6 @@
 import { useThemedColors } from '../../theme/useThemedColors';
 import { mapSemaforoLegacy } from '../../utils/derived';
-import { fmtFecha } from '../../utils/format';
+import { fmtFecha, nombreDepartamento } from '../../utils/format';
 
 const TIPO_LABEL_SHORT = {
   SIPRESALUD_JORNADA: 'SIPRES',
@@ -56,7 +56,7 @@ export default function JornadaRow({ jornada, onClick, dense = false }) {
           </div>
           {(jornada.municipio || jornada.departamento) && (
             <div className="text-[10px] text-fg-subtle truncate">
-              {[jornada.municipio, jornada.departamento].filter(Boolean).join(', ')}
+              {[jornada.municipio, nombreDepartamento(jornada.departamento)].filter(Boolean).join(', ')}
             </div>
           )}
           {jornada.programados != null && (

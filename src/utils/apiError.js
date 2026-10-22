@@ -34,6 +34,11 @@ function detalle(e) {
     }).filter(Boolean);
     if (partes.length) return partes.join(' · ');
   }
+  // Los avisos con código (POSIBLE_DUPLICADA, EMPRESA_PARECIDA…) traen su
+  // texto en `mensaje`: es lo que tiene que leer la persona.
+  if (d && typeof d === 'object' && typeof d.mensaje === 'string' && d.mensaje.trim()) {
+    return d.mensaje.trim();
+  }
   // Un objeto suelto: preferible verlo serializado a un '[object Object]'.
   if (d && typeof d === 'object') {
     try { return JSON.stringify(d); } catch { return ''; }

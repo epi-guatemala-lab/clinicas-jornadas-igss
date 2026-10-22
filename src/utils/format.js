@@ -198,3 +198,20 @@ export const ESTADO_LABEL = {
   CANCELADA: 'Cancelada',
   REPROGRAMADA: 'Reprogramada',
 };
+
+// Departamentos: en la base va la clave del catálogo («SUCHITEPEQUEZ»); para
+// mostrar, el nombre con sus tildes. Lo que no está en el catálogo se muestra tal cual.
+const NOMBRES_DEPARTAMENTO = {
+  'ALTA VERAPAZ': 'Alta Verapaz', 'BAJA VERAPAZ': 'Baja Verapaz', CHIMALTENANGO: 'Chimaltenango',
+  CHIQUIMULA: 'Chiquimula', 'EL PROGRESO': 'El Progreso', ESCUINTLA: 'Escuintla',
+  GUATEMALA: 'Guatemala', HUEHUETENANGO: 'Huehuetenango', IZABAL: 'Izabal', JALAPA: 'Jalapa',
+  JUTIAPA: 'Jutiapa', PETEN: 'Petén', QUETZALTENANGO: 'Quetzaltenango', QUICHE: 'Quiché',
+  RETALHULEU: 'Retalhuleu', SACATEPEQUEZ: 'Sacatepéquez', 'SAN MARCOS': 'San Marcos',
+  'SANTA ROSA': 'Santa Rosa', SOLOLA: 'Sololá', SUCHITEPEQUEZ: 'Suchitepéquez',
+  TOTONICAPAN: 'Totonicapán', ZACAPA: 'Zacapa',
+};
+export function nombreDepartamento(v) {
+  if (!v) return '';
+  const clave = String(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+  return NOMBRES_DEPARTAMENTO[clave] || v;
+}

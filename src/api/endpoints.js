@@ -69,10 +69,14 @@ export const apiCorregirJornadaCerrada = (id, body) =>
 export const apiEliminarJornadaDuplicada = (id, body) =>
   api.post(`/api/admin/jornadas/${id}/eliminar-duplicada`, body).then((r) => r.data);
 // Duplicadas: candidatas (misma fecha y empresa equivalente), plan y fusión.
-export const apiDuplicadasDe = (id) =>
-  api.get(`/api/admin/jornadas/${id}/duplicadas`).then((r) => r.data.candidatas || []);
-export const apiPlanFusion = (id, con) =>
-  api.get(`/api/admin/jornadas/${id}/fusion`, { params: { con } }).then((r) => r.data);
+// `atendidos`: la cifra que se estaba por cerrar (desde el aviso del cierre).
+const conCifra = (params, atendidos) => (atendidos != null ? { ...params, atendidos } : params);
+export const apiDuplicadasDe = (id, atendidos = null) =>
+  api.get(`/api/admin/jornadas/${id}/duplicadas`, { params: conCifra({}, atendidos) })
+    .then((r) => r.data.candidatas || []);
+export const apiPlanFusion = (id, con, empresaDe = null, atendidos = null) =>
+  api.get(`/api/admin/jornadas/${id}/fusion`,
+    { params: conCifra(empresaDe ? { con, empresa_de: empresaDe } : { con }, atendidos) }).then((r) => r.data);
 export const apiFusionarJornadas = (id, body) =>
   api.post(`/api/admin/jornadas/${id}/fusionar`, body).then((r) => r.data);
 

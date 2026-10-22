@@ -21,6 +21,24 @@ const ENDPOINT_POR_ROL = {
 const MES_NOM = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio',
   'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
+function SubLabelAtendidos({ kpi }) {
+  const meta = !kpi.metaMes ? 'Sin meta definida'
+    : kpi.faltaMeta > 0 ? `Faltan ${fmtN(kpi.faltaMeta)}` : 'Meta cumplida';
+  const r = kpi.respaldo;
+  if (!r || !(r.sin_analisis > 0)) return meta;
+  const n = r.jornadas_sin_analisis;
+  const detalle = `${fmtN(r.con_analisis)} de jornadas con su análisis de datos y ${fmtN(r.sin_analisis)} de `
+    + `${n === 1 ? 'una jornada cerrada' : `${n} jornadas cerradas`} sin él`
+    + (r.codigos_sin_analisis?.length ? `: ${r.codigos_sin_analisis.join(', ')}` : '');
+  // Dos renglones: en uno solo la tarjeta lo cortaba («Meta cumplida · 290 sin…»).
+  return (
+    <span title={detalle}>
+      <span className="block truncate">{meta}</span>
+      <span className="block truncate text-warning">{fmtN(r.sin_analisis)} sin análisis de datos</span>
+    </span>
+  );
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const t = useThemedColors();
@@ -244,8 +262,11 @@ export default function Dashboard() {
             }}
             // Sin meta, "falta 0" no significa que se haya cumplido nada: no hay
             // contra qué comparar. Decirlo, en vez de felicitar por accidente.
-            subLabel={!kpi.metaMes ? 'Sin meta definida'
-              : kpi.faltaMeta > 0 ? `Faltan ${fmtN(kpi.faltaMeta)}` : 'Meta cumplida'}
+            // Si parte de lo atendido viene de jornadas cerradas SIN su análisis
+            // de datos, se dice al lado de la meta (y el detalle, al pasar el
+            // cursor): en julio de 2026 eran dos copias (290 de más) y el total
+            // no dejaba ver de dónde salía la diferencia.
+            subLabel={<SubLabelAtendidos kpi={kpi} />}
             icon={<UsersIcon />}
             compact
           />
@@ -562,6 +583,7 @@ function derivarKpis(data, serieDiaria) {
   const metaMes = serieDiaria?.meta_mes ?? kPac?.meta;
   const atendidos = serieDiaria?.acumulado_atendidos ?? kPac?.value;
   const faltaMeta = serieDiaria?.falta_para_meta;
+  const respaldo = serieDiaria?.respaldo || null;
 
   const pctMetaPrev = aux.pct_meta_mes_anterior;
   const pctMetaDelta = (pctMeta != null && pctMetaPrev != null && pctMetaPrev > 0)
@@ -573,7 +595,7 @@ function derivarKpis(data, serieDiaria) {
   const metricLabel = serieDiaria?.metric_label || 'Atendidos';
 
   return {
-    pctMeta, pctMetaDelta, metaMes, atendidos, faltaMeta, metricLabel,
+    pctMeta, pctMetaDelta, metaMes, atendidos, faltaMeta, metricLabel, respaldo,
     pctAsistencia,
     diasRestantes: aux.dias_restantes_mes,
     diasConsumidos: aux.dias_consumidos_mes,

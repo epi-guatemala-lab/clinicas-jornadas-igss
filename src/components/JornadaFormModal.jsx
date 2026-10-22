@@ -6,7 +6,7 @@ import {
 } from '../api/endpoints';
 import { useAuth } from '../hooks/useAuth';
 import { useApi } from '../hooks/useApi';
-import { fmtFecha, isoLocalDate, TIPOS_ACTIVIDAD_UI } from '../utils/format';
+import { fmtFecha, isoLocalDate, nombreDepartamento, TIPOS_ACTIVIDAD_UI } from '../utils/format';
 // Traductor ÚNICO de errores del backend (incluye el aplanado por campo de los
 // 422 de Pydantic). Este archivo tenía su propia copia con el mismo nombre y
 // semántica opuesta en el segundo argumento —texto por defecto acá, acción en
@@ -140,6 +140,16 @@ function charlasPayload(lista) {
 
 /** Firma comparable del set de charlas, para saber si la sección cambió. */
 const firmaCharlas = (lista) => JSON.stringify(charlasPayload(lista));
+// Lo que mueve la ventana de ocupación del equipo: los mismos campos que mira
+// `update_jornada` en el servidor para decidir si revisa la agenda de todos.
+// `trasladoPrevio` va aparte porque el servidor compara lo GUARDADO contra lo
+// que se envía, y lo que se envía es derivado (departamental + transporte).
+const firmaHorario = (f, trasladoPrevio) => JSON.stringify([
+  f.fecha_inicio || '', f.fecha_fin || '', f.hora_inicio || '', f.hora_fin || '',
+  !!f.odontologia, !!trasladoPrevio,
+  f.transporte_ida_salida || '', f.transporte_ida_llegada || '',
+  f.transporte_regreso_salida || '', f.transporte_regreso_llegada || '',
+]);
 
 /**
  * Formulario de jornada — CREA (jornada=null) o EDITA (jornada=objeto hidratado).
@@ -266,6 +276,32 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
     charlas: [],
   });
 
+  // Equipo y horario con los que se abrió la edición. El servidor solo revisa
+  // la agenda de las personas NUEVAS, o de todas si cambió el horario
+  // (`update_jornada`); esta pantalla revisaba siempre a todas y obligaba a
+  // quitar a quien ya estaba asignado para poder guardar cualquier otra cosa.
+  // Así JOR-2026-0150 perdió a su líder al cambiarle la empresa (22-oct-2026).
+  const alAbrir = useRef(null);
+  if (alAbrir.current === null) {
+    const ids = new Set((form.personal || []).map((p) => Number(p.personal_id)));
+    if (form.lider_personal_id) ids.add(Number(form.lider_personal_id));
+    alAbrir.current = { equipo: ids, horario: firmaHorario(form, form.requiere_dia_traslado_previo) };
+  }
+  // Cambio que el servidor detuvo porque contradice el análisis de la jornada
+  // (409 EMPRESA_DISTINTA_ANALISIS o FECHA_DISTINTA_ANALISIS): se muestra y se
+  // pide confirmar. Las confirmaciones se acumulan: si se cambian empresa y
+  // fecha, el servidor pregunta por una y después por la otra.
+  const [avisoAnalisis, setAvisoAnalisis] = useState(null);
+  const [confirmados, setConfirmados] = useState(() => new Set());
+  const confirmar = (codigo, si) => setConfirmados((prev) => {
+    const n = new Set(prev); if (si) n.add(codigo); else n.delete(codigo); return n;
+  });
+  // Al tocar el campo otra vez, lo confirmado deja de valer.
+  const olvidar = (codigo) => {
+    confirmar(codigo, false);
+    setAvisoAnalisis((a) => (a && a.codigo === codigo ? null : a));
+  };
+
   // Última fecha de inicio y de fin VÁLIDAS (ver `cambiarFecha`).
   const fechasValidas = useRef({
     ini: esFechaISO(form.fecha_inicio) ? form.fecha_inicio : null,
@@ -384,6 +420,14 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
     if (form.lider_personal_id) ids.add(Number(form.lider_personal_id));
     return [...ids].filter((id) => conflictosPorPersona.has(id));
   }, [form.personal, form.lider_personal_id, conflictosPorPersona]);
+  // Los que impiden guardar: en una edición sin cambio de horario, solo los
+  // recién agregados. Los que ya estaban se conservan y se avisan aparte.
+  const horarioCambio = !isEdit
+    || firmaHorario(form, form.es_departamental === true && traslado(form)) !== alAbrir.current.horario;
+  const ocupadosBloqueantes = ocupadosSeleccionados.filter(
+    (id) => horarioCambio || !alAbrir.current.equipo.has(Number(id)));
+  const ocupadosPrevios = ocupadosSeleccionados.filter(
+    (id) => !ocupadosBloqueantes.includes(id));
   const fechaEsFutura = !!form.fecha_inicio && form.fecha_inicio > isoLocalDate();
   function setField(k, v) { setForm((f) => ({ ...f, [k]: v })); }
 
@@ -394,6 +438,7 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
    * fallaba pidiendo corregir a mano los cuatro horarios.
    */
   function cambiarFecha(campo, valor) {
+    if (campo === 'fecha_inicio') olvidar('FECHA_DISTINTA_ANALISIS');
     // El corrimiento se mide contra la ÚLTIMA fecha válida, no contra la tecla
     // anterior: al escribir la fecha a mano el control pasa por valores vacíos
     // y por años como 0002 o 0020, y medir contra eso mandaba el transporte al
@@ -749,7 +794,7 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
       setErr('Esperá un momento: se está revisando la agenda del personal con los datos nuevos.');
       return;
     }
-    if (ocupadosSeleccionados.length > 0) {
+    if (ocupadosBloqueantes.length > 0) {
       setErr('Hay personal ocupado en una jornada o traslado para estas fechas. Quitalo o cambiá la programación.');
       return;
     }
@@ -761,6 +806,8 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
     // que propuso el sorteo. Le sirve al servidor para marcar esa corrida como
     // adoptada y anotar qué se cambió; es inocuo si la corrida ya no existe.
     if (sorteo?.corrida_id && hayPropuestos) base.sorteo_corrida_id = sorteo.corrida_id;
+    if (confirmados.has('EMPRESA_DISTINTA_ANALISIS')) base.confirmar_empresa_distinta = true;
+    if (confirmados.has('FECHA_DISTINTA_ANALISIS')) base.confirmar_fecha_distinta = true;
 
     const charlas = charlasPayload(form.charlas);
     try {
@@ -775,6 +822,11 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
       }
       onSaved?.();
     } catch (e2) {
+      const d = e2.response?.data?.detail;
+      if (e2.response?.status === 409 && d
+          && (d.codigo === 'EMPRESA_DISTINTA_ANALISIS' || d.codigo === 'FECHA_DISTINTA_ANALISIS')) {
+        setAvisoAnalisis(d); return;
+      }
       setErr(mensajeDeError(
         e2, isEdit ? 'guardar los cambios' : 'crear la actividad'));
     }
@@ -804,7 +856,7 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
                 </select></div>
               <div><label className="label">Empresa</label>
                 <SearchableSelect value={form.empresa_id || ''}
-                  onChange={(v) => setField('empresa_id', v ? Number(v) : null)}
+                  onChange={(v) => { setField('empresa_id', v ? Number(v) : null); olvidar('EMPRESA_DISTINTA_ANALISIS'); }}
                   placeholder="— Sin empresa (webinar/oficina) —"
                   options={empresas.map((e) => ({ value: e.id, label: e.nombre_legal }))} />
                 {posiblesDup.length > 0 && (
@@ -1154,7 +1206,7 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
                             className="w-full text-left rounded px-2 py-1 hover:bg-surface"
                             onClick={() => copiarEquipoDe(a.id)}>
                             <b>{a.codigo}</b> · {fmtFecha(a.fecha_fin || a.fecha_inicio)}
-                            {' · '}{a.empresa || a.municipio || a.departamento || 'sin lugar'}
+                            {' · '}{a.empresa || a.municipio || nombreDepartamento(a.departamento) || 'sin lugar'}
                             {' · '}{a.n_equipo === 1 ? '1 persona' : `${a.n_equipo} personas`}
                             {a.lider_nombre ? ` · lidera ${a.lider_nombre}` : ''}
                           </button>
@@ -1164,11 +1216,24 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
                   )}
                 </div>
               )}
-              {ocupadosSeleccionados.length > 0 && (
+              {ocupadosPrevios.length > 0 && (
+                <div className="mb-2 rounded-md border border-warning/40 bg-warning-soft p-2 text-xs text-warning">
+                  Ya estaban asignados a esta jornada y también figuran en otra esas fechas. Se conservan al guardar;
+                  revisalo solo si no es correcto.
+                  <ul className="mt-1 list-disc pl-4">
+                    {ocupadosPrevios.map((id) => (
+                      <li key={id}>
+                        <b>{personalPorId.get(Number(id))?.nombre_completo || `#${id}`}</b>: {razonOcupado(id)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {ocupadosBloqueantes.length > 0 && (
                 <div className="mb-2 rounded-md border border-danger/40 bg-danger-soft p-2 text-xs text-danger">
                   Hay personal seleccionado que ya está ocupado en estas fechas. Quitalo o cambiá la programación antes de guardar.
                   <ul className="mt-1 list-disc pl-4">
-                    {ocupadosSeleccionados.map((id) => (
+                    {ocupadosBloqueantes.map((id) => (
                       <li key={id}>
                         <b>{personalPorId.get(Number(id))?.nombre_completo || `#${id}`}</b>: {razonOcupado(id)}
                       </li>
@@ -1286,6 +1351,23 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
               </div>
             )}
 
+            {avisoAnalisis && (
+              <div className="rounded-md border border-warning/60 bg-warning-soft p-2 text-sm space-y-2" role="alert">
+                <p className="font-semibold text-warning">
+                  {avisoAnalisis.codigo === 'FECHA_DISTINTA_ANALISIS'
+                    ? 'La fecha no coincide con la del análisis'
+                    : 'La empresa no coincide con la del análisis'}
+                </p>
+                <p className="text-fg">{avisoAnalisis.mensaje}</p>
+                <label className="flex items-start gap-2 text-xs">
+                  <input type="checkbox" checked={confirmados.has(avisoAnalisis.codigo)}
+                    onChange={(e) => confirmar(avisoAnalisis.codigo, e.target.checked)} />
+                  <span>{avisoAnalisis.codigo === 'FECHA_DISTINTA_ANALISIS'
+                    ? 'El análisis tiene mal la fecha: cambiarla de todos modos.'
+                    : 'El análisis tiene mal el nombre: cambiar la empresa de todos modos.'} Después, «Guardar cambios».</span>
+                </label>
+              </div>
+            )}
             {err && <div className="bg-danger-soft text-danger p-2 rounded text-sm whitespace-pre-wrap">{err}</div>}
           </div>
           <div className="border-t border-line-subtle p-3 flex justify-end gap-2 bg-surface-elev">
