@@ -339,6 +339,11 @@ export default function JornadaModal({ jornadaId, onClose, onChanged }) {
               )}
             </Field>
           )}
+          {j.regresa_oficina && (
+            <Field label="Al terminar" className="col-span-2 text-cyan-700 dark:text-cyan-300 font-medium">
+              🏢 El equipo regresa a la oficina
+            </Field>
+          )}
           <Field label="Líder">{j.lider_nombre || '—'}</Field>
           <Field label="Afiliados proyectados">{fmtN(j.programados)}</Field>
           {/* Un solo renglón para el conteo del cierre: todas las personas

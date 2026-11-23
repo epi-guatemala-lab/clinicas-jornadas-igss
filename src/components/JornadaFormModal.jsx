@@ -228,6 +228,9 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
     direccion: jornada.direccion || '',
     es_departamental: !!jornada.es_departamental,
     requiere_dia_traslado_previo: !!jornada.requiere_dia_traslado_previo,
+    // Hidratarla es obligatorio: el PUT reemplaza la fila y, si arrancara
+    // apagada, la primera edición la borraba sin que nadie la tocara.
+    regresa_oficina: !!jornada.regresa_oficina,
     programados: jornada.programados ?? 0,
     aplica_kit_lab: !!jornada.aplica_kit_lab,
     tamizaje_vih: !!jornada.tamizaje_vih,
@@ -256,6 +259,7 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
     modalidad: 'PRESENCIAL',
     es_departamental: null, // se pregunta explícitamente; no asumir capital
     requiere_dia_traslado_previo: false,
+    regresa_oficina: false,
     fecha_inicio: isoLocalDate(),
     hora_fin: '',
     transporte_ida_salida: '',
@@ -1025,6 +1029,19 @@ export default function JornadaFormModal({ jornada = null, onClose, onSaved }) {
                     : <>. Ese día aparecerá en el calendario y el personal no podrá asignarse a otra actividad.</>}
                 </div>
               )}
+              {/* Logística del cierre de la actividad: coordinación necesita
+                  saber qué equipos vuelven a la oficina. Sale en la columna de
+                  observaciones de la programación impresa (PDF y Excel). */}
+              <label className="flex items-start gap-2 rounded-md border border-line bg-surface p-2.5 text-sm">
+                <input type="checkbox" className="mt-0.5" checked={!!form.regresa_oficina}
+                  onChange={(e) => setField('regresa_oficina', e.target.checked)} />
+                <span>
+                  <span className="block font-semibold">🏢 El equipo regresa a la oficina al terminar</span>
+                  <span className="block text-xs text-fg-muted">
+                    Se anota en las observaciones de la programación impresa.
+                  </span>
+                </span>
+              </label>
             </div>
 
             {/* Charlas de educación en salud — MÚLTIPLES, desde catálogo */}
