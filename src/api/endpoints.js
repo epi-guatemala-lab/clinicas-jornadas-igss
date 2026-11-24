@@ -263,7 +263,7 @@ const _subirEnUnPost = (fileObj, modo, opts) => {
   const url = opts.jornadaId
     ? `/api/jornadas/${opts.jornadaId}/carga-cierre?modo=${modo}${
       opts.confirmarEmpresa ? '&confirmar_empresa=true' : ''}`
-    : `/api/cargas?modo=${modo}`;
+    : `/api/cargas?modo=${modo}&tipo=${opts.tipo || 'MAESTRO'}`;
   return api.post(url, fd, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: SUBIDA_TIMEOUT_MS,
@@ -284,7 +284,7 @@ export const apiCrearCarga = async (fileObj, modo = 'PREVIEW', opts = {}) => {
 
   try {
     return await subirReanudable(fileObj, {
-      tipo: opts.jornadaId ? 'CIERRE_JORNADA' : 'MAESTRO',
+      tipo: opts.jornadaId ? 'CIERRE_JORNADA' : (opts.tipo || 'MAESTRO'),
       jornadaId: opts.jornadaId || null,
       modo,
       onProgreso: opts.onProgreso,
@@ -431,3 +431,26 @@ export const apiConfirmarEmpresaCierre = (jornadaId, cargaId) =>
   api.post(
     `/api/jornadas/${jornadaId}/carga-cierre/${cargaId}/confirmar-empresa`,
   ).then((r) => r.data);
+
+// ── Tamizajes sin jornada y unificación de empresas ──────────────────────
+
+export const apiTamizajesPendientes = () =>
+  api.get('/api/admin/tamizajes-pendientes').then((r) => r.data?.pendientes || []);
+
+export const apiEnlazarTamizaje = (codigo, body) =>
+  api.post(`/api/admin/tamizajes/${encodeURIComponent(codigo)}/enlazar`, body)
+    .then((r) => r.data);
+
+export const apiSugerenciasUnificacion = () =>
+  api.get('/api/empresas/unificacion/sugerencias').then((r) => r.data?.pares || []);
+
+export const apiPlanUnificacion = (conservarId, absorberId) =>
+  api.get(`/api/empresas/${conservarId}/unificacion`, { params: { absorber: absorberId } })
+    .then((r) => r.data);
+
+export const apiUnificarEmpresa = (conservarId, body) =>
+  api.post(`/api/empresas/${conservarId}/unificar`, body).then((r) => r.data);
+
+export const apiNoSonLaMisma = (empresaA, empresaB) =>
+  api.post('/api/empresas/unificacion/no-son-la-misma', { empresa_a: empresaA, empresa_b: empresaB })
+    .then((r) => r.data);

@@ -12,6 +12,7 @@ import BloqueosCarga from '../components/cargas/BloqueosCarga';
 import ConflictosCarga from '../components/cargas/ConflictosCarga';
 import HistorialCargas from '../components/cargas/HistorialCargas';
 import ProgresoSubida from '../components/cargas/ProgresoSubida';
+import TamizajesPendientes from '../components/cargas/TamizajesPendientes';
 
 const EXTENSIONES = ['.xlsx', '.xlsm'];
 // Un pelo por debajo de config.CARGA_MAX_MB (120) a propósito: el servidor
@@ -44,8 +45,14 @@ const LIMITE_MB = 119;   // config.CARGA_MAX_MB del backend es 120
  * veces era minuto y medio de espera regalado.
  */
 export default function Cargas() {
-  const { canWrite } = useAuth();
+  const { user, canWrite } = useAuth();
+  const esAdminEditor = user?.rol === 'admin' && canWrite;
   const [archivo, setArchivo] = useState(null);
+  // Qué tipo de carga se eligió antes de elegir el archivo: 'EPIDEMIOLOGIA' o 'MAESTRO'.
+  const [tipoCarga, setTipoCarga] = useState(null);
+  // Segunda confirmación para aplicar una carga completa.
+  const [entiendeCompleta, setEntiendeCompleta] = useState(false);
+  const [textoCompleta, setTextoCompleta] = useState('');
   const [cargaId, setCargaId] = useState(null);
   const [soloLectura, setSoloLectura] = useState(false);   // viendo una del historial
   const [pctSubida, setPctSubida] = useState(null);
@@ -80,6 +87,7 @@ export default function Cargas() {
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const limpiar = useCallback(() => {
+    setEntiendeCompleta(false); setTextoCompleta('');
     abortRef.current?.abort();
     abortRef.current = null;
     setArchivo(null); setCargaId(null); setSoloLectura(false);
@@ -87,6 +95,14 @@ export default function Cargas() {
     setReintento(null);
     if (inputRef.current) inputRef.current.value = '';
   }, []);
+
+  // Cada carga nueva exige su propia confirmación de carga completa.
+  useEffect(() => { setEntiendeCompleta(false); setTextoCompleta(''); }, [cargaId]);
+
+  function elegirTipo(t) {
+    if (cargaId && soloLectura) limpiar();   // salir de una carga del historial
+    setTipoCarga(t);
+  }
 
   function elegir(f) {
     setError(null); setCargaId(null); setSoloLectura(false); setPctSubida(null);
@@ -133,6 +149,7 @@ export default function Cargas() {
     abortRef.current = new AbortController();
     try {
       const r = await apiCrearCarga(archivo, 'PREVIEW', {
+        tipo: tipoCarga || 'MAESTRO',
         signal: abortRef.current.signal,
         onProgreso: setPctSubida,
         onEstado: setEstadoSubida,
@@ -153,6 +170,7 @@ export default function Cargas() {
 
   async function aplicar() {
     if (!cargaId) return;
+    if (exigeConfirmacionCompleta && !confirmacionCompletaOk) return;
     const ok = window.confirm(
       'Vas a aplicar la carga: los datos entran a la base y quedan visibles para todos.\n\n'
       + 'Mientras se aplica, el portal queda en solo lectura unos segundos: nadie más '
@@ -172,6 +190,7 @@ export default function Cargas() {
     abortRef.current = new AbortController();
     try {
       const r = await apiAplicarCarga(cargaId, archivo, {
+        tipo: tipoActual || 'MAESTRO',
         signal: abortRef.current.signal,
         // Solo si el servidor todavía no tiene la ruta que reusa el archivo.
         onReenvio: () => { setReenviando(true); setPctSubida(0); },
@@ -204,6 +223,9 @@ export default function Cargas() {
     setEstadoSubida(null);
   }
 
+  const tipoActual = carga?.tipo || tipoCarga;
+  const exigeConfirmacionCompleta = tipoActual === 'MAESTRO';
+  const confirmacionCompletaOk = entiendeCompleta && textoCompleta.trim() === 'CARGA COMPLETA';
   const enProceso = carga && !esFinal(carga.estado);
   const estadoBadge = carga ? (ESTADO_CARGA[carga.estado] || { texto: carga.estado, clase: 'badge-neutral' }) : null;
   const esPreview = carga?.modo === 'PREVIEW';
@@ -225,9 +247,10 @@ export default function Cargas() {
       <header className="space-y-1">
         <h1 className="text-2xl font-bold">Carga de datos</h1>
         <p className="text-sm text-fg-muted max-w-3xl">
-          Subí el Excel maestro <b>BASE_EPIDE</b> y el sistema actualiza todo de una sola vez:
-          epidemiología, jornadas, empresas, personal, viáticos y laboratorio. Primero vas a ver
-          una previsualización de lo que entraría; nada se guarda hasta que lo aplicás.
+          Subí el Excel maestro <b>BASE_EPIDE</b>. Lo habitual es cargar solo los datos
+          epidemiológicos; la carga completa también reescribe jornadas, empresas, personal y
+          viáticos. Primero vas a ver una previsualización de lo que entraría; nada se guarda hasta
+          que lo aplicás.
         </p>
       </header>
 
@@ -248,7 +271,47 @@ export default function Cargas() {
       {/* ── Paso 1: elegir el archivo (solo quien puede cargar) ────── */}
       {canWrite && (
         <section className="card p-4 space-y-3">
-          <h2 className="font-semibold text-fg">1. Elegí el archivo</h2>
+          <h2 className="font-semibold text-fg">1. Elegí qué vas a cargar</h2>
+          <div className="grid gap-3 md:grid-cols-[3fr_2fr]" role="radiogroup" aria-label="Tipo de carga">
+            <button type="button" role="radio" aria-checked={tipoCarga === 'EPIDEMIOLOGIA'}
+              disabled={enviando || enProceso || (Boolean(cargaId) && !soloLectura)}
+              onClick={() => elegirTipo('EPIDEMIOLOGIA')}
+              className={`text-left rounded-xl border-2 p-4 transition disabled:opacity-60 ${
+                tipoCarga === 'EPIDEMIOLOGIA' ? 'border-accent bg-accent-soft/40' : 'border-line hover:bg-surface-elev'}`}>
+              <div className="font-semibold text-fg">Cargar datos epidemiológicos</div>
+              <p className="text-xs text-fg-muted mt-1">
+                Solo tamizaje: personas, hallazgos, ficha de la persona y laboratorio. No cambia
+                empresas, jornadas, personal ni viáticos. Hojas obligatorias: BASE_PERSONAS y
+                BASE_HALLAZGOS.
+              </p>
+            </button>
+            <button type="button" role="radio" aria-checked={tipoCarga === 'MAESTRO'}
+              disabled={enviando || enProceso || (Boolean(cargaId) && !soloLectura)}
+              onClick={() => elegirTipo('MAESTRO')}
+              className={`text-left rounded-xl border-2 p-3 transition disabled:opacity-60 ${
+                tipoCarga === 'MAESTRO' ? 'border-warning bg-warning-soft/40' : 'border-warning/40 hover:bg-warning-soft/20'}`}>
+              <div className="text-sm font-semibold text-warning">Carga completa</div>
+              <p className="text-xs text-fg-muted mt-1">
+                También reescribe empresas, jornadas, personal y viáticos con lo que trae el Excel.
+                Úsala solo si el archivo está al día en todas sus hojas.
+              </p>
+            </button>
+          </div>
+
+          {!tipoCarga && (
+            <p className="text-xs text-fg-muted">Elegí una de las dos opciones para continuar.</p>
+          )}
+        </section>
+      )}
+
+      {canWrite && tipoCarga && (
+        <section className="card p-4 space-y-3">
+          <h2 className="font-semibold text-fg">
+            2. Elegí el archivo{' '}
+            <span className={tipoCarga === 'MAESTRO' ? 'badge-warning' : 'badge-info'}>
+              {tipoCarga === 'MAESTRO' ? 'Carga completa' : 'Datos epidemiológicos'}
+            </span>
+          </h2>
           <div className="flex flex-wrap items-center gap-3">
             {/* El botón nativo del navegador dice "Choose File" en inglés: se
                 oculta el input y se usa una etiqueta propia, en español. */}
@@ -321,10 +384,15 @@ export default function Cargas() {
         <section className="card p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-semibold text-fg">
-              {canWrite ? '2. ' : ''}Proceso {soloLectura ? `de la carga #${carga.id}` : 'en el servidor'}
+              {canWrite ? '3. ' : ''}Proceso {soloLectura ? `de la carga #${carga.id}` : 'en el servidor'}
             </h2>
             <div className="flex items-center gap-2 text-xs">
               {estadoBadge && <span className={estadoBadge.clase}>{estadoBadge.texto}</span>}
+              {tipoActual && (
+                <span className={tipoActual === 'MAESTRO' ? 'badge-warning' : 'badge-info'}>
+                  {etiquetaTipo(tipoActual)}
+                </span>
+              )}
               <span className="text-fg-subtle">carga #{carga.id}</span>
             </div>
           </div>
@@ -416,13 +484,35 @@ export default function Cargas() {
               {puedeAplicar && (
                 <div className="space-y-2 border-t border-line-subtle pt-3">
                   <div className="flex flex-wrap items-center gap-3">
-                    <button type="button" className="btn-primary" onClick={aplicar} disabled={enviando}>
+                    <button type="button" className="btn-primary" onClick={aplicar}
+                      disabled={enviando || (exigeConfirmacionCompleta && !confirmacionCompletaOk)}>
                       {enviando ? 'Aplicando…' : 'Aplicar la carga'}
                     </button>
                     <button type="button" className="btn-secondary" onClick={limpiar} disabled={enviando}>
                       Descartar
                     </button>
                   </div>
+                  {exigeConfirmacionCompleta && (
+                    <div className="rounded-lg border border-warning/50 bg-warning-soft/40 p-3 space-y-2 max-w-3xl">
+                      <p className="text-sm font-semibold text-warning">
+                        Carga completa: reescribe lo que el equipo actualizó a mano
+                      </p>
+                      <label className="flex items-start gap-2 text-sm text-fg">
+                        <input type="checkbox" className="mt-1" checked={entiendeCompleta}
+                          disabled={enviando}
+                          onChange={(e) => setEntiendeCompleta(e.target.checked)} />
+                        <span>Entiendo que esta carga reemplaza datos que el equipo actualizó a mano</span>
+                      </label>
+                      <div>
+                        <label className="label" htmlFor="texto-carga-completa">
+                          Para continuar, escribí <b>CARGA COMPLETA</b>
+                        </label>
+                        <input id="texto-carga-completa" className="input max-w-xs" autoComplete="off"
+                          value={textoCompleta} disabled={enviando}
+                          onChange={(e) => setTextoCompleta(e.target.value)} />
+                      </div>
+                    </div>
+                  )}
                   <p className="text-xs text-fg-muted max-w-3xl">
                     Se aplica con el archivo que ya subiste: no hay que volver a subirlo. Mientras
                     se aplica, el portal queda <b>en solo lectura</b> unos segundos —las demás
@@ -483,6 +573,11 @@ export default function Cargas() {
         </section>
       )}
 
+      {/* ── Tamizajes sin jornada (administración) ─────────────────── */}
+      {user?.rol === 'admin' && (
+        <TamizajesPendientes puedeEditar={esAdminEditor} recargarToken={tokenHistorial} />
+      )}
+
       {/* ── Historial ─────────────────────────────────────────────── */}
       <HistorialCargas
         recargarToken={tokenHistorial}
@@ -496,6 +591,12 @@ export default function Cargas() {
     </div>
   );
 }
+
+const etiquetaTipo = (t) => ({
+  EPIDEMIOLOGIA: 'Datos epidemiológicos',
+  MAESTRO: 'Carga completa',
+  CIERRE_JORNADA: 'Cierre de jornada',
+}[t] || t);
 
 /**
  * Qué pasó, mirando las DOS capas.

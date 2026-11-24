@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { fmtN } from '../../utils/format';
+import ResumenEpidemiologia from './ResumenEpidemiologia';
 import {
   SECCIONES_RESUMEN, defectosResumen, etiquetaDeClave, extrasResumen,
   listasResumen, renglonesDeSeccion, totalesResumen,
@@ -18,6 +19,13 @@ import {
  *    en español; el identificador interno solo aparece en el detalle técnico.
  */
 export default function ResumenCarga({ resumen, aplicado = false }) {
+  if (resumen?.tipo === 'EPIDEMIOLOGIA') {
+    return <ResumenEpidemiologia resumen={resumen} aplicado={aplicado} />;
+  }
+  return <ResumenMaestro resumen={resumen} aplicado={aplicado} />;
+}
+
+function ResumenMaestro({ resumen, aplicado = false }) {
   const [verDetalle, setVerDetalle] = useState(false);
   if (!resumen) return null;
 

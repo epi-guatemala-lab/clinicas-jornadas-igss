@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 import { fmtN, fmtFecha, isoLocalDate } from '../utils/format';
 import { mensajeDeError } from '../utils/apiError';
 import Modal from '../components/forms/Modal';
+import UnificarEmpresasModal from '../components/empresas/UnificarEmpresasModal';
 import Field from '../components/forms/Field';
 import GeoSelects from '../components/forms/GeoSelects';
 import MiniChartCard from '../components/cards/MiniChartCard';
@@ -26,6 +27,7 @@ export default function Empresas() {
   const [creating, setCreating] = useState(false);
   const [inaugurando, setInaugurando] = useState(null);
   const [convenioDe, setConvenioDe] = useState(null);
+  const [unificando, setUnificando] = useState(false);
   const [q, setQ] = useState('');
   const dq = useDebounce(q, 300);
 
@@ -46,9 +48,14 @@ export default function Empresas() {
     <div className="space-y-4">
       <div className="flex justify-between items-center flex-wrap gap-2">
         <h1 className="text-xl font-bold text-fg">Empresas</h1>
-        {canEdit && !esHistorico && (
-          <button className="btn-primary" onClick={() => setCreating(true)}>+ Nueva empresa</button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {user?.rol === 'admin' && canWrite && (
+            <button className="btn-secondary" onClick={() => setUnificando(true)}>Unificar empresas</button>
+          )}
+          {canEdit && !esHistorico && (
+            <button className="btn-primary" onClick={() => setCreating(true)}>+ Nueva empresa</button>
+          )}
+        </div>
       </div>
 
       {/* Tabs: pendientes de inauguración vs histórico (ya con clínica) */}
@@ -132,6 +139,7 @@ export default function Empresas() {
         </div>
       </MiniChartCard>
 
+      {unificando && <UnificarEmpresasModal open onClose={() => setUnificando(false)} onUnificada={reload} />}
       {creating && <EmpresaForm onClose={() => setCreating(false)} onSave={() => { setCreating(false); reload(); }} />}
       {editing && <EmpresaForm initial={editing} onClose={() => setEditing(null)} onSave={() => { setEditing(null); reload(); }} />}
       {inaugurando && <InauguracionForm empresa={inaugurando} onClose={() => setInaugurando(null)} onSave={() => { setInaugurando(null); reload(); }} />}
